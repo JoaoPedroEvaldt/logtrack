@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>LogTrack — Ocorrências</title>
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+<body class="dashboard-page">
+
+  <button class="btn-menu-mobile" onclick="toggleMenu()">☰</button>
+  <div class="sidebar-overlay" onclick="fecharMenu()"></div>
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <span>🚛</span>
+      <h2>LogTrack</h2>
+      <p>Gestão Operacional</p>
+    </div>
+    <nav class="sidebar-menu">
+      <a class="menu-item" href="dashboard.html"><span class="icon">📊</span> Dashboard</a>
+      <a class="menu-item" href="entregas.html"><span class="icon">📦</span> Entregas</a>
+      <a class="menu-item" href="motoristas.html"><span class="icon">👤</span> Motoristas</a>
+      <a class="menu-item" href="veiculos.html"><span class="icon">🚛</span> Veículos</a>
+      <a class="menu-item active" href="ocorrencias.html"><span class="icon">⚠️</span> Ocorrências</a>
+      <a class="menu-item" href="relatorios.html"><span class="icon">📈</span> Relatórios</a>
+      <a class="menu-item" href="conjuntos.html"><span class="icon">🔗</span> Conjuntos</a>
+    </nav>
+    <div class="sidebar-user">
+      <button class="btn-tema" id="btn-tema" onclick="alternarTema()">🌙 Tema Escuro</button>
+      <p>Logado como</p>
+      <strong id="usuario-perfil"></strong>
+      <button class="btn-logout" onclick="logout()">Sair</button>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+      <div>
+        <h1>Ocorrências</h1>
+        <p>Acompanhe todas as ocorrências registradas</p>
+      </div>
+      <button class="btn btn-primary" onclick="abrirModal()">+ Nova Ocorrência</button>
+    </div>
+
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Entrega</th>
+            <th>Tipo</th>
+            <th>Descrição</th>
+            <th>Data</th>
+          </tr>
+        </thead>
+        <tbody id="tabela-ocorrencias">
+          <tr><td colspan="5" style="text-align:center;color:#888;">Carregando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <div class="modal-overlay" id="modal">
+    <div class="modal" style="max-width:480px;">
+      <div class="modal-header">
+        <h2>Nova Ocorrência</h2>
+        <button class="btn-fechar" onclick="fecharModal()">✕</button>
+      </div>
+      <div class="form-grid">
+        <div class="form-group"><label>ID da Entrega *</label><input type="number" id="entrega-id" placeholder="Ex: 1" /></div>
+        <div class="form-group">
+          <label>Tipo *</label>
+          <select id="tipo">
+            <option value="">Selecionar</option>
+            <option value="atraso">Atraso</option>
+            <option value="acidente">Acidente</option>
+            <option value="cliente_ausente">Cliente Ausente</option>
+            <option value="problema_mecanico">Problema Mecânico</option>
+            <option value="extravio">Extravio</option>
+            <option value="outro">Outro</option>
+          </select>
+        </div>
+        <div class="form-group" style="grid-column:span 2;">
+          <label>Descrição *</label>
+          <textarea id="descricao" rows="4" placeholder="Descreva a ocorrência..." style="resize:vertical;"></textarea>
+        </div>
+      </div>
+      <div style="margin-top:24px;display:flex;gap:12px;justify-content:flex-end;">
+        <button class="btn btn-outline" onclick="fecharModal()">Cancelar</button>
+        <button class="btn btn-primary" onclick="salvarOcorrencia()">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/ocorrencias.js"></script>
+</body>
+</html>

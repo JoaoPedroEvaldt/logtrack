@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>LogTrack — Login</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="login-page">
+
+  <div class="login-container">
+    <div class="login-box">
+
+      <div class="login-logo">
+        <span class="logo-icon">🚛</span>
+        <h1>LogTrack</h1>
+        <p>Sistema de Gestão Operacional</p>
+      </div>
+
+      <div id="erro-msg" class="erro-msg" style="display:none;"></div>
+
+      <form id="form-login">
+        <div class="input-group">
+          <label>E-mail</label>
+          <input type="email" id="email" placeholder="seu@email.com" required />
+        </div>
+        <div class="input-group">
+          <label>Senha</label>
+          <input type="password" id="senha" placeholder="••••••••" required />
+        </div>
+        <button type="submit" class="btn-login" id="btn-login">
+          Entrar
+        </button>
+      </form>
+
+    </div>
+    <div class="login-footer">
+      © 2025 LogTrack — Todos os direitos reservados
+    </div>
+  </div>
+
+  <script src="js/login.js"></script>
+</body>
+</html>

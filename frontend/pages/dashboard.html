@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>LogTrack — Dashboard</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="dashboard-page">
+
+  <button class="btn-menu-mobile" onclick="toggleMenu()">☰</button>
+  <div class="sidebar-overlay" onclick="fecharMenu()"></div>
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <span>🚛</span>
+      <h2>LogTrack</h2>
+      <p>Gestão Operacional</p>
+    </div>
+    <nav class="sidebar-menu">
+      <a class="menu-item active" href="dashboard.html"><span class="icon">📊</span> Dashboard</a>
+      <a class="menu-item" href="entregas.html"><span class="icon">📦</span> Entregas</a>
+      <a class="menu-item" href="motoristas.html"><span class="icon">👤</span> Motoristas</a>
+      <a class="menu-item" href="veiculos.html"><span class="icon">🚛</span> Veículos</a>
+      <a class="menu-item" href="ocorrencias.html"><span class="icon">⚠️</span> Ocorrências</a>
+      <a class="menu-item" href="relatorios.html"><span class="icon">📈</span> Relatórios</a>
+      <a class="menu-item" href="conjuntos.html"><span class="icon">🔗</span> Conjuntos</a>
+    </nav>
+    <div class="sidebar-user">
+      <button class="btn-tema" id="btn-tema" onclick="alternarTema()">🌙 Tema Escuro</button>
+      <p>Logado como</p>
+      <strong id="usuario-perfil">Administrador</strong>
+      <button class="btn-logout" onclick="logout()">Sair</button>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+      <div>
+        <h1>Painel Operacional</h1>
+        <p id="data-hoje"></p>
+      </div>
+    </div>
+
+    <div class="cards-grid">
+      <div class="card azul">
+        <div class="card-icon">📦</div>
+        <div class="card-valor" id="entregas-hoje">—</div>
+        <div class="card-label">Entregas hoje</div>
+      </div>
+      <div class="card verde">
+        <div class="card-icon">✅</div>
+        <div class="card-valor" id="concluidas-hoje">—</div>
+        <div class="card-label">Concluídas hoje</div>
+      </div>
+      <div class="card laranja">
+        <div class="card-icon">🚛</div>
+        <div class="card-valor" id="em-rota">—</div>
+        <div class="card-label">Em rota agora</div>
+      </div>
+      <div class="card vermelho">
+        <div class="card-icon">⏰</div>
+        <div class="card-valor" id="atrasadas">—</div>
+        <div class="card-label">Atrasadas</div>
+      </div>
+      <div class="card laranja">
+        <div class="card-icon">⚠️</div>
+        <div class="card-valor" id="ocorrencias">—</div>
+        <div class="card-label">Ocorrências hoje</div>
+      </div>
+      <div class="card verde">
+        <div class="card-icon">🚗</div>
+        <div class="card-valor" id="veiculos">—</div>
+        <div class="card-label">Veículos disponíveis</div>
+      </div>
+    </div>
+
+    <div class="charts-grid">
+      <div class="chart-card">
+        <h3>Entregas por Status</h3>
+        <canvas id="grafico-status"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Entregas por Dia</h3>
+        <canvas id="grafico-dias"></canvas>
+      </div>
+    </div>
+
+    <div class="table-container">
+      <div class="table-header">
+        <h2>Entregas Recentes</h2>
+        <a href="entregas.html" class="btn btn-outline">Ver todas</a>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Cliente</th>
+            <th>Origem</th>
+            <th>Destino</th>
+            <th>Status</th>
+            <th>Previsão</th>
+          </tr>
+        </thead>
+        <tbody id="tabela-entregas">
+          <tr><td colspan="6" style="text-align:center;color:#888;">Carregando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/dashboard.js"></script>
+</body>
+</html>

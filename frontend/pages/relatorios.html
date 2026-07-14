@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>LogTrack — Relatórios</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body class="dashboard-page">
+
+  <button class="btn-menu-mobile" onclick="toggleMenu()">☰</button>
+  <div class="sidebar-overlay" onclick="fecharMenu()"></div>
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <span>🚛</span>
+      <h2>LogTrack</h2>
+      <p>Gestão Operacional</p>
+    </div>
+    <nav class="sidebar-menu">
+      <a class="menu-item" href="dashboard.html"><span class="icon">📊</span> Dashboard</a>
+      <a class="menu-item" href="entregas.html"><span class="icon">📦</span> Entregas</a>
+      <a class="menu-item" href="motoristas.html"><span class="icon">👤</span> Motoristas</a>
+      <a class="menu-item" href="veiculos.html"><span class="icon">🚛</span> Veículos</a>
+      <a class="menu-item" href="ocorrencias.html"><span class="icon">⚠️</span> Ocorrências</a>
+      <a class="menu-item active" href="relatorios.html"><span class="icon">📈</span> Relatórios</a>
+      <a class="menu-item" href="conjuntos.html"><span class="icon">🔗</span> Conjuntos</a>
+    </nav>
+    <div class="sidebar-user">
+      <button class="btn-tema" id="btn-tema" onclick="alternarTema()">🌙 Tema Escuro</button>
+      <p>Logado como</p>
+      <strong id="usuario-perfil"></strong>
+      <button class="btn-logout" onclick="logout()">Sair</button>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+      <div>
+        <h1>Relatórios</h1>
+        <p>Gere e exporte relatórios operacionais</p>
+      </div>
+      <button class="btn btn-primary" onclick="exportarPDF()">⬇ Exportar PDF</button>
+    </div>
+
+    <!-- FILTROS -->
+    <div class="filtros">
+      <div class="form-group">
+        <label style="font-size:12px;color:var(--text-light);">Data início</label>
+        <input type="date" id="data-inicio" />
+      </div>
+      <div class="form-group">
+        <label style="font-size:12px;color:var(--text-light);">Data fim</label>
+        <input type="date" id="data-fim" />
+      </div>
+      <div class="form-group">
+        <label style="font-size:12px;color:var(--text-light);">Status</label>
+        <select id="filtro-status">
+          <option value="">Todos</option>
+          <option value="aguardando">Aguardando</option>
+          <option value="em_rota">Em Rota</option>
+          <option value="entregue">Entregue</option>
+          <option value="atrasado">Atrasado</option>
+          <option value="ocorrencia">Ocorrência</option>
+          <option value="cancelado">Cancelado</option>
+        </select>
+      </div>
+      <div style="display:flex;align-items:flex-end;">
+        <button class="btn btn-primary" onclick="filtrar()">Filtrar</button>
+      </div>
+    </div>
+
+    <!-- CARDS RESUMO -->
+    <div class="cards-grid" id="cards-resumo">
+      <div class="card azul">
+        <div class="card-icon">📦</div>
+        <div class="card-valor" id="total-entregas">—</div>
+        <div class="card-label">Total de entregas</div>
+      </div>
+      <div class="card verde">
+        <div class="card-icon">✅</div>
+        <div class="card-valor" id="total-entregues">—</div>
+        <div class="card-label">Entregues</div>
+      </div>
+      <div class="card vermelho">
+        <div class="card-icon">⏰</div>
+        <div class="card-valor" id="total-atrasadas">—</div>
+        <div class="card-label">Atrasadas</div>
+      </div>
+      <div class="card laranja">
+        <div class="card-icon">⚠️</div>
+        <div class="card-valor" id="total-ocorrencias">—</div>
+        <div class="card-label">Com ocorrência</div>
+      </div>
+    </div>
+
+    <!-- GRÁFICO -->
+    <div class="charts-grid">
+      <div class="chart-card">
+        <h3>Entregas por Status</h3>
+        <canvas id="grafico-status"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Desempenho por Motorista</h3>
+        <canvas id="grafico-motoristas"></canvas>
+      </div>
+    </div>
+
+    <!-- TABELA -->
+    <div class="table-container">
+      <div class="table-header">
+        <h2>Listagem de Entregas</h2>
+        <span id="total-label" style="font-size:13px;color:var(--text-light);"></span>
+      </div>
+      <table id="tabela-relatorio">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Cliente</th>
+            <th>Origem</th>
+            <th>Destino</th>
+            <th>Status</th>
+            <th>Previsão</th>
+            <th>Concluído em</th>
+          </tr>
+        </thead>
+        <tbody id="tabela-body">
+          <tr><td colspan="7" style="text-align:center;color:#888;">Carregando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/relatorios.js"></script>
+</body>
+</html>

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>LogTrack — Veículos</title>
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+<body class="dashboard-page">
+
+  <button class="btn-menu-mobile" onclick="toggleMenu()">☰</button>
+  <div class="sidebar-overlay" onclick="fecharMenu()"></div>
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <span>🚛</span>
+      <h2>LogTrack</h2>
+      <p>Gestão Operacional</p>
+    </div>
+    <nav class="sidebar-menu">
+      <a class="menu-item" href="dashboard.html"><span class="icon">📊</span> Dashboard</a>
+      <a class="menu-item" href="entregas.html"><span class="icon">📦</span> Entregas</a>
+      <a class="menu-item" href="motoristas.html"><span class="icon">👤</span> Motoristas</a>
+      <a class="menu-item active" href="veiculos.html"><span class="icon">🚛</span> Veículos</a>
+      <a class="menu-item" href="conjuntos.html"><span class="icon">🔗</span> Conjuntos</a>
+      <a class="menu-item" href="ocorrencias.html"><span class="icon">⚠️</span> Ocorrências</a>
+      <a class="menu-item" href="relatorios.html"><span class="icon">📈</span> Relatórios</a>
+    </nav>
+    <div class="sidebar-user">
+      <button class="btn-tema" id="btn-tema" onclick="alternarTema()">🌙 Tema Escuro</button>
+      <p>Logado como</p>
+      <strong id="usuario-perfil"></strong>
+      <button class="btn-logout" onclick="logout()">Sair</button>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+      <div>
+        <h1>Veículos</h1>
+        <p>Gerencie a frota de veículos</p>
+      </div>
+      <button class="btn btn-primary" onclick="abrirModal()">+ Novo Veículo</button>
+    </div>
+
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Placa</th>
+            <th>Modelo</th>
+            <th>Marca</th>
+            <th>Ano</th>
+            <th>Tipo</th>
+            <th>Subtipo</th>
+            <th>Eixos</th>
+            <th>Capacidade</th>
+            <th>Status</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="tabela-veiculos">
+          <tr><td colspan="11" style="text-align:center;color:#888;">Carregando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <div class="modal-overlay" id="modal">
+    <div class="modal" style="max-width:640px;">
+      <div class="modal-header">
+        <h2 id="modal-titulo">Novo Veículo</h2>
+        <button class="btn-fechar" onclick="fecharModal()">✕</button>
+      </div>
+      <div class="form-grid">
+        <div class="form-group"><label>Placa *</label><input type="text" id="placa" placeholder="ABC-1234" /></div>
+        <div class="form-group"><label>Marca *</label><input type="text" id="marca" placeholder="Ex: Scania, Volvo, Randon" /></div>
+        <div class="form-group"><label>Modelo *</label><input type="text" id="modelo" placeholder="Ex: R450, FH, SR" /></div>
+        <div class="form-group"><label>Ano *</label><input type="number" id="ano" placeholder="2023" /></div>
+
+        <div class="form-group">
+          <label>Categoria *</label>
+          <select id="tipo" onchange="atualizarSubtipo()">
+            <option value="">Selecionar</option>
+            <option value="cavalo">🚛 Cavalo Mecânico</option>
+            <option value="semirreboque">🚌 Semirreboque</option>
+            <option value="van">🚐 Van / Furgão</option>
+            <option value="utilitario">🚙 Utilitário</option>
+            <option value="moto">🏍️ Moto</option>
+          </select>
+        </div>
+
+        <div class="form-group" id="grupo-subtipo" style="display:none;">
+          <label>Tipo de Semirreboque *</label>
+          <select id="subtipo">
+            <option value="">Selecionar</option>
+            <option value="sider">Sider</option>
+            <option value="bau">Baú</option>
+            <option value="bau_frigorifico">Baú Frigorífico</option>
+            <option value="graneleiro">Graneleiro</option>
+            <option value="cacamba">Caçamba</option>
+            <option value="tampa_baixa">Tampa Baixa</option>
+            <option value="porta_container">Porta Container</option>
+            <option value="tanque">Tanque</option>
+            <option value="florestal">Florestal</option>
+            <option value="lowboy">Lowboy</option>
+            <option value="plataforma">Plataforma</option>
+          </select>
+        </div>
+
+        <div class="form-group" id="grupo-eixos" style="display:none;">
+          <label>Quantidade de Eixos *</label>
+          <select id="eixos" onchange="atualizarTipoEixo()">
+            <option value="">Selecionar</option>
+            <option value="1">1 Eixo</option>
+            <option value="2">2 Eixos</option>
+            <option value="3">3 Eixos</option>
+            <option value="4">4 Eixos</option>
+            <option value="5">5 Eixos</option>
+          </select>
+        </div>
+
+        <div class="form-group" id="grupo-tipo-eixo" style="display:none;">
+          <label>Tipo de Suspensão (3 eixos)</label>
+          <select id="tipo-eixo">
+            <option value="">Selecionar</option>
+            <option value="ls">LS (Lâmina)</option>
+            <option value="vanderleia">Vanderleia (Ar)</option>
+          </select>
+        </div>
+
+        <div class="form-group"><label>Capacidade (kg) *</label><input type="number" id="capacidade" placeholder="Ex: 30000" step="0.01" /></div>
+        <div class="form-group"><label>Cor</label><input type="text" id="cor" placeholder="Ex: Branco, Vermelho" /></div>
+        <div class="form-group"><label>Validade CRLV</label><input type="date" id="crlv-validade" /></div>
+        <div class="form-group"><label>Validade Seguro</label><input type="date" id="seguro-validade" /></div>
+      </div>
+      <div style="margin-top:24px;display:flex;gap:12px;justify-content:flex-end;">
+        <button class="btn btn-outline" onclick="fecharModal()">Cancelar</button>
+        <button class="btn btn-primary" onclick="salvarVeiculo()">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/veiculos.js"></script>
+</body>
+</html>
