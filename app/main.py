@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import auth, usuarios, motoristas, veiculos, entregas, ocorrencias, dashboard
 from app.routers import conjunto as conjuntos_router
+from app.routers import manutencao as manutencoes
 
 app = FastAPI(
     title="LogTrack API",
@@ -25,6 +26,7 @@ app.include_router(entregas.router)
 app.include_router(ocorrencias.router)
 app.include_router(dashboard.router)
 app.include_router(conjuntos_router.router)
+app.include_router(manutencoes.router)
 
 @app.get("/")
 def root():

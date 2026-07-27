@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>LogTrack — Manutenções</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body class="dashboard-page">
+
+  <button class="btn-menu-mobile" onclick="toggleMenu()">☰</button>
+  <div class="sidebar-overlay" onclick="fecharMenu()"></div>
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <span>🚛</span>
+      <h2>LogTrack</h2>
+      <p>Gestão Operacional</p>
+    </div>
+    <nav class="sidebar-menu">
+      <a class="menu-item" href="dashboard.html"><span class="icon">📊</span> Dashboard</a>
+      <a class="menu-item" href="entregas.html"><span class="icon">📦</span> Entregas</a>
+      <a class="menu-item" href="motoristas.html"><span class="icon">👤</span> Motoristas</a>
+      <a class="menu-item" href="veiculos.html"><span class="icon">🚛</span> Veículos</a>
+      <a class="menu-item" href="conjuntos.html"><span class="icon">🔗</span> Conjuntos</a>
+      <a class="menu-item active" href="manutencoes.html"><span class="icon">🔧</span> Manutenções</a>
+      <a class="menu-item" href="ocorrencias.html"><span class="icon">⚠️</span> Ocorrências</a>
+      <a class="menu-item" href="relatorios.html"><span class="icon">📈</span> Relatórios</a>
+    </nav>
+    <div class="sidebar-user">
+      <button class="btn-tema" id="btn-tema" onclick="alternarTema()">🌙 Tema Escuro</button>
+      <p>Logado como</p>
+      <strong id="usuario-perfil"></strong>
+      <button class="btn-logout" onclick="logout()">Sair</button>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+      <div>
+        <h1>Manutenções</h1>
+        <p>Gerencie o histórico de manutenções da frota</p>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-outline" onclick="exportarPDF()">⬇ Exportar PDF</button>
+        <button class="btn btn-primary" onclick="abrirModal()">+ Nova Manutenção</button>
+      </div>
+    </div>
+
+    <!-- CARDS RESUMO -->
+    <div class="cards-grid" style="margin-bottom:24px;">
+      <div class="card azul">
+        <div class="card-icon">🔧</div>
+        <div class="card-valor" id="total-manutencoes">—</div>
+        <div class="card-label">Total de manutenções</div>
+      </div>
+      <div class="card verde">
+        <div class="card-icon">✅</div>
+        <div class="card-valor" id="total-concluidas">—</div>
+        <div class="card-label">Concluídas</div>
+      </div>
+      <div class="card laranja">
+        <div class="card-icon">⏳</div>
+        <div class="card-valor" id="total-andamento">—</div>
+        <div class="card-label">Em andamento</div>
+      </div>
+      <div class="card vermelho">
+        <div class="card-icon">📅</div>
+        <div class="card-valor" id="total-agendadas">—</div>
+        <div class="card-label">Agendadas</div>
+      </div>
+    </div>
+
+    <!-- FILTROS -->
+    <div class="filtros">
+      <select id="filtro-tipo" onchange="filtrar()">
+        <option value="">Todos os tipos</option>
+        <option value="preventiva">Preventiva</option>
+        <option value="corretiva">Corretiva</option>
+        <option value="revisao">Revisão</option>
+        <option value="pneus">Pneus</option>
+        <option value="eletrica">Elétrica</option>
+        <option value="freios">Freios</option>
+        <option value="outro">Outro</option>
+      </select>
+      <select id="filtro-status" onchange="filtrar()">
+        <option value="">Todos os status</option>
+        <option value="agendada">Agendada</option>
+        <option value="em_andamento">Em andamento</option>
+        <option value="concluida">Concluída</option>
+      </select>
+      <input type="text" id="filtro-veiculo" placeholder="Buscar por veículo..." onkeyup="filtrar()" style="min-width:200px;" />
+    </div>
+
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Veículo</th>
+            <th>Data</th>
+            <th>Tipo</th>
+            <th>Descrição</th>
+            <th>Mecânico</th>
+            <th>KM</th>
+            <th>Custo</th>
+            <th>Status</th>
+            <th>Próx. Revisão</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="tabela-manutencoes">
+          <tr><td colspan="11" style="text-align:center;color:#888;">Carregando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <!-- MODAL -->
+  <div class="modal-overlay" id="modal">
+    <div class="modal" style="max-width:640px;">
+      <div class="modal-header">
+        <h2 id="modal-titulo">Nova Manutenção</h2>
+        <button class="btn-fechar" onclick="fecharModal()">✕</button>
+      </div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Veículo *</label>
+          <select id="veiculo-id">
+            <option value="">Selecionar veículo</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Data *</label>
+          <input type="date" id="data-manutencao" />
+        </div>
+        <div class="form-group">
+          <label>Tipo *</label>
+          <select id="tipo">
+            <option value="">Selecionar</option>
+            <option value="preventiva">Preventiva</option>
+            <option value="corretiva">Corretiva</option>
+            <option value="revisao">Revisão</option>
+            <option value="pneus">Pneus</option>
+            <option value="eletrica">Elétrica</option>
+            <option value="freios">Freios</option>
+            <option value="outro">Outro</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select id="status">
+            <option value="concluida">Concluída</option>
+            <option value="em_andamento">Em andamento</option>
+            <option value="agendada">Agendada</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Mecânico</label>
+          <input type="text" id="mecanico" placeholder="Nome do mecânico" />
+        </div>
+        <div class="form-group">
+          <label>Quilometragem</label>
+          <input type="number" id="quilometragem" placeholder="Ex: 150000" />
+        </div>
+        <div class="form-group">
+          <label>Custo (R$)</label>
+          <input type="number" id="custo" placeholder="0.00" step="0.01" />
+        </div>
+        <div class="form-group">
+          <label>Próxima revisão</label>
+          <input type="date" id="proxima-revisao" />
+        </div>
+        <div class="form-group" style="grid-column:span 2;">
+          <label>Descrição *</label>
+          <textarea id="descricao" rows="3" placeholder="Descreva o serviço realizado..." style="resize:vertical;"></textarea>
+        </div>
+      </div>
+      <div style="margin-top:24px;display:flex;gap:12px;justify-content:flex-end;">
+        <button class="btn btn-outline" onclick="fecharModal()">Cancelar</button>
+        <button class="btn btn-primary" onclick="salvarManutencao()">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/manutencoes.js"></script>
+</body>
+</html>

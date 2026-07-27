@@ -23,5 +23,5 @@ class Veiculo(Base):
     criado_em       = Column(DateTime, server_default=func.now())
     atualizado_em   = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
-    manutencoes     = relationship("Manutencao", backref="veiculo")
+    manutencoes     = relationship("Manutencao", back_populates="veiculo")
     entregas        = relationship("Entrega", backref="veiculo")
