@@ -40,7 +40,7 @@ def criar_motorista(dados: MotoristaCreate, db: Session = Depends(get_db), atual
 
 @router.get("/", response_model=List[MotoristaResponse])
 def listar_motoristas(db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
-    motoristas = db.query(Motorista).all()
+    motoristas = db.query(Motorista).filter(Motorista.status != "inativo").all()
     return [_motorista_com_nome(m, db) for m in motoristas]
 
 @router.get("/{id}", response_model=MotoristaResponse)
