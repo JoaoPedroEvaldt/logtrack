@@ -5,6 +5,13 @@
   font-family: 'Segoe UI', sans-serif;
 }
 
+/* ===================== TRANSIÇÃO SUAVE ENTRE PÁGINAS ===================== */
+/* Suaviza a troca entre os módulos (evita corte seco); navegadores sem
+   suporte simplesmente ignoram a regra e continuam funcionando normal. */
+@view-transition {
+  navigation: auto;
+}
+
 /* ===================== VARIÁVEIS TEMA CLARO ===================== */
 :root {
   --primary: #1E4D78;

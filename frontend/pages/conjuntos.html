@@ -4,6 +4,15 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>LogTrack — Conjuntos</title>
+  <script>
+    (function () {
+      try {
+        var escuro = localStorage.getItem('tema') === 'dark';
+        document.documentElement.style.backgroundColor = escuro ? '#111827' : '#F0F4FA';
+        document.documentElement.style.colorScheme = escuro ? 'dark' : 'light';
+      } catch (e) {}
+    })();
+  </script>
   <link rel="stylesheet" href="../css/style.css" />
 </head>
 <body class="dashboard-page">
@@ -40,9 +49,9 @@
       <a class="menu-item" href="entregas.html"><span class="icon">📦</span> Entregas</a>
       <a class="menu-item" href="motoristas.html"><span class="icon">👤</span> Motoristas</a>
       <a class="menu-item" href="veiculos.html"><span class="icon">🚛</span> Veículos</a>
-      <a class="menu-item active" href="conjuntos.html"><span class="icon">🔗</span> Conjuntos</a>
       <a class="menu-item" href="ocorrencias.html"><span class="icon">⚠️</span> Ocorrências</a>
       <a class="menu-item" href="relatorios.html"><span class="icon">📈</span> Relatórios</a>
+      <a class="menu-item active" href="conjuntos.html"><span class="icon">🔗</span> Conjuntos</a>
       <a class="menu-item" href="manutencoes.html"><span class="icon">🔧</span> Manutenções</a>
     </nav>
     <div class="sidebar-user">

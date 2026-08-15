@@ -4,6 +4,15 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>LogTrack — Dashboard</title>
+  <script>
+    (function () {
+      try {
+        var escuro = localStorage.getItem('tema') === 'dark';
+        document.documentElement.style.backgroundColor = escuro ? '#111827' : '#F0F4FA';
+        document.documentElement.style.colorScheme = escuro ? 'dark' : 'light';
+      } catch (e) {}
+    })();
+  </script>
   <link rel="stylesheet" href="../css/style.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>

@@ -4,6 +4,15 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>LogTrack — Manutenções</title>
+  <script>
+    (function () {
+      try {
+        var escuro = localStorage.getItem('tema') === 'dark';
+        document.documentElement.style.backgroundColor = escuro ? '#111827' : '#F0F4FA';
+        document.documentElement.style.colorScheme = escuro ? 'dark' : 'light';
+      } catch (e) {}
+    })();
+  </script>
   <link rel="stylesheet" href="../css/style.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
@@ -42,10 +51,10 @@
       <a class="menu-item" href="entregas.html"><span class="icon">📦</span> Entregas</a>
       <a class="menu-item" href="motoristas.html"><span class="icon">👤</span> Motoristas</a>
       <a class="menu-item" href="veiculos.html"><span class="icon">🚛</span> Veículos</a>
-      <a class="menu-item" href="conjuntos.html"><span class="icon">🔗</span> Conjuntos</a>
-      <a class="menu-item active" href="manutencoes.html"><span class="icon">🔧</span> Manutenções</a>
       <a class="menu-item" href="ocorrencias.html"><span class="icon">⚠️</span> Ocorrências</a>
       <a class="menu-item" href="relatorios.html"><span class="icon">📈</span> Relatórios</a>
+      <a class="menu-item" href="conjuntos.html"><span class="icon">🔗</span> Conjuntos</a>
+      <a class="menu-item active" href="manutencoes.html"><span class="icon">🔧</span> Manutenções</a>
     </nav>
     <div class="sidebar-user">
       <button class="btn-tema" id="btn-tema" onclick="alternarTema()">🌙 Tema Escuro</button>
