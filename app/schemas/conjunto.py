@@ -28,8 +28,19 @@ class VeiculoInfo(BaseModel):
 
 class MotoristaInfo(BaseModel):
     id: int
+    nome: Optional[str] = None
     cpf: str
     cnh_numero: str
+
+    class Config:
+        from_attributes = True
+
+class ViagemInfo(BaseModel):
+    id: int
+    cliente: str
+    destino: str
+    status: str
+    previsao: datetime
 
     class Config:
         from_attributes = True
@@ -46,6 +57,7 @@ class ConjuntoResponse(BaseModel):
     cavalo: Optional[VeiculoInfo]
     semirreboque1: Optional[VeiculoInfo]
     semirreboque2: Optional[VeiculoInfo]
+    viagem_atual: Optional[ViagemInfo] = None
     criado_em: datetime
 
     class Config:
