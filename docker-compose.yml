@@ -7,7 +7,7 @@ services:
     environment:
       POSTGRES_DB: logtrack
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: logtrack123
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
     ports:
       - "5433:5432"
     volumes:
@@ -19,8 +19,8 @@ services:
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: postgresql://postgres:logtrack123@db:5432/logtrack
-      SECRET_KEY: logtrack_secret_key_2024_muito_segura
+      DATABASE_URL: ${DOCKER_DATABASE_URL:?defina DOCKER_DATABASE_URL no .env}
+      SECRET_KEY: ${SECRET_KEY:?defina SECRET_KEY no .env}
       ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_HOURS: 8
     depends_on:

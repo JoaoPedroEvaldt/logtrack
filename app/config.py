@@ -8,5 +8,6 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
+        extra = "ignore"  # .env também guarda POSTGRES_PASSWORD/DOCKER_DATABASE_URL, usadas só pelo docker-compose.yml
 
 settings = Settings()
