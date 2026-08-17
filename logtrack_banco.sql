@@ -12,8 +12,8 @@ CREATE TABLE IF NOT EXISTS usuarios (
 CREATE TABLE IF NOT EXISTS motoristas (
     id SERIAL PRIMARY KEY,
     usuario_id INTEGER NOT NULL UNIQUE REFERENCES usuarios(id) ON DELETE CASCADE,
-    cpf VARCHAR(14) NOT NULL UNIQUE,
-    cnh_numero VARCHAR(20) NOT NULL UNIQUE,
+    cpf VARCHAR(14) NOT NULL,
+    cnh_numero VARCHAR(20) NOT NULL,
     cnh_categoria VARCHAR(5) NOT NULL,
     cnh_validade DATE NOT NULL,
     telefone VARCHAR(20),
@@ -21,6 +21,11 @@ CREATE TABLE IF NOT EXISTS motoristas (
     criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
     atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
 );
+
+-- CPF e CNH só precisam ser únicos entre motoristas ativos: um motorista
+-- desativado ("excluído") libera seu CPF/CNH para um novo cadastro.
+CREATE UNIQUE INDEX IF NOT EXISTS motoristas_cpf_ativo_idx ON motoristas (cpf) WHERE status <> 'inativo';
+CREATE UNIQUE INDEX IF NOT EXISTS motoristas_cnh_numero_ativo_idx ON motoristas (cnh_numero) WHERE status <> 'inativo';
 
 CREATE TABLE IF NOT EXISTS veiculos (
     id SERIAL PRIMARY KEY,
@@ -45,9 +50,14 @@ CREATE TABLE IF NOT EXISTS manutencoes (
     id SERIAL PRIMARY KEY,
     veiculo_id INTEGER NOT NULL REFERENCES veiculos(id) ON DELETE CASCADE,
     data_manutencao DATE NOT NULL,
-    tipo VARCHAR(50) NOT NULL CHECK (tipo IN ('preventiva', 'corretiva', 'revisao', 'outro')),
+    data_fim DATE,
+    tipo VARCHAR(50) NOT NULL CHECK (tipo IN ('preventiva', 'corretiva', 'revisao', 'pneus', 'eletrica', 'freios', 'outro')),
     descricao TEXT NOT NULL,
     custo DECIMAL(10,2) CHECK (custo >= 0),
+    mecanico VARCHAR(100),
+    quilometragem INTEGER,
+    status VARCHAR(20) NOT NULL DEFAULT 'concluida' CHECK (status IN ('agendada', 'em_andamento', 'concluida')),
+    proxima_revisao DATE,
     criado_em TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
@@ -60,6 +70,7 @@ CREATE TABLE IF NOT EXISTS entregas (
     destino TEXT NOT NULL,
     descricao_carga TEXT,
     peso_kg DECIMAL(10,2) CHECK (peso_kg > 0),
+    valor_frete DECIMAL(10,2) CHECK (valor_frete >= 0),
     status VARCHAR(20) NOT NULL DEFAULT 'aguardando' CHECK (status IN ('aguardando', 'em_rota', 'entregue', 'atrasado', 'ocorrencia', 'cancelado')),
     previsao TIMESTAMP NOT NULL,
     iniciado_em TIMESTAMP,
@@ -97,6 +108,14 @@ CREATE TABLE IF NOT EXISTS conjuntos (
     criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
     atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
 );
+
+-- Bancos já criados antes destas colunas existirem: adiciona sem perder dados.
+ALTER TABLE manutencoes ADD COLUMN IF NOT EXISTS data_fim DATE;
+ALTER TABLE manutencoes ADD COLUMN IF NOT EXISTS mecanico VARCHAR(100);
+ALTER TABLE manutencoes ADD COLUMN IF NOT EXISTS quilometragem INTEGER;
+ALTER TABLE manutencoes ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'concluida';
+ALTER TABLE manutencoes ADD COLUMN IF NOT EXISTS proxima_revisao DATE;
+ALTER TABLE entregas ADD COLUMN IF NOT EXISTS valor_frete DECIMAL(10,2) CHECK (valor_frete >= 0);
 
 INSERT INTO usuarios (nome, email, senha_hash, perfil)
 VALUES (

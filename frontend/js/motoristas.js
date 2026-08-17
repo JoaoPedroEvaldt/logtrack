@@ -16,7 +16,7 @@ async function carregarMotoristas() {
     const validade = new Date(m.cnh_validade);
     const hoje = new Date();
     const dias = Math.ceil((validade - hoje) / (1000 * 60 * 60 * 24));
-    const alertaCNH = dias <= 30 ? '⚠️ ' : '';
+    const alertaCNH = dias <= 30 ? `<span style="color:var(--warning);display:inline-flex;vertical-align:-3px;margin-right:3px;">${svgIcone('alerta', 13)}</span>` : '';
 
     return `
       <tr>
@@ -29,8 +29,8 @@ async function carregarMotoristas() {
         <td>${m.telefone || '—'}</td>
         <td><span class="badge badge-${m.status === 'disponivel' ? 'entregue' : m.status === 'em_rota' ? 'em_rota' : 'cancelado'}">${m.status}</span></td>
         <td style="display:flex;gap:6px;">
-          <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="editarMotorista(${m.id}, '${m.nome || ''}', '${m.telefone || ''}', '${m.cnh_categoria}', '${m.cnh_validade}')">✏️ Editar</button>
-          <button class="btn btn-danger" style="font-size:11px;padding:4px 10px;" onclick="excluirMotorista(${m.id})">🗑️ Excluir</button>
+          <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="editarMotorista(${m.id}, '${m.nome || ''}', '${m.telefone || ''}', '${m.cnh_categoria}', '${m.cnh_validade}')">${svgIcone('editar', 12)} Editar</button>
+          <button class="btn btn-danger" style="font-size:11px;padding:4px 10px;" onclick="excluirMotorista(${m.id})">${svgIcone('excluir', 12)} Excluir</button>
         </td>
       </tr>
     `;
@@ -68,7 +68,7 @@ function editarMotorista(id, nome, telefone, cnhCategoria, cnhValidade) {
 }
 
 async function excluirMotorista(id) {
-  if (!confirm('Deseja desativar este motorista?')) return;
+  if (!(await confirmarAcao('Deseja desativar este motorista?'))) return;
   await del(`/motoristas/${id}`);
   carregarMotoristas();
 }
@@ -97,7 +97,7 @@ async function salvarMotorista() {
     };
 
     if (!dados.nome || !dados.email || !dados.senha || !dados.cpf || !dados.cnh_numero || !dados.cnh_categoria || !dados.cnh_validade) {
-      alert('Preencha todos os campos obrigatórios!');
+      toastAviso('Preencha todos os campos obrigatórios!');
       return;
     }
 
@@ -105,7 +105,7 @@ async function salvarMotorista() {
   }
 
   if (res.detail) {
-    alert('Erro: ' + res.detail);
+    toastErro('Erro: ' + res.detail);
     return;
   }
 

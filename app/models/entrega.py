@@ -14,6 +14,7 @@ class Entrega(Base):
     destino         = Column(Text, nullable=False)
     descricao_carga = Column(Text)
     peso_kg         = Column(Numeric(10, 2))
+    valor_frete     = Column(Numeric(10, 2))
     status          = Column(String(20), nullable=False, default="aguardando")
     previsao        = Column(DateTime, nullable=False)
     iniciado_em     = Column(DateTime)

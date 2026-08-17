@@ -66,6 +66,27 @@ function formatarDataHora(data) {
   return new Date(data).toLocaleString('pt-BR');
 }
 
+/* ===================== MOEDA (R$) ===================== */
+function aplicarMascaraMoeda(input) {
+  input.addEventListener('input', () => {
+    const digitos = input.value.replace(/\D/g, '');
+    if (!digitos) { input.value = ''; return; }
+    const numero = parseInt(digitos, 10) / 100;
+    input.value = numero.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  });
+}
+
+function moedaParaNumero(valor) {
+  if (!valor) return null;
+  const numero = parseFloat(valor.replace(/\./g, '').replace(',', '.'));
+  return isNaN(numero) ? null : numero;
+}
+
+function numeroParaMoeda(numero) {
+  if (numero === null || numero === undefined || numero === '') return '';
+  return parseFloat(numero).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 function badgeStatus(status) {
   const labels = {
     aguardando: 'Aguardando',
@@ -78,6 +99,21 @@ function badgeStatus(status) {
   return `<span class="badge badge-${status}">${labels[status] || status}</span>`;
 }
 
+/* Mesmas cores usadas nos badges/kanban (.badge-*, .kanban-card-*) em style.css,
+   para que os gráficos (Chart.js) fiquem sempre consistentes com o resto da interface. */
+const CORES_STATUS = {
+  aguardando: '#3B6D11',
+  em_rota: '#1E4D78',
+  entregue: '#0F6E56',
+  atrasado: '#993C1D',
+  ocorrencia: '#854F0B',
+  cancelado: '#888888'
+};
+
+function corPorStatus(status) {
+  return CORES_STATUS[status] || '#95A5A6';
+}
+
 /* ===================== TEMA ===================== */
 function alternarTema() {
   const dark = document.body.classList.toggle('dark');
@@ -85,9 +121,12 @@ function alternarTema() {
   atualizarBtnTema(dark);
 }
 
+const ICONE_LUA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+const ICONE_SOL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
+
 function atualizarBtnTema(dark) {
   const btn = document.getElementById('btn-tema');
-  if (btn) btn.textContent = dark ? '☀️ Tema Claro' : '🌙 Tema Escuro';
+  if (btn) btn.innerHTML = `${dark ? ICONE_SOL : ICONE_LUA} <span>${dark ? 'Tema Claro' : 'Tema Escuro'}</span>`;
 }
 
 function aplicarTema() {

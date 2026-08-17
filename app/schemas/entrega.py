@@ -8,6 +8,7 @@ class EntregaCreate(BaseModel):
     destino: str
     descricao_carga: Optional[str] = None
     peso_kg: Optional[float] = None
+    valor_frete: Optional[float] = None
     motorista_id: Optional[int] = None
     veiculo_id: Optional[int] = None
     previsao: datetime
@@ -18,6 +19,7 @@ class EntregaUpdate(BaseModel):
     destino: Optional[str] = None
     descricao_carga: Optional[str] = None
     peso_kg: Optional[float] = None
+    valor_frete: Optional[float] = None
     motorista_id: Optional[int] = None
     veiculo_id: Optional[int] = None
     status: Optional[str] = None
@@ -30,6 +32,7 @@ class EntregaResponse(BaseModel):
     destino: str
     descricao_carga: Optional[str]
     peso_kg: Optional[float]
+    valor_frete: Optional[float]
     motorista_id: Optional[int]
     veiculo_id: Optional[int]
     status: str

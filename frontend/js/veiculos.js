@@ -42,12 +42,16 @@ async function carregarVeiculos() {
   };
 
   const tipoLabel = {
-    cavalo: '🚛 Cavalo',
-    semirreboque: '🚌 Semirreboque',
-    van: '🚐 Van',
-    utilitario: '🚙 Utilitário',
-    moto: '🏍️ Moto'
+    cavalo: 'Cavalo',
+    semirreboque: 'Semirreboque',
+    van: 'Van',
+    utilitario: 'Utilitário',
+    moto: 'Moto',
+    caminhao: 'Caminhão',
+    carro: 'Carro'
   };
+
+  const tipoBadge = { cavalo: 1, semirreboque: 2, van: 3, utilitario: 4, moto: 5, caminhao: 6, carro: 7 };
 
   tbody.innerHTML = data.map(v => {
     const subtipo = v.subtipo ? ` — ${v.subtipo}` : '';
@@ -61,14 +65,14 @@ async function carregarVeiculos() {
         <td>${v.modelo}</td>
         <td>${v.marca}</td>
         <td>${v.ano}</td>
-        <td>${tipoLabel[v.tipo] || v.tipo}</td>
+        <td><span class="badge badge-tipo-${tipoBadge[v.tipo] || 7}">${tipoLabel[v.tipo] || v.tipo}</span></td>
         <td>${v.subtipo || '—'}</td>
         <td>${v.eixos ? v.eixos + eixos.replace(` | ${v.eixos} eixos`, '') + tipoEixo : '—'}</td>
         <td>${v.capacidade_kg} kg</td>
         <td><span class="badge badge-${statusBadge[v.status] || 'aguardando'}">${v.status}</span></td>
         <td style="display:flex;gap:6px;">
-          <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="editarVeiculo(${v.id}, '${v.placa}', '${v.modelo}', '${v.marca}', ${v.ano}, '${v.tipo}', ${v.capacidade_kg}, '${v.subtipo || ''}', '${v.eixos || ''}', '${v.tipo_eixo || ''}', '${v.cor || ''}')">✏️ Editar</button>
-          <button class="btn btn-danger" style="font-size:11px;padding:4px 10px;" onclick="excluirVeiculo(${v.id})">🗑️ Excluir</button>
+          <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="editarVeiculo(${v.id}, '${v.placa}', '${v.modelo}', '${v.marca}', ${v.ano}, '${v.tipo}', ${v.capacidade_kg}, '${v.subtipo || ''}', '${v.eixos || ''}', '${v.tipo_eixo || ''}', '${v.cor || ''}')">${svgIcone('editar', 12)} Editar</button>
+          <button class="btn btn-danger" style="font-size:11px;padding:4px 10px;" onclick="excluirVeiculo(${v.id})">${svgIcone('excluir', 12)} Excluir</button>
         </td>
       </tr>
     `;
@@ -128,7 +132,7 @@ function editarVeiculo(id, placa, modelo, marca, ano, tipo, capacidade, subtipo,
 }
 
 async function excluirVeiculo(id) {
-  if (!confirm('Deseja desativar este veículo?')) return;
+  if (!(await confirmarAcao('Deseja desativar este veículo?'))) return;
   await del(`/veiculos/${id}`);
   carregarVeiculos();
 }
@@ -151,7 +155,7 @@ async function salvarVeiculo() {
   };
 
   if (!dados.placa || !dados.modelo || !dados.marca || !dados.ano || !dados.tipo || !dados.capacidade_kg) {
-    alert('Preencha todos os campos obrigatórios!');
+    toastAviso('Preencha todos os campos obrigatórios!');
     return;
   }
 
@@ -163,7 +167,7 @@ async function salvarVeiculo() {
   }
 
   if (res.detail) {
-    alert('Erro: ' + res.detail);
+    toastErro('Erro: ' + res.detail);
     return;
   }
 

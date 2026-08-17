@@ -1,5 +1,6 @@
 checarAuth();
 document.getElementById('usuario-perfil').textContent = localStorage.getItem('perfil') || '';
+aplicarMascaraMoeda(document.getElementById('custo'));
 
 let manutencoes = [];
 let manutencaoEditandoId = null;
@@ -37,15 +38,8 @@ function renderizar(lista) {
     return;
   }
 
-  const tipoLabel = {
-    preventiva: '🔧 Preventiva',
-    corretiva: '🔨 Corretiva',
-    revisao: '📋 Revisão',
-    pneus: '🔄 Pneus',
-    eletrica: '⚡ Elétrica',
-    freios: '🛑 Freios',
-    outro: '📌 Outro'
-  };
+  const tipoLabel = { preventiva: 'Preventiva', corretiva: 'Corretiva', revisao: 'Revisão', pneus: 'Pneus', eletrica: 'Elétrica', freios: 'Freios', outro: 'Outro' };
+  const tipoBadge = { preventiva: 1, corretiva: 2, revisao: 3, pneus: 4, eletrica: 5, freios: 6, outro: 7 };
 
   const statusBadge = {
     concluida: 'badge-entregue',
@@ -63,8 +57,8 @@ function renderizar(lista) {
     <tr>
       <td>#${m.id}</td>
       <td>${m.veiculo ? `<strong>${m.veiculo.placa}</strong><br><small>${m.veiculo.modelo} ${m.veiculo.marca}</small>` : '—'}</td>
-      <td>${formatarData(m.data_manutencao)}</td>
-      <td>${tipoLabel[m.tipo] || m.tipo}</td>
+      <td>${formatarData(m.data_manutencao)}${m.data_fim ? ' → ' + formatarData(m.data_fim) : ''}</td>
+      <td><span class="badge badge-tipo-${tipoBadge[m.tipo] || 7}">${tipoLabel[m.tipo] || m.tipo}</span></td>
       <td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${m.descricao}</td>
       <td>${m.mecanico || '—'}</td>
       <td>${m.quilometragem ? m.quilometragem.toLocaleString('pt-BR') + ' km' : '—'}</td>
@@ -72,8 +66,8 @@ function renderizar(lista) {
       <td><span class="badge ${statusBadge[m.status]}">${statusLabel[m.status] || m.status}</span></td>
       <td>${m.proxima_revisao ? formatarData(m.proxima_revisao) : '—'}</td>
       <td style="display:flex;gap:6px;">
-        <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="editarManutencao(${m.id})">✏️</button>
-        <button class="btn btn-danger" style="font-size:11px;padding:4px 10px;" onclick="excluirManutencao(${m.id})">🗑️</button>
+        <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="editarManutencao(${m.id})" aria-label="Editar">${svgIcone('editar', 14)}</button>
+        <button class="btn btn-danger" style="font-size:11px;padding:4px 10px;" onclick="excluirManutencao(${m.id})" aria-label="Excluir">${svgIcone('excluir', 14)}</button>
       </td>
     </tr>
   `).join('');
@@ -100,6 +94,7 @@ function abrirModal() {
   document.getElementById('modal-titulo').textContent = 'Nova Manutenção';
   document.getElementById('veiculo-id').value = '';
   document.getElementById('data-manutencao').value = '';
+  document.getElementById('data-fim').value = '';
   document.getElementById('tipo').value = '';
   document.getElementById('status').value = 'concluida';
   document.getElementById('mecanico').value = '';
@@ -121,18 +116,19 @@ async function editarManutencao(id) {
   document.getElementById('modal-titulo').textContent = 'Editar Manutenção';
   document.getElementById('veiculo-id').value = m.veiculo_id;
   document.getElementById('data-manutencao').value = m.data_manutencao;
+  document.getElementById('data-fim').value = m.data_fim || '';
   document.getElementById('tipo').value = m.tipo;
   document.getElementById('status').value = m.status;
   document.getElementById('mecanico').value = m.mecanico || '';
   document.getElementById('quilometragem').value = m.quilometragem || '';
-  document.getElementById('custo').value = m.custo || '';
+  document.getElementById('custo').value = numeroParaMoeda(m.custo);
   document.getElementById('proxima-revisao').value = m.proxima_revisao || '';
   document.getElementById('descricao').value = m.descricao;
   document.getElementById('modal').classList.add('aberto');
 }
 
 async function excluirManutencao(id) {
-  if (!confirm('Deseja excluir esta manutenção?')) return;
+  if (!(await confirmarAcao('Deseja excluir esta manutenção?'))) return;
   await del(`/manutencoes/${id}`);
   carregarManutencoes();
 }
@@ -141,17 +137,18 @@ async function salvarManutencao() {
   const dados = {
     veiculo_id: parseInt(document.getElementById('veiculo-id').value),
     data_manutencao: document.getElementById('data-manutencao').value,
+    data_fim: document.getElementById('data-fim').value || null,
     tipo: document.getElementById('tipo').value,
     status: document.getElementById('status').value,
     mecanico: document.getElementById('mecanico').value || null,
     quilometragem: parseInt(document.getElementById('quilometragem').value) || null,
-    custo: parseFloat(document.getElementById('custo').value) || null,
+    custo: moedaParaNumero(document.getElementById('custo').value),
     proxima_revisao: document.getElementById('proxima-revisao').value || null,
     descricao: document.getElementById('descricao').value,
   };
 
   if (!dados.veiculo_id || !dados.data_manutencao || !dados.tipo || !dados.descricao) {
-    alert('Preencha todos os campos obrigatórios!');
+    toastAviso('Preencha todos os campos obrigatórios!');
     return;
   }
 
@@ -163,7 +160,7 @@ async function salvarManutencao() {
   }
 
   if (res.detail) {
-    alert('Erro: ' + res.detail);
+    toastErro('Erro: ' + res.detail);
     return;
   }
 

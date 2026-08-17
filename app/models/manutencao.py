@@ -9,6 +9,7 @@ class Manutencao(Base):
     id              = Column(Integer, primary_key=True, index=True)
     veiculo_id      = Column(Integer, ForeignKey("veiculos.id"), nullable=False)
     data_manutencao = Column(Date, nullable=False)
+    data_fim        = Column(Date)
     tipo            = Column(String(50), nullable=False)
     descricao       = Column(Text, nullable=False)
     custo           = Column(Numeric(10, 2))

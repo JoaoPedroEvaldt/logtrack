@@ -46,14 +46,14 @@ async function salvarOcorrencia() {
   };
 
   if (!dados.entrega_id || !dados.tipo || !dados.descricao) {
-    alert('Preencha todos os campos obrigatórios!');
+    toastAviso('Preencha todos os campos obrigatórios!');
     return;
   }
 
   const res = await post('/ocorrencias', dados);
 
   if (res.detail) {
-    alert('Erro: ' + res.detail);
+    toastErro('Erro: ' + res.detail);
     return;
   }
 
@@ -61,4 +61,4 @@ async function salvarOcorrencia() {
   carregarOcorrencias();
 }
 
-carregarOcorrencias(); 
+carregarOcorrencias();

@@ -2,13 +2,39 @@ checarAuth();
 document.getElementById('usuario-perfil').textContent = localStorage.getItem('perfil') || '';
 
 let todasEntregas = [];
+let todosVeiculos = [];
+let todasManutencoes = [];
+let desempenhoVeiculosAtual = [];
 let graficoStatus = null;
 let graficoMotoristas = null;
 
+function definirPeriodoPadrao() {
+  const hoje = new Date();
+  const seisMesesAtras = new Date();
+  seisMesesAtras.setMonth(hoje.getMonth() - 6);
+  document.getElementById('data-fim').value = hoje.toISOString().slice(0, 10);
+  document.getElementById('data-inicio').value = seisMesesAtras.toISOString().slice(0, 10);
+}
+
+function preencherFiltroVeiculos() {
+  const sel = document.getElementById('filtro-veiculo');
+  todosVeiculos.forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v.id;
+    opt.textContent = `${v.placa} — ${v.modelo}`;
+    sel.appendChild(opt);
+  });
+}
+
 async function carregarDados() {
-  todasEntregas = await get('/entregas') || [];
-  renderizar(todasEntregas);
-  carregarGraficos(todasEntregas);
+  [todasEntregas, todosVeiculos, todasManutencoes] = await Promise.all([
+    get('/entregas'), get('/veiculos'), get('/manutencoes')
+  ]);
+  todasEntregas = todasEntregas || [];
+  todosVeiculos = todosVeiculos || [];
+  todasManutencoes = todasManutencoes || [];
+  preencherFiltroVeiculos();
+  filtrar();
 }
 
 function renderizar(lista) {
@@ -44,7 +70,8 @@ function carregarGraficos(lista) {
     statusCount[e.status] = (statusCount[e.status] || 0) + 1;
   });
 
-  const labels = Object.keys(statusCount).map(s => ({
+  const statusKeys = Object.keys(statusCount);
+  const labels = statusKeys.map(s => ({
     aguardando: 'Aguardando', em_rota: 'Em Rota', entregue: 'Entregue',
     atrasado: 'Atrasado', ocorrencia: 'Ocorrência', cancelado: 'Cancelado'
   }[s] || s));
@@ -56,7 +83,7 @@ function carregarGraficos(lista) {
       labels,
       datasets: [{
         data: Object.values(statusCount),
-        backgroundColor: ['#2E75B6','#27AE60','#1E4D78','#C0392B','#E67E22','#95A5A6'],
+        backgroundColor: statusKeys.map(s => corPorStatus(s)),
         borderWidth: 0
       }]
     },
@@ -104,6 +131,63 @@ function filtrar() {
 
   renderizar(filtradas);
   carregarGraficos(filtradas);
+  renderizarDesempenhoVeiculos(inicio, fim);
+}
+
+function diasManutencaoNoPeriodo(m, periodoInicio, periodoFim) {
+  const inicioM = new Date(m.data_manutencao + 'T00:00:00');
+  const fimM = m.data_fim ? new Date(m.data_fim + 'T00:00:00') : new Date();
+  const inicio = periodoInicio && periodoInicio > inicioM ? periodoInicio : inicioM;
+  const fim = periodoFim && periodoFim < fimM ? periodoFim : fimM;
+  const dias = Math.round((fim - inicio) / 86400000);
+  return dias > 0 ? dias : 0;
+}
+
+function renderizarDesempenhoVeiculos(inicioStr, fimStr) {
+  const tbody = document.getElementById('tabela-veiculos-body');
+  if (!tbody) return;
+
+  const veiculoFiltro = document.getElementById('filtro-veiculo').value;
+  const periodoInicio = inicioStr ? new Date(inicioStr + 'T00:00:00') : null;
+  const periodoFim = fimStr ? new Date(fimStr + 'T23:59:59') : null;
+
+  let veiculos = todosVeiculos;
+  if (veiculoFiltro) veiculos = veiculos.filter(v => String(v.id) === veiculoFiltro);
+
+  document.getElementById('total-label-veiculos').textContent = `${veiculos.length} veículo(s)`;
+
+  if (veiculos.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#888;">Nenhum veículo encontrado</td></tr>';
+    return;
+  }
+
+  const linhas = veiculos.map(v => {
+    const entregasVeiculo = todasEntregas.filter(e =>
+      e.veiculo_id === v.id && e.status === 'entregue' && e.concluido_em &&
+      (!periodoInicio || new Date(e.concluido_em) >= periodoInicio) &&
+      (!periodoFim || new Date(e.concluido_em) <= periodoFim)
+    );
+
+    const viagens = entregasVeiculo.length;
+    const faturamento = entregasVeiculo.reduce((soma, e) => soma + (parseFloat(e.valor_frete) || 0), 0);
+
+    const diasManutencao = todasManutencoes
+      .filter(m => m.veiculo_id === v.id)
+      .reduce((soma, m) => soma + diasManutencaoNoPeriodo(m, periodoInicio, periodoFim), 0);
+
+    return { v, viagens, faturamento, diasManutencao };
+  }).sort((a, b) => b.faturamento - a.faturamento);
+
+  desempenhoVeiculosAtual = linhas;
+
+  tbody.innerHTML = linhas.map(({ v, viagens, faturamento, diasManutencao }) => `
+    <tr>
+      <td><strong>${v.placa}</strong><br><small style="color:var(--text-light);">${v.modelo} ${v.marca}</small></td>
+      <td>${viagens}</td>
+      <td>R$ ${faturamento.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+      <td>${diasManutencao} dia(s)</td>
+    </tr>
+  `).join('');
 }
 
 async function exportarPDF() {
@@ -136,7 +220,30 @@ async function exportarPDF() {
     margin: { left: 14, right: 14 }
   });
 
+  const linhasVeiculos = desempenhoVeiculosAtual.map(({ v, viagens, faturamento, diasManutencao }) => [
+    `${v.placa} — ${v.modelo} ${v.marca}`,
+    viagens,
+    'R$ ' + faturamento.toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
+    `${diasManutencao} dia(s)`
+  ]);
+
+  doc.addPage();
+  doc.setFontSize(18);
+  doc.setTextColor(30, 77, 120);
+  doc.text('LogTrack — Desempenho por Veículo', 14, 20);
+
+  doc.autoTable({
+    startY: 30,
+    head: [['Veículo', 'Viagens concluídas', 'Faturamento', 'Dias em manutenção']],
+    body: linhasVeiculos,
+    headStyles: { fillColor: [30, 77, 120], textColor: 255, fontSize: 9 },
+    bodyStyles: { fontSize: 8 },
+    alternateRowStyles: { fillColor: [240, 244, 250] },
+    margin: { left: 14, right: 14 }
+  });
+
   doc.save(`logtrack-relatorio-${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.pdf`);
 }
 
+definirPeriodoPadrao();
 carregarDados();

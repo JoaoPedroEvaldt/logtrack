@@ -5,6 +5,7 @@ from typing import Optional
 class ManutencaoCreate(BaseModel):
     veiculo_id: int
     data_manutencao: date
+    data_fim: Optional[date] = None
     tipo: str
     descricao: str
     custo: Optional[float] = None
@@ -15,6 +16,7 @@ class ManutencaoCreate(BaseModel):
 
 class ManutencaoUpdate(BaseModel):
     data_manutencao: Optional[date] = None
+    data_fim: Optional[date] = None
     tipo: Optional[str] = None
     descricao: Optional[str] = None
     custo: Optional[float] = None
@@ -37,6 +39,7 @@ class ManutencaoResponse(BaseModel):
     veiculo_id: int
     veiculo: Optional[VeiculoInfo] = None
     data_manutencao: date
+    data_fim: Optional[date]
     tipo: str
     descricao: str
     custo: Optional[float]

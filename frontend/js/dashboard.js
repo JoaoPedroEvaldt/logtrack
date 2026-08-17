@@ -36,7 +36,7 @@ async function carregarGraficoStatus() {
       labels,
       datasets: [{
         data: data.map(d => d.total),
-        backgroundColor: ['#2E75B6','#1E4D78','#27AE60','#C0392B','#E67E22','#95A5A6'],
+        backgroundColor: data.map(d => corPorStatus(d.status)),
         borderWidth: 0
       }]
     },
