@@ -34,7 +34,7 @@ function renderizar(lista) {
   const tbody = document.getElementById('tabela-manutencoes');
 
   if (lista.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:#888;">Nenhuma manutenção registrada</td></tr>';
+    tbody.innerHTML = estadoVazio(11, 'Nenhuma manutenção registrada', 'O histórico de manutenções da frota aparecerá aqui.', 'check');
     return;
   }
 
@@ -56,18 +56,18 @@ function renderizar(lista) {
   tbody.innerHTML = lista.map(m => `
     <tr>
       <td>#${m.id}</td>
-      <td>${m.veiculo ? `<strong>${m.veiculo.placa}</strong><br><small>${m.veiculo.modelo} ${m.veiculo.marca}</small>` : '—'}</td>
+      <td>${m.veiculo ? `<strong>${escapeHtml(m.veiculo.placa)}</strong><br><small>${escapeHtml(m.veiculo.modelo)} ${escapeHtml(m.veiculo.marca)}</small>` : '—'}</td>
       <td>${formatarData(m.data_manutencao)}${m.data_fim ? ' → ' + formatarData(m.data_fim) : ''}</td>
-      <td><span class="badge badge-tipo-${tipoBadge[m.tipo] || 7}">${tipoLabel[m.tipo] || m.tipo}</span></td>
-      <td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${m.descricao}</td>
-      <td>${m.mecanico || '—'}</td>
+      <td><span class="badge badge-tipo-${tipoBadge[m.tipo] || 7}">${tipoLabel[m.tipo] || escapeHtml(m.tipo)}</span></td>
+      <td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(m.descricao)}</td>
+      <td>${escapeHtml(m.mecanico) || '—'}</td>
       <td>${m.quilometragem ? m.quilometragem.toLocaleString('pt-BR') + ' km' : '—'}</td>
       <td>${m.custo ? 'R$ ' + parseFloat(m.custo).toLocaleString('pt-BR', {minimumFractionDigits:2}) : '—'}</td>
       <td><span class="badge ${statusBadge[m.status]}">${statusLabel[m.status] || m.status}</span></td>
       <td>${m.proxima_revisao ? formatarData(m.proxima_revisao) : '—'}</td>
       <td style="display:flex;gap:6px;">
-        <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="editarManutencao(${m.id})" aria-label="Editar">${svgIcone('editar', 14)}</button>
-        <button class="btn btn-danger" style="font-size:11px;padding:4px 10px;" onclick="excluirManutencao(${m.id})" aria-label="Excluir">${svgIcone('excluir', 14)}</button>
+        <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="editarManutencao(${m.id})">${svgIcone('editar', 12)} Editar</button>
+        <button class="btn btn-danger" style="font-size:11px;padding:4px 10px;" onclick="excluirManutencao(${m.id})">${svgIcone('excluir', 12)} Excluir</button>
       </td>
     </tr>
   `).join('');

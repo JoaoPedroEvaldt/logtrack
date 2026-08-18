@@ -89,7 +89,7 @@ function atualizarVeiculoPorMotorista() {
     preencherOpcoesVeiculo(veiculosCompletos.filter(v => v.id === vinculo.veiculoId));
     selVeiculo.value = vinculo.veiculoId;
     selVeiculo.disabled = true;
-    if (info) info.innerHTML = `${svgIcone('link', 12)} Vinculado ao conjunto "${vinculo.conjuntoNome}". Para trocar o veículo, altere o conjunto na aba Conjuntos.`;
+    if (info) info.innerHTML = `${svgIcone('link', 12)} Vinculado ao conjunto "${escapeHtml(vinculo.conjuntoNome)}". Para trocar o veículo, altere o conjunto na aba Conjuntos.`;
   } else {
     preencherOpcoesVeiculo(veiculosCompletos);
     selVeiculo.disabled = false;
@@ -109,14 +109,14 @@ const COLUNAS_STATUS = [
 function veiculoLabel(veiculoId) {
   if (!veiculoId) return null;
   const v = veiculosCompletos.find(v => v.id === veiculoId);
-  return v ? `${v.placa} — ${v.modelo}` : `Veículo #${veiculoId}`;
+  return v ? `${escapeHtml(v.placa)} — ${escapeHtml(v.modelo)}` : `Veículo #${veiculoId}`;
 }
 
 function renderizarKanban(lista) {
   const board = document.getElementById('kanban-board');
 
   if (lista.length === 0) {
-    board.innerHTML = '<div style="text-align:center;color:#888;padding:40px;width:100%;">Nenhuma entrega encontrada</div>';
+    board.innerHTML = `<div style="width:100%;">${estadoVazio(null, 'Nenhuma entrega encontrada', 'Ajuste os filtros ou cadastre uma nova entrega para começar.', 'vazio')}</div>`;
     return;
   }
 
@@ -133,8 +133,8 @@ function renderizarKanban(lista) {
             ? '<div style="text-align:center;color:var(--text-light);font-size:12px;padding:12px;">Vazio</div>'
             : itens.map(e => `
               <div class="kanban-card kanban-card-${col.status}">
-                <div style="font-weight:600;color:var(--text);font-size:13px;">#${e.id} ${e.cliente}</div>
-                <div style="font-size:12px;color:var(--text-light);margin-top:4px;display:flex;align-items:center;gap:5px;">${svgIcone('local', 13)} ${e.destino}</div>
+                <div style="font-weight:600;color:var(--text);font-size:13px;">#${e.id} ${escapeHtml(e.cliente)}</div>
+                <div style="font-size:12px;color:var(--text-light);margin-top:4px;display:flex;align-items:center;gap:5px;">${svgIcone('local', 13)} ${escapeHtml(e.destino)}</div>
                 <div style="font-size:12px;color:var(--text-light);margin-top:2px;display:flex;align-items:center;gap:5px;">${svgIcone('relogio', 13)} ${formatarDataHora(e.previsao)}</div>
                 <div style="font-size:12px;color:var(--text-light);margin-top:2px;display:flex;align-items:center;gap:5px;">${svgIcone('caminhao', 13)} ${veiculoLabel(e.veiculo_id) || 'Sem veículo definido'}</div>
                 ${e.valor_frete ? `<div style="font-size:12px;color:var(--text-light);margin-top:2px;display:flex;align-items:center;gap:5px;">${svgIcone('dinheiro', 13)} R$ ${parseFloat(e.valor_frete).toLocaleString('pt-BR', {minimumFractionDigits:2})}</div>` : ''}

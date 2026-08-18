@@ -2,6 +2,7 @@ checarAuth();
 document.getElementById('usuario-perfil').textContent = localStorage.getItem('perfil') || '';
 
 let veiculoEditandoId = null;
+let veiculosCarregados = [];
 
 function atualizarSubtipo() {
   const tipo = document.getElementById('tipo').value;
@@ -27,10 +28,11 @@ function atualizarTipoEixo() {
 
 async function carregarVeiculos() {
   const data = await get('/veiculos') || [];
+  veiculosCarregados = data;
   const tbody = document.getElementById('tabela-veiculos');
 
   if (data.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:#888;">Nenhum veículo cadastrado</td></tr>';
+    tbody.innerHTML = estadoVazio(11, 'Nenhum veículo cadastrado', 'Clique em "Novo Veículo" para adicionar o primeiro da sua frota.', 'caminhao');
     return;
   }
 
@@ -61,17 +63,17 @@ async function carregarVeiculos() {
     return `
       <tr>
         <td>#${v.id}</td>
-        <td><strong>${v.placa}</strong></td>
-        <td>${v.modelo}</td>
-        <td>${v.marca}</td>
+        <td><strong>${escapeHtml(v.placa)}</strong></td>
+        <td>${escapeHtml(v.modelo)}</td>
+        <td>${escapeHtml(v.marca)}</td>
         <td>${v.ano}</td>
-        <td><span class="badge badge-tipo-${tipoBadge[v.tipo] || 7}">${tipoLabel[v.tipo] || v.tipo}</span></td>
-        <td>${v.subtipo || '—'}</td>
+        <td><span class="badge badge-tipo-${tipoBadge[v.tipo] || 7}">${tipoLabel[v.tipo] || escapeHtml(v.tipo)}</span></td>
+        <td>${escapeHtml(v.subtipo) || '—'}</td>
         <td>${v.eixos ? v.eixos + eixos.replace(` | ${v.eixos} eixos`, '') + tipoEixo : '—'}</td>
         <td>${v.capacidade_kg} kg</td>
-        <td><span class="badge badge-${statusBadge[v.status] || 'aguardando'}">${v.status}</span></td>
+        <td><span class="badge badge-${statusBadge[v.status] || 'aguardando'}">${escapeHtml(v.status)}</span></td>
         <td style="display:flex;gap:6px;">
-          <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="editarVeiculo(${v.id}, '${v.placa}', '${v.modelo}', '${v.marca}', ${v.ano}, '${v.tipo}', ${v.capacidade_kg}, '${v.subtipo || ''}', '${v.eixos || ''}', '${v.tipo_eixo || ''}', '${v.cor || ''}')">${svgIcone('editar', 12)} Editar</button>
+          <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="editarVeiculo(${v.id})">${svgIcone('editar', 12)} Editar</button>
           <button class="btn btn-danger" style="font-size:11px;padding:4px 10px;" onclick="excluirVeiculo(${v.id})">${svgIcone('excluir', 12)} Excluir</button>
         </td>
       </tr>
@@ -104,20 +106,24 @@ function fecharModal() {
   document.getElementById('modal').classList.remove('aberto');
 }
 
-function editarVeiculo(id, placa, modelo, marca, ano, tipo, capacidade, subtipo, eixos, tipoEixo, cor) {
+function editarVeiculo(id) {
+  const v = veiculosCarregados.find(v => v.id === id);
+  if (!v) return;
   veiculoEditandoId = id;
   document.getElementById('modal-titulo').textContent = 'Editar Veículo';
-  document.getElementById('placa').value = placa;
-  document.getElementById('modelo').value = modelo;
-  document.getElementById('marca').value = marca;
-  document.getElementById('ano').value = ano;
-  document.getElementById('tipo').value = tipo;
-  document.getElementById('capacidade').value = capacidade;
-  document.getElementById('cor').value = cor;
-  document.getElementById('subtipo').value = subtipo;
-  document.getElementById('eixos').value = eixos;
-  document.getElementById('tipo-eixo').value = tipoEixo;
+  document.getElementById('placa').value = v.placa;
+  document.getElementById('modelo').value = v.modelo;
+  document.getElementById('marca').value = v.marca;
+  document.getElementById('ano').value = v.ano;
+  document.getElementById('tipo').value = v.tipo;
+  document.getElementById('capacidade').value = v.capacidade_kg;
+  document.getElementById('cor').value = v.cor || '';
+  document.getElementById('subtipo').value = v.subtipo || '';
+  document.getElementById('eixos').value = v.eixos || '';
+  document.getElementById('tipo-eixo').value = v.tipo_eixo || '';
 
+  const tipo = v.tipo;
+  const eixos = String(v.eixos || '');
   if (tipo === 'semirreboque') {
     document.getElementById('grupo-subtipo').style.display = 'block';
     document.getElementById('grupo-eixos').style.display = 'block';

@@ -11,7 +11,8 @@ class Motorista(Base):
     )
 
     id              = Column(Integer, primary_key=True, index=True)
-    usuario_id      = Column(Integer, ForeignKey("usuarios.id"), nullable=False, unique=True)
+    usuario_id      = Column(Integer, ForeignKey("usuarios.id"), nullable=True, unique=True)
+    nome            = Column(String(100), nullable=False)
     cpf             = Column(String(14), nullable=False)
     cnh_numero      = Column(String(20), nullable=False)
     cnh_categoria   = Column(String(5), nullable=False)

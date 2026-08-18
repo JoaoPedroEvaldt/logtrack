@@ -15,6 +15,7 @@ async function carregarResumo() {
   document.getElementById('atrasadas').textContent = data.atrasadas;
   document.getElementById('ocorrencias').textContent = data.ocorrencias_abertas;
   document.getElementById('veiculos').textContent = data.veiculos_disponiveis;
+  document.getElementById('motoristas-disponiveis').textContent = data.motoristas_disponiveis;
 }
 
 async function carregarGraficoStatus() {
@@ -79,7 +80,7 @@ async function carregarEntregas() {
   const tbody = document.getElementById('tabela-entregas');
 
   if (data.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#888;">Nenhuma entrega cadastrada</td></tr>';
+    tbody.innerHTML = estadoVazio(6, 'Nenhuma entrega cadastrada', 'Cadastre a primeira entrega para ver o painel ganhar vida.', 'vazio');
     return;
   }
 
@@ -87,12 +88,55 @@ async function carregarEntregas() {
   tbody.innerHTML = recentes.map(e => `
     <tr>
       <td>#${e.id}</td>
-      <td>${e.cliente}</td>
-      <td>${e.origem}</td>
-      <td>${e.destino}</td>
+      <td>${escapeHtml(e.cliente)}</td>
+      <td>${escapeHtml(e.origem)}</td>
+      <td>${escapeHtml(e.destino)}</td>
       <td>${badgeStatus(e.status)}</td>
       <td>${formatarDataHora(e.previsao)}</td>
     </tr>
+  `).join('');
+
+  calcularFaturamentoMes(data);
+}
+
+function calcularFaturamentoMes(entregas) {
+  const hoje = new Date();
+  const total = entregas
+    .filter(e => {
+      if (e.status !== 'entregue' || !e.concluido_em) return false;
+      const data = new Date(e.concluido_em);
+      return data.getMonth() === hoje.getMonth() && data.getFullYear() === hoje.getFullYear();
+    })
+    .reduce((soma, e) => soma + (parseFloat(e.valor_frete) || 0), 0);
+
+  document.getElementById('faturamento-mes').textContent =
+    'R$ ' + total.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+}
+
+async function carregarTopMotoristas() {
+  const data = await get('/dashboard/desempenho-motoristas');
+  const container = document.getElementById('top-motoristas');
+  if (!container) return;
+
+  const comFaturamento = (data || []).filter(m => m.faturamento > 0);
+
+  if (comFaturamento.length === 0) {
+    container.innerHTML = estadoVazio(null, 'Sem dados ainda', 'O ranking aparece assim que houver entregas concluídas com valor de frete.', 'usuario');
+    return;
+  }
+
+  const top5 = comFaturamento.slice(0, 5);
+  const max = Math.max(...top5.map(m => m.faturamento), 1);
+
+  container.innerHTML = top5.map((m, i) => `
+    <div class="ranking-item">
+      <span class="ranking-pos">${i + 1}º</span>
+      <div class="ranking-info">
+        <div class="ranking-nome">${escapeHtml(m.motorista || 'Motorista')}</div>
+        <div class="ranking-bar-track"><div class="ranking-bar-fill" style="width:${(m.faturamento / max * 100)}%;"></div></div>
+      </div>
+      <span class="ranking-valor">R$ ${m.faturamento.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+    </div>
   `).join('');
 }
 
@@ -100,8 +144,10 @@ carregarResumo();
 carregarGraficoStatus();
 carregarGraficoDias();
 carregarEntregas();
+carregarTopMotoristas();
 
 setInterval(() => {
   carregarResumo();
   carregarEntregas();
+  carregarTopMotoristas();
 }, 30000);

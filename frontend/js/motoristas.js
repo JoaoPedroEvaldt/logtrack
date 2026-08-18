@@ -1,14 +1,18 @@
 checarAuth();
 document.getElementById('usuario-perfil').textContent = localStorage.getItem('perfil') || '';
+aplicarMascaraCPF(document.getElementById('cpf'));
+aplicarMascaraSomenteDigitos(document.getElementById('cnh-numero'), 11);
 
 let motoristaEditandoId = null;
+let motoristasCarregados = [];
 
 async function carregarMotoristas() {
   const data = await get('/motoristas') || [];
+  motoristasCarregados = data;
   const tbody = document.getElementById('tabela-motoristas');
 
   if (data.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#888;">Nenhum motorista cadastrado</td></tr>';
+    tbody.innerHTML = estadoVazio(10, 'Nenhum motorista cadastrado', 'Clique em "Novo Motorista" para cadastrar o primeiro da equipe.', 'usuario');
     return;
   }
 
@@ -21,20 +25,30 @@ async function carregarMotoristas() {
     return `
       <tr>
         <td>#${m.id}</td>
-        <td>${m.nome || '—'}</td>
-        <td>${m.cpf}</td>
-        <td>${m.cnh_numero}</td>
-        <td>${m.cnh_categoria}</td>
+        <td>${escapeHtml(m.nome) || '—'}</td>
+        <td>${escapeHtml(m.cpf)}</td>
+        <td>${escapeHtml(m.cnh_numero)}</td>
+        <td>${escapeHtml(m.cnh_categoria)}</td>
         <td>${alertaCNH}${formatarData(m.cnh_validade)}</td>
-        <td>${m.telefone || '—'}</td>
-        <td><span class="badge badge-${m.status === 'disponivel' ? 'entregue' : m.status === 'em_rota' ? 'em_rota' : 'cancelado'}">${m.status}</span></td>
+        <td>${escapeHtml(m.telefone) || '—'}</td>
+        <td><span class="badge badge-${m.status === 'disponivel' ? 'entregue' : m.status === 'em_rota' ? 'em_rota' : 'cancelado'}">${escapeHtml(m.status)}</span></td>
+        <td>${m.possui_login ? `<span class="badge badge-entregue" title="${escapeHtml(m.email || '')}">Com acesso</span>` : '<span class="badge badge-cancelado">Sem acesso</span>'}</td>
         <td style="display:flex;gap:6px;">
-          <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="editarMotorista(${m.id}, '${m.nome || ''}', '${m.telefone || ''}', '${m.cnh_categoria}', '${m.cnh_validade}')">${svgIcone('editar', 12)} Editar</button>
+          <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="editarMotorista(${m.id})">${svgIcone('editar', 12)} Editar</button>
           <button class="btn btn-danger" style="font-size:11px;padding:4px 10px;" onclick="excluirMotorista(${m.id})">${svgIcone('excluir', 12)} Excluir</button>
         </td>
       </tr>
     `;
   }).join('');
+}
+
+function alternarCamposAcesso() {
+  const marcado = document.getElementById('criar-acesso').checked;
+  document.getElementById('campos-acesso').style.display = marcado ? 'grid' : 'none';
+  if (!marcado) {
+    document.getElementById('email').value = '';
+    document.getElementById('senha').value = '';
+  }
 }
 
 function abrirModal() {
@@ -48,6 +62,8 @@ function abrirModal() {
   document.getElementById('cnh-categoria').value = '';
   document.getElementById('cnh-validade').value = '';
   document.getElementById('telefone').value = '';
+  document.getElementById('criar-acesso').checked = false;
+  document.getElementById('campos-acesso').style.display = 'none';
   document.getElementById('campos-novo').style.display = 'block';
   document.getElementById('modal').classList.add('aberto');
 }
@@ -56,13 +72,15 @@ function fecharModal() {
   document.getElementById('modal').classList.remove('aberto');
 }
 
-function editarMotorista(id, nome, telefone, cnhCategoria, cnhValidade) {
+function editarMotorista(id) {
+  const m = motoristasCarregados.find(m => m.id === id);
+  if (!m) return;
   motoristaEditandoId = id;
   document.querySelector('#modal .modal-header h2').textContent = 'Editar Motorista';
-  document.getElementById('nome').value = nome;
-  document.getElementById('telefone').value = telefone;
-  document.getElementById('cnh-categoria').value = cnhCategoria;
-  document.getElementById('cnh-validade').value = cnhValidade;
+  document.getElementById('nome').value = m.nome || '';
+  document.getElementById('telefone').value = m.telefone || '';
+  document.getElementById('cnh-categoria').value = m.cnh_categoria;
+  document.getElementById('cnh-validade').value = m.cnh_validade;
   document.getElementById('campos-novo').style.display = 'none';
   document.getElementById('modal').classList.add('aberto');
 }
@@ -85,19 +103,36 @@ async function salvarMotorista() {
     };
     res = await put(`/motoristas/${motoristaEditandoId}`, dados);
   } else {
+    const criarAcesso = document.getElementById('criar-acesso').checked;
     const dados = {
       nome: document.getElementById('nome').value,
-      email: document.getElementById('email').value,
-      senha: document.getElementById('senha').value,
       cpf: document.getElementById('cpf').value,
       cnh_numero: document.getElementById('cnh-numero').value,
       cnh_categoria: document.getElementById('cnh-categoria').value,
       cnh_validade: document.getElementById('cnh-validade').value,
       telefone: document.getElementById('telefone').value || null,
+      email: criarAcesso ? document.getElementById('email').value : null,
+      senha: criarAcesso ? document.getElementById('senha').value : null,
     };
 
-    if (!dados.nome || !dados.email || !dados.senha || !dados.cpf || !dados.cnh_numero || !dados.cnh_categoria || !dados.cnh_validade) {
+    if (!dados.nome || !dados.cpf || !dados.cnh_numero || !dados.cnh_categoria || !dados.cnh_validade) {
       toastAviso('Preencha todos os campos obrigatórios!');
+      return;
+    }
+    if (dados.cpf.replace(/\D/g, '').length !== 11) {
+      toastAviso('CPF incompleto! Informe os 11 dígitos.');
+      return;
+    }
+    if (dados.cnh_numero.length !== 11) {
+      toastAviso('Número da CNH incompleto! Informe os 11 dígitos.');
+      return;
+    }
+    if (criarAcesso && (!dados.email || !dados.senha)) {
+      toastAviso('Para criar acesso, preencha e-mail e senha!');
+      return;
+    }
+    if (criarAcesso && dados.senha.length < 8) {
+      toastAviso('A senha de acesso deve ter no mínimo 8 caracteres!');
       return;
     }
 
@@ -105,7 +140,7 @@ async function salvarMotorista() {
   }
 
   if (res.detail) {
-    toastErro('Erro: ' + res.detail);
+    toastErro('Erro: ' + extrairErro(res));
     return;
   }
 

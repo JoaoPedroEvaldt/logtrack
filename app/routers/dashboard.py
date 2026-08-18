@@ -66,16 +66,22 @@ def entregas_por_dia(db: Session = Depends(get_db), atual: Usuario = Depends(get
 
 @router.get("/desempenho-motoristas")
 def desempenho_motoristas(db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
-    from app.models.motorista import Motorista
-    from app.models.usuario import Usuario as UsuarioModel
-
+    faturamento = func.coalesce(
+        func.sum(Entrega.valor_frete).filter(Entrega.status == "entregue"), 0
+    )
     resultado = db.query(
-        UsuarioModel.nome,
+        Motorista.nome,
         func.count(Entrega.id).label("total"),
         func.count(Entrega.id).filter(Entrega.status == "entregue").label("concluidas"),
-        func.count(Entrega.id).filter(Entrega.status == "atrasado").label("atrasadas")
-    ).join(Motorista, Motorista.usuario_id == UsuarioModel.id)\
-     .join(Entrega, Entrega.motorista_id == Motorista.id)\
-     .group_by(UsuarioModel.nome).all()
+        func.count(Entrega.id).filter(Entrega.status == "atrasado").label("atrasadas"),
+        faturamento.label("faturamento")
+    ).join(Entrega, Entrega.motorista_id == Motorista.id)\
+     .filter(Motorista.status != "inativo")\
+     .group_by(Motorista.id, Motorista.nome)\
+     .order_by(faturamento.desc())\
+     .all()
 
-    return [{"motorista": r.nome, "total": r.total, "concluidas": r.concluidas, "atrasadas": r.atrasadas} for r in resultado] 
+    return [
+        {"motorista": r.nome, "total": r.total, "concluidas": r.concluidas, "atrasadas": r.atrasadas, "faturamento": float(r.faturamento)}
+        for r in resultado
+    ]

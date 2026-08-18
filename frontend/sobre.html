@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>LogTrack — Sobre o Sistema</title>
+  <meta name="description" content="LogTrack — Sistema inteligente de gestão operacional para transportadoras: problema, solução, funcionalidades e tecnologia por trás do projeto." />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 56 66'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%232E75B6'/%3E%3Cstop offset='100%25' stop-color='%231E4D78'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M28 2C14.7 2 4 12.5 4 25.5 4 42 28 62 28 62S52 42 52 25.5C52 12.5 41.3 2 28 2Z' fill='url(%23g)'/%3E%3Cg fill='%23FFFFFF'%3E%3Crect x='10' y='18' width='6' height='9'/%3E%3Crect x='17' y='15' width='23' height='12' rx='1'/%3E%3Ccircle cx='14' cy='29' r='2.3'/%3E%3Ccircle cx='31' cy='29' r='2.3'/%3E%3Ccircle cx='38' cy='29' r='2.3'/%3E%3C/g%3E%3Ccircle cx='45' cy='9' r='7' fill='%2327AE60' opacity='0.25'/%3E%3Ccircle cx='45' cy='9' r='4' fill='%2327AE60'/%3E%3C/svg%3E" />
+  <style>
+    .sobre-page { background: var(--bg); min-height: 100vh; }
+    .sobre-hero {
+      background: linear-gradient(135deg, #1E4D78 0%, #2E75B6 100%);
+      padding: 64px 24px 80px;
+      text-align: center;
+      color: white;
+    }
+    .sobre-hero .logo-icon svg { margin: 0 auto 16px; display: block; }
+    .sobre-hero h1 { font-size: 34px; font-weight: 800; letter-spacing: -0.01em; }
+    .sobre-hero p.tagline { font-size: 16px; color: rgba(255,255,255,0.85); margin-top: 10px; max-width: 560px; margin-left: auto; margin-right: auto; }
+    .sobre-hero .btn-voltar {
+      display: inline-flex; align-items: center; gap: 8px; margin-top: 28px;
+      background: white; color: var(--primary); font-weight: 700; font-size: 14px;
+      padding: 12px 24px; border-radius: var(--radius); text-decoration: none;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.15); transition: transform 0.15s;
+    }
+    .sobre-hero .btn-voltar:hover { transform: translateY(-2px); }
+
+    .sobre-container { max-width: 980px; margin: -48px auto 0; padding: 0 24px 64px; position: relative; }
+
+    .sobre-secao { background: var(--bg-card); border-radius: 16px; box-shadow: var(--shadow); border: 1px solid var(--border); padding: 36px; margin-bottom: 24px; }
+    .sobre-secao h2 { font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+    .sobre-secao > p { color: var(--text-light); font-size: 14px; line-height: 1.7; }
+
+    .problema-solucao { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .ps-card { padding: 20px; border-radius: var(--radius); }
+    .ps-card.problema { background: rgba(192,57,43,0.06); border: 1px solid rgba(192,57,43,0.15); }
+    .ps-card.solucao { background: rgba(39,174,96,0.06); border: 1px solid rgba(39,174,96,0.15); }
+    .ps-card h3 { font-size: 14px; font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+    .ps-card.problema h3 { color: var(--danger); }
+    .ps-card.solucao h3 { color: var(--secondary); }
+    .ps-card p { font-size: 13px; color: var(--text); line-height: 1.7; }
+
+    .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-top: 20px; }
+    .feature-item { display: flex; gap: 14px; align-items: flex-start; }
+    .feature-item .info-icon { margin-top: 2px; }
+    .feature-item h4 { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
+    .feature-item p { font-size: 12.5px; color: var(--text-light); line-height: 1.5; }
+
+    .tech-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+    .tech-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: var(--bg); border: 1px solid var(--border); border-radius: 20px;
+      padding: 8px 16px; font-size: 13px; font-weight: 600; color: var(--text);
+    }
+    .tech-badge .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary-light); flex-shrink: 0; }
+
+    .sobre-footer { text-align: center; color: var(--text-light); font-size: 12px; padding-bottom: 24px; }
+
+    @media (max-width: 640px) {
+      .problema-solucao { grid-template-columns: 1fr; }
+      .sobre-secao { padding: 24px; }
+      .sobre-hero h1 { font-size: 26px; }
+    }
+  </style>
+</head>
+<body class="sobre-page">
+
+  <div class="sobre-hero">
+    <span class="logo-icon">
+      <svg viewBox="0 0 56 66" width="52" height="62" role="img" aria-label="LogTrack">
+        <defs>
+          <linearGradient id="lt-grad-sobre" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#FFFFFF"/>
+            <stop offset="100%" stop-color="#E8F1FA"/>
+          </linearGradient>
+        </defs>
+        <path d="M28 2C14.7 2 4 12.5 4 25.5 4 42 28 62 28 62S52 42 52 25.5C52 12.5 41.3 2 28 2Z" fill="url(#lt-grad-sobre)"/>
+        <g fill="#1E4D78">
+          <rect x="10" y="18" width="6" height="9"/>
+          <rect x="17" y="15" width="23" height="12" rx="1"/>
+          <circle cx="14" cy="29" r="2.3"/>
+          <circle cx="31" cy="29" r="2.3"/>
+          <circle cx="38" cy="29" r="2.3"/>
+        </g>
+        <circle cx="45" cy="9" r="7" fill="#27AE60" opacity="0.35"/>
+        <circle cx="45" cy="9" r="4" fill="#27AE60"/>
+      </svg>
+    </span>
+    <h1>LogTrack</h1>
+    <p class="tagline">Sistema inteligente de gestão operacional para transportadoras — entregas, motoristas, veículos, manutenções e ocorrências, tudo em um só lugar.</p>
+    <a href="index.html" class="btn-voltar">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      Voltar ao login
+    </a>
+  </div>
+
+  <div class="sobre-container">
+
+    <section class="sobre-secao">
+      <h2>O problema</h2>
+      <p>Transportadoras de pequeno e médio porte costumam controlar entregas, motoristas e veículos por planilhas soltas, papel e mensagens de WhatsApp. Sem um sistema central, informação se perde, prazos escapam do controle e decisões são tomadas sem dados confiáveis.</p>
+      <div class="problema-solucao" style="margin-top:24px;">
+        <div class="ps-card problema">
+          <h3><span class="ps-icone" data-icone="alerta"></span> Sem sistema centralizado</h3>
+          <p>Cada motorista, veículo e entrega vive numa fonte de informação diferente. Ocorrências não ficam registradas, manutenções são esquecidas e ninguém sabe, em tempo real, quantas entregas estão atrasadas.</p>
+        </div>
+        <div class="ps-card solucao">
+          <h3><span class="ps-icone" data-icone="check"></span> Com o LogTrack</h3>
+          <p>Uma única fonte de verdade: cadastro de motoristas e veículos, acompanhamento de entregas em kanban, histórico de manutenções, registro de ocorrências e relatórios gerenciais — acessível de qualquer lugar, com controle de acesso por perfil.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="sobre-secao">
+      <h2>Funcionalidades</h2>
+      <p>Um módulo para cada frente da operação, todos conectados aos mesmos dados.</p>
+      <div class="feature-grid" id="feature-grid"></div>
+    </section>
+
+    <section class="sobre-secao">
+      <h2>Tecnologia</h2>
+      <p>Construído com uma stack moderna, focada em segurança e simplicidade de manutenção.</p>
+      <div class="tech-grid" id="tech-grid"></div>
+    </section>
+
+  </div>
+
+  <div class="sobre-footer">© 2025 LogTrack — Projeto acadêmico de gestão operacional para transportadoras</div>
+
+  <script src="js/icons.js"></script>
+  <script>
+    document.querySelectorAll('.ps-icone').forEach(el => {
+      el.innerHTML = svgIcone(el.dataset.icone, 16);
+    });
+
+    const FEATURES = [
+      { icone: 'caminhao', titulo: 'Entregas', texto: 'Acompanhamento em kanban por status: aguardando, em rota, entregue, atrasado, ocorrência ou cancelado.' },
+      { icone: 'usuario', titulo: 'Motoristas', texto: 'Cadastro de CPF, CNH e validade, com alerta automático de CNH prestes a vencer. Login de acesso é opcional.' },
+      { icone: 'caminhao', titulo: 'Veículos e Conjuntos', texto: 'Frota organizada por tipo, com montagem de conjuntos (cavalo + semirreboques) vinculados a um motorista.' },
+      { icone: 'editar', titulo: 'Manutenções', texto: 'Histórico completo por veículo, com custo, quilometragem e exportação de relatório em PDF.' },
+      { icone: 'alerta', titulo: 'Ocorrências', texto: 'Registro de atrasos, acidentes e problemas vinculado à entrega e ao veículo, com edição e exclusão.' },
+      { icone: 'relogio', titulo: 'Relatórios', texto: 'Indicadores de desempenho por período, com exportação em PDF para prestação de contas.' },
+      { icone: 'link', titulo: 'Dashboard', texto: 'Visão gerencial em tempo real: entregas do dia, faturamento do mês e ranking de motoristas.' },
+      { icone: 'usuario', titulo: 'Usuários e Perfis', texto: 'Controle de acesso por perfil — administrador, operador e motorista — cada um vendo só o que precisa.' },
+    ];
+
+    document.getElementById('feature-grid').innerHTML = FEATURES.map(f => `
+      <div class="feature-item">
+        <span class="info-icon">${svgIcone(f.icone, 16)}</span>
+        <div>
+          <h4>${f.titulo}</h4>
+          <p>${f.texto}</p>
+        </div>
+      </div>
+    `).join('');
+
+    const TECH = ['FastAPI', 'PostgreSQL', 'SQLAlchemy', 'JWT + bcrypt', 'Docker', 'JavaScript'];
+    document.getElementById('tech-grid').innerHTML = TECH.map(t => `<span class="tech-badge"><span class="dot"></span>${t}</span>`).join('');
+  </script>
+</body>
+</html>

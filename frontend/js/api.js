@@ -16,6 +16,31 @@ function checarAuth() {
   }
 }
 
+function checarAdmin() {
+  if (localStorage.getItem('perfil') !== 'administrador') {
+    window.location.href = 'dashboard.html';
+  }
+}
+
+function obterIdUsuarioLogado() {
+  const token = getToken();
+  if (!token) return null;
+  try {
+    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const json = decodeURIComponent(atob(base64).split('').map(c => '%' + c.charCodeAt(0).toString(16).padStart(2, '0')).join(''));
+    return parseInt(JSON.parse(json).sub, 10);
+  } catch (e) {
+    return null;
+  }
+}
+
+function aplicarVisibilidadePorPerfil() {
+  const perfil = localStorage.getItem('perfil');
+  document.querySelectorAll('[data-admin-only]').forEach(el => {
+    if (perfil !== 'administrador') el.style.display = 'none';
+  });
+}
+
 async function get(endpoint) {
   const res = await fetch(`${API}${endpoint}`, {
     headers: { 'Authorization': `Bearer ${getToken()}` }
@@ -56,6 +81,29 @@ async function del(endpoint) {
   return res.json();
 }
 
+function escapeHtml(valor) {
+  if (valor === null || valor === undefined) return '';
+  return String(valor).replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+/* ===================== ESTADOS VAZIO / CARREGANDO ===================== */
+function estadoVazio(colspan, titulo, subtitulo, icone) {
+  const conteudo = `
+    <div class="empty-state">
+      ${svgIcone(icone || 'vazio', 38)}
+      <div class="empty-titulo">${titulo}</div>
+      ${subtitulo ? `<div class="empty-sub">${subtitulo}</div>` : ''}
+    </div>`;
+  return colspan ? `<tr><td colspan="${colspan}" style="padding:0;">${conteudo}</td></tr>` : conteudo;
+}
+
+function estadoCarregando(colspan) {
+  const conteudo = `<div class="loading-state"><span class="spinner"></span> Carregando...</div>`;
+  return colspan ? `<tr><td colspan="${colspan}" style="padding:0;">${conteudo}</td></tr>` : conteudo;
+}
+
 function formatarData(data) {
   if (!data) return '—';
   return new Date(data).toLocaleDateString('pt-BR');
@@ -80,6 +128,34 @@ function moedaParaNumero(valor) {
   if (!valor) return null;
   const numero = parseFloat(valor.replace(/\./g, '').replace(',', '.'));
   return isNaN(numero) ? null : numero;
+}
+
+/* ===================== MÁSCARAS SOMENTE NÚMEROS ===================== */
+function aplicarMascaraSomenteDigitos(input, maxLength) {
+  input.addEventListener('input', () => {
+    input.value = input.value.replace(/\D/g, '').slice(0, maxLength);
+  });
+}
+
+function aplicarMascaraCPF(input) {
+  input.addEventListener('input', () => {
+    let digitos = input.value.replace(/\D/g, '').slice(0, 11);
+    digitos = digitos.replace(/(\d{3})(\d)/, '$1.$2');
+    digitos = digitos.replace(/(\d{3})(\d)/, '$1.$2');
+    digitos = digitos.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+    input.value = digitos;
+  });
+}
+
+/* Extrai uma mensagem legível de um erro da API, seja ele
+   {detail: "texto"} (HTTPException) ou {detail: [{msg: "..."}]} (validação do Pydantic). */
+function extrairErro(res) {
+  if (!res || !res.detail) return 'Erro desconhecido';
+  if (typeof res.detail === 'string') return res.detail;
+  if (Array.isArray(res.detail)) {
+    return res.detail.map(e => e.msg || JSON.stringify(e)).join('; ');
+  }
+  return 'Erro desconhecido';
 }
 
 function numeroParaMoeda(numero) {
@@ -151,7 +227,9 @@ function fecharMenu() {
 }
 
 aplicarTema();
+aplicarVisibilidadePorPerfil();
 
 document.addEventListener('DOMContentLoaded', () => {
   aplicarTema();
+  aplicarVisibilidadePorPerfil();
 });

@@ -7,6 +7,10 @@ class OcorrenciaCreate(BaseModel):
     tipo: str
     descricao: str
 
+class OcorrenciaUpdate(BaseModel):
+    tipo: Optional[str] = None
+    descricao: Optional[str] = None
+
 class OcorrenciaResponse(BaseModel):
     id: int
     entrega_id: int

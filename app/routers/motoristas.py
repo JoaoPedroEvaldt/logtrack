@@ -15,7 +15,10 @@ def criar_motorista(dados: MotoristaCreate, db: Session = Depends(get_db), atual
     if atual.perfil not in ["administrador", "operador"]:
         raise HTTPException(status_code=403, detail="Acesso negado")
 
-    usuario_existente = db.query(Usuario).filter(Usuario.email == dados.email).first()
+    if bool(dados.email) != bool(dados.senha):
+        raise HTTPException(status_code=400, detail="Para criar acesso ao sistema, informe e-mail e senha juntos")
+
+    usuario_existente = db.query(Usuario).filter(Usuario.email == dados.email).first() if dados.email else None
     motorista_reativar = None
     if usuario_existente:
         motorista_reativar = db.query(Motorista).filter(Motorista.usuario_id == usuario_existente.id).first()
@@ -30,6 +33,7 @@ def criar_motorista(dados: MotoristaCreate, db: Session = Depends(get_db), atual
         if motorista_reativar:
             usuario_existente.nome = dados.nome
             usuario_existente.senha_hash = auth.gerar_hash_senha(dados.senha)
+            motorista_reativar.nome = dados.nome
             motorista_reativar.cpf = dados.cpf
             motorista_reativar.cnh_numero = dados.cnh_numero
             motorista_reativar.cnh_categoria = dados.cnh_categoria
@@ -39,16 +43,20 @@ def criar_motorista(dados: MotoristaCreate, db: Session = Depends(get_db), atual
             db.commit()
             motorista = motorista_reativar
         else:
-            usuario = Usuario(
-                nome=dados.nome,
-                email=dados.email,
-                senha_hash=auth.gerar_hash_senha(dados.senha),
-                perfil="motorista"
-            )
-            db.add(usuario)
-            db.flush()
+            usuario_id = None
+            if dados.email:
+                usuario = Usuario(
+                    nome=dados.nome,
+                    email=dados.email,
+                    senha_hash=auth.gerar_hash_senha(dados.senha),
+                    perfil="motorista"
+                )
+                db.add(usuario)
+                db.flush()
+                usuario_id = usuario.id
             motorista = Motorista(
-                usuario_id=usuario.id,
+                usuario_id=usuario_id,
+                nome=dados.nome,
                 cpf=dados.cpf,
                 cnh_numero=dados.cnh_numero,
                 cnh_categoria=dados.cnh_categoria,
@@ -61,19 +69,19 @@ def criar_motorista(dados: MotoristaCreate, db: Session = Depends(get_db), atual
         db.rollback()
         raise HTTPException(status_code=400, detail="Não foi possível cadastrar o motorista. Verifique os dados informados.")
     db.refresh(motorista)
-    return _motorista_com_nome(motorista, db)
+    return _serializar_motorista(motorista, db)
 
 @router.get("/", response_model=List[MotoristaResponse])
 def listar_motoristas(db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
     motoristas = db.query(Motorista).filter(Motorista.status != "inativo").all()
-    return [_motorista_com_nome(m, db) for m in motoristas]
+    return [_serializar_motorista(m, db) for m in motoristas]
 
 @router.get("/{id}", response_model=MotoristaResponse)
 def buscar_motorista(id: int, db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
     motorista = db.query(Motorista).filter(Motorista.id == id).first()
     if not motorista:
         raise HTTPException(status_code=404, detail="Motorista não encontrado")
-    return _motorista_com_nome(motorista, db)
+    return _serializar_motorista(motorista, db)
 
 @router.put("/{id}", response_model=MotoristaResponse)
 def atualizar_motorista(id: int, dados: MotoristaUpdate, db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
@@ -83,15 +91,10 @@ def atualizar_motorista(id: int, dados: MotoristaUpdate, db: Session = Depends(g
     if not motorista:
         raise HTTPException(status_code=404, detail="Motorista não encontrado")
     for campo, valor in dados.model_dump(exclude_none=True).items():
-        if campo == "nome":
-            usuario = db.query(Usuario).filter(Usuario.id == motorista.usuario_id).first()
-            if usuario:
-                usuario.nome = valor
-        else:
-            setattr(motorista, campo, valor)
+        setattr(motorista, campo, valor)
     db.commit()
     db.refresh(motorista)
-    return _motorista_com_nome(motorista, db)
+    return _serializar_motorista(motorista, db)
 
 @router.delete("/{id}")
 def deletar_motorista(id: int, db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
@@ -104,17 +107,18 @@ def deletar_motorista(id: int, db: Session = Depends(get_db), atual: Usuario = D
     db.commit()
     return {"message": "Motorista desativado com sucesso"}
 
-def _motorista_com_nome(motorista, db):
-    usuario = db.query(Usuario).filter(Usuario.id == motorista.usuario_id).first()
-    result = MotoristaResponse(
+def _serializar_motorista(motorista, db):
+    usuario = db.query(Usuario).filter(Usuario.id == motorista.usuario_id).first() if motorista.usuario_id else None
+    return MotoristaResponse(
         id=motorista.id,
-        nome=usuario.nome if usuario else None,
+        nome=motorista.nome,
         cpf=motorista.cpf,
         cnh_numero=motorista.cnh_numero,
         cnh_categoria=motorista.cnh_categoria,
         cnh_validade=motorista.cnh_validade,
         telefone=motorista.telefone,
         status=motorista.status,
+        possui_login=motorista.usuario_id is not None,
+        email=usuario.email if usuario else None,
         criado_em=motorista.criado_em
     )
-    return result

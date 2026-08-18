@@ -11,7 +11,8 @@ CREATE TABLE IF NOT EXISTS usuarios (
 
 CREATE TABLE IF NOT EXISTS motoristas (
     id SERIAL PRIMARY KEY,
-    usuario_id INTEGER NOT NULL UNIQUE REFERENCES usuarios(id) ON DELETE CASCADE,
+    usuario_id INTEGER UNIQUE REFERENCES usuarios(id) ON DELETE CASCADE,
+    nome VARCHAR(100) NOT NULL,
     cpf VARCHAR(14) NOT NULL,
     cnh_numero VARCHAR(20) NOT NULL,
     cnh_categoria VARCHAR(5) NOT NULL,
@@ -116,6 +117,15 @@ ALTER TABLE manutencoes ADD COLUMN IF NOT EXISTS quilometragem INTEGER;
 ALTER TABLE manutencoes ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'concluida';
 ALTER TABLE manutencoes ADD COLUMN IF NOT EXISTS proxima_revisao DATE;
 ALTER TABLE entregas ADD COLUMN IF NOT EXISTS valor_frete DECIMAL(10,2) CHECK (valor_frete >= 0);
+
+-- Motorista deixa de exigir login: nome passa a ser campo próprio de motoristas
+-- (antes vinha só do usuário vinculado) e usuario_id vira opcional, para permitir
+-- cadastrar motoristas sem conta de acesso ao sistema.
+ALTER TABLE motoristas ADD COLUMN IF NOT EXISTS nome VARCHAR(100);
+UPDATE motoristas m SET nome = u.nome FROM usuarios u WHERE m.usuario_id = u.id AND m.nome IS NULL;
+UPDATE motoristas SET nome = 'Motorista #' || id WHERE nome IS NULL;
+ALTER TABLE motoristas ALTER COLUMN nome SET NOT NULL;
+ALTER TABLE motoristas ALTER COLUMN usuario_id DROP NOT NULL;
 
 INSERT INTO usuarios (nome, email, senha_hash, perfil)
 VALUES (

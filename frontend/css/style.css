@@ -276,8 +276,24 @@ html.dark body {
   box-shadow: var(--shadow);
   border: 1px solid var(--border);
   transition: background 0.3s, transform 0.15s, box-shadow 0.15s;
+  position: relative;
 }
 .card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
+
+/* Cards que também são links (ex.: atalhos do dashboard) — só afeta <a class="card">,
+   os cards comuns (<div>, ex. conjuntos.js) continuam sem esse comportamento. */
+a.card { display: block; text-decoration: none; color: inherit; cursor: pointer; }
+
+.card-arrow {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  color: var(--text-light);
+  opacity: 0.3;
+  transition: opacity 0.15s, transform 0.15s;
+}
+.card-arrow svg { width: 16px; height: 16px; display: block; }
+a.card:hover .card-arrow { opacity: 0.7; transform: translateX(2px); }
 
 .card-icon {
   width: 42px;
@@ -435,6 +451,15 @@ body.dark .badge-tipo-7 { background: rgba(137,135,129,0.22); color: #b3b1a9; }
 .chart-card { background: var(--bg-card); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); transition: background 0.3s; }
 .chart-card h3 { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 16px; }
 
+/* ===================== RANKING (TOP MOTORISTAS) ===================== */
+.ranking-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
+.ranking-pos { font-size: 12px; font-weight: 700; color: var(--text-light); width: 20px; flex-shrink: 0; }
+.ranking-info { flex: 1; min-width: 0; }
+.ranking-nome { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ranking-bar-track { height: 6px; background: var(--bg); border-radius: 4px; overflow: hidden; }
+.ranking-bar-fill { height: 100%; background: linear-gradient(90deg, var(--primary-light), var(--primary)); border-radius: 4px; transition: width 0.5s ease; }
+.ranking-valor { font-size: 13px; font-weight: 700; color: var(--text); flex-shrink: 0; }
+
 /* ===================== FILTROS ===================== */
 .filtros {
   background: var(--bg-card);
@@ -470,6 +495,53 @@ body.dark .filtros input {
   color: #F3F4F6;
   border-color: #374151;
 }
+
+/* ===================== ESTADOS VAZIO / CARREGANDO ===================== */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 56px 20px;
+  color: var(--text-light);
+  gap: 6px;
+  text-align: center;
+}
+.empty-state svg { opacity: 0.3; margin-bottom: 6px; }
+.empty-state .empty-titulo { font-size: 14px; font-weight: 600; color: var(--text); }
+.empty-state .empty-sub { font-size: 12px; color: var(--text-light); max-width: 320px; }
+
+.loading-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 48px 20px;
+  color: var(--text-light);
+  font-size: 13px;
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2.5px solid var(--border);
+  border-top-color: var(--primary-light);
+  border-radius: 50%;
+  animation: girar 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes girar { to { transform: rotate(360deg); } }
+
+/* ===================== ENTRADA SUAVE DO CONTEÚDO ===================== */
+@keyframes surgir {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.main-content > * { animation: surgir 0.35s ease-out both; }
+.main-content > *:nth-child(2) { animation-delay: 0.03s; }
+.main-content > *:nth-child(3) { animation-delay: 0.06s; }
+.main-content > *:nth-child(4) { animation-delay: 0.09s; }
 
 /* ===================== RESPONSIVIDADE ===================== */
 @media (max-width: 768px) {

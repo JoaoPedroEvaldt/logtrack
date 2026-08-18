@@ -34,6 +34,8 @@ def listar_usuarios(db: Session = Depends(get_db), atual: Usuario = Depends(get_
 
 @router.get("/{id}", response_model=UsuarioResponse)
 def buscar_usuario(id: int, db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
+    if atual.perfil != "administrador" and atual.id != id:
+        raise HTTPException(status_code=403, detail="Acesso negado")
     usuario = db.query(Usuario).filter(Usuario.id == id).first()
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
@@ -46,8 +48,24 @@ def atualizar_usuario(id: int, dados: UsuarioUpdate, db: Session = Depends(get_d
     usuario = db.query(Usuario).filter(Usuario.id == id).first()
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
-    for campo, valor in dados.model_dump(exclude_none=True).items():
+
+    if dados.ativo is False and usuario.id == atual.id:
+        raise HTTPException(status_code=400, detail="Você não pode desativar sua própria conta")
+
+    rebaixando_admin = dados.perfil is not None and dados.perfil != "administrador"
+    if usuario.perfil == "administrador" and (dados.ativo is False or rebaixando_admin):
+        outros_admins_ativos = db.query(Usuario).filter(
+            Usuario.perfil == "administrador", Usuario.ativo == True, Usuario.id != usuario.id
+        ).count()
+        if outros_admins_ativos == 0:
+            raise HTTPException(status_code=400, detail="Não é possível remover o único administrador ativo")
+
+    campos = dados.model_dump(exclude_none=True)
+    senha = campos.pop("senha", None)
+    if senha:
+        usuario.senha_hash = auth.gerar_hash_senha(senha)
+    for campo, valor in campos.items():
         setattr(usuario, campo, valor)
     db.commit()
     db.refresh(usuario)
-    return usuario 
+    return usuario

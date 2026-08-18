@@ -47,16 +47,16 @@ function renderizar(lista) {
   document.getElementById('total-ocorrencias').textContent = lista.filter(e => e.status === 'ocorrencia').length;
 
   if (lista.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;">Nenhuma entrega encontrada</td></tr>';
+    tbody.innerHTML = estadoVazio(7, 'Nenhuma entrega encontrada', 'Ajuste os filtros de período ou status para ver resultados.', 'vazio');
     return;
   }
 
   tbody.innerHTML = lista.map(e => `
     <tr>
       <td>#${e.id}</td>
-      <td>${e.cliente}</td>
-      <td>${e.origem}</td>
-      <td>${e.destino}</td>
+      <td>${escapeHtml(e.cliente)}</td>
+      <td>${escapeHtml(e.origem)}</td>
+      <td>${escapeHtml(e.destino)}</td>
       <td>${badgeStatus(e.status)}</td>
       <td>${formatarDataHora(e.previsao)}</td>
       <td>${formatarDataHora(e.concluido_em)}</td>
@@ -157,7 +157,7 @@ function renderizarDesempenhoVeiculos(inicioStr, fimStr) {
   document.getElementById('total-label-veiculos').textContent = `${veiculos.length} veículo(s)`;
 
   if (veiculos.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#888;">Nenhum veículo encontrado</td></tr>';
+    tbody.innerHTML = estadoVazio(4, 'Nenhum veículo encontrado', null, 'caminhao');
     return;
   }
 
@@ -182,7 +182,7 @@ function renderizarDesempenhoVeiculos(inicioStr, fimStr) {
 
   tbody.innerHTML = linhas.map(({ v, viagens, faturamento, diasManutencao }) => `
     <tr>
-      <td><strong>${v.placa}</strong><br><small style="color:var(--text-light);">${v.modelo} ${v.marca}</small></td>
+      <td><strong>${escapeHtml(v.placa)}</strong><br><small style="color:var(--text-light);">${escapeHtml(v.modelo)} ${escapeHtml(v.marca)}</small></td>
       <td>${viagens}</td>
       <td>R$ ${faturamento.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
       <td>${diasManutencao} dia(s)</td>
