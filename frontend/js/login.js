@@ -1,5 +1,18 @@
 const API = 'http://127.0.0.1:8000';
 
+(async function carregarStatsPublicas() {
+  try {
+    const res = await fetch(`${API}/dashboard/publico/resumo`);
+    if (!res.ok) return;
+    const data = await res.json();
+    document.getElementById('stat-entregas').textContent = data.entregas_ativas;
+    document.getElementById('stat-motoristas').textContent = data.motoristas;
+    document.getElementById('stat-veiculos').textContent = data.veiculos;
+  } catch (e) {
+    /* backend offline: mantém o traço estático já presente no HTML */
+  }
+})();
+
 document.getElementById('form-login').addEventListener('submit', async (e) => {
   e.preventDefault();
 
@@ -30,6 +43,7 @@ document.getElementById('form-login').addEventListener('submit', async (e) => {
 
     localStorage.setItem('token', data.access_token);
     localStorage.setItem('perfil', data.perfil);
+    localStorage.setItem('nome', data.nome || '');
 
     window.location.href = 'pages/dashboard.html';
 

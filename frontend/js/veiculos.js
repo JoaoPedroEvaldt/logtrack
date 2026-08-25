@@ -26,13 +26,45 @@ function atualizarTipoEixo() {
   grupoTipoEixo.style.display = eixos === '3' ? 'block' : 'none';
 }
 
+let veiculosEmRota = new Set();
+let veiculosEmManutencao = new Set();
+
+/* O cadastro de veículo só guarda "disponivel"/"inativo" — "em uso" e "manutenção"
+   não são campos salvos, são derivados de ter (ou não) uma entrega/manutenção ativa agora. */
+function statusEfetivoVeiculo(v) {
+  if (veiculosEmManutencao.has(v.id)) return 'em_manutencao';
+  if (veiculosEmRota.has(v.id)) return 'em_rota';
+  return v.status;
+}
+
 async function carregarVeiculos() {
-  const data = await get('/veiculos') || [];
-  veiculosCarregados = data;
-  const tbody = document.getElementById('tabela-veiculos');
+  const [veiculos, entregas, manutencoes] = await Promise.all([get('/veiculos'), get('/entregas'), get('/manutencoes')]);
+  veiculosCarregados = veiculos || [];
+  veiculosEmRota = new Set((entregas || []).filter(e => e.status === 'em_rota' && e.veiculo_id).map(e => e.veiculo_id));
+  veiculosEmManutencao = new Set((manutencoes || []).filter(m => m.status !== 'concluida').map(m => m.veiculo_id));
+  filtrarVeiculos();
+}
+
+function filtrarVeiculos() {
+  const busca = document.getElementById('busca-veiculo').value.toLowerCase();
+  const tipo = document.getElementById('filtro-tipo-veiculo').value;
+  const status = document.getElementById('filtro-status-veiculo').value;
+
+  const filtrados = veiculosCarregados.filter(v => {
+    if (tipo && v.tipo !== tipo) return false;
+    if (status && statusEfetivoVeiculo(v) !== status) return false;
+    if (busca && !`${v.placa} ${v.modelo} ${v.marca}`.toLowerCase().includes(busca)) return false;
+    return true;
+  });
+
+  renderizarVeiculos(filtrados);
+}
+
+function renderizarVeiculos(data) {
+  const grid = document.getElementById('grid-veiculos');
 
   if (data.length === 0) {
-    tbody.innerHTML = estadoVazio(11, 'Nenhum veículo cadastrado', 'Clique em "Novo Veículo" para adicionar o primeiro da sua frota.', 'caminhao');
+    grid.innerHTML = estadoVazio(null, 'Nenhum veículo encontrado', 'Ajuste a busca ou clique em "Novo Veículo" para adicionar.', 'caminhao');
     return;
   }
 
@@ -43,8 +75,15 @@ async function carregarVeiculos() {
     inativo: 'cancelado'
   };
 
+  const statusLabel = {
+    disponivel: 'Disponível',
+    em_rota: 'Em uso',
+    em_manutencao: 'Manutenção',
+    inativo: 'Inativo'
+  };
+
   const tipoLabel = {
-    cavalo: 'Cavalo',
+    cavalo: 'Cavalo-mecânico',
     semirreboque: 'Semirreboque',
     van: 'Van',
     utilitario: 'Utilitário',
@@ -53,30 +92,28 @@ async function carregarVeiculos() {
     carro: 'Carro'
   };
 
-  const tipoBadge = { cavalo: 1, semirreboque: 2, van: 3, utilitario: 4, moto: 5, caminhao: 6, carro: 7 };
-
-  tbody.innerHTML = data.map(v => {
-    const subtipo = v.subtipo ? ` — ${v.subtipo}` : '';
-    const eixos = v.eixos ? ` | ${v.eixos} eixos` : '';
-    const tipoEixo = v.tipo_eixo ? ` (${v.tipo_eixo.toUpperCase()})` : '';
+  grid.innerHTML = data.map(v => {
+    const detalhes = [
+      v.subtipo,
+      v.eixos ? `${v.eixos} eixos${v.tipo_eixo ? ' (' + v.tipo_eixo.toUpperCase() + ')' : ''}` : null
+    ].filter(Boolean).join(' · ');
 
     return `
-      <tr>
-        <td>#${v.id}</td>
-        <td><strong>${escapeHtml(v.placa)}</strong></td>
-        <td>${escapeHtml(v.modelo)}</td>
-        <td>${escapeHtml(v.marca)}</td>
-        <td>${v.ano}</td>
-        <td><span class="badge badge-tipo-${tipoBadge[v.tipo] || 7}">${tipoLabel[v.tipo] || escapeHtml(v.tipo)}</span></td>
-        <td>${escapeHtml(v.subtipo) || '—'}</td>
-        <td>${v.eixos ? v.eixos + eixos.replace(` | ${v.eixos} eixos`, '') + tipoEixo : '—'}</td>
-        <td>${v.capacidade_kg} kg</td>
-        <td><span class="badge badge-${statusBadge[v.status] || 'aguardando'}">${escapeHtml(v.status)}</span></td>
-        <td style="display:flex;gap:6px;">
+      <div class="vehicle-card">
+        <div class="vehicle-topo">
+          <span class="vehicle-tipo-pill">${tipoLabel[v.tipo] || escapeHtml(v.tipo)}</span>
+          <span class="badge badge-${statusBadge[statusEfetivoVeiculo(v)] || 'aguardando'}">${statusLabel[statusEfetivoVeiculo(v)] || escapeHtml(v.status)}</span>
+        </div>
+        <div class="vehicle-imagem">${svgIcone('caminhao', 34)}</div>
+        <div class="vehicle-placa">${escapeHtml(v.placa)}</div>
+        <div class="vehicle-modelo">${escapeHtml(v.marca)} ${escapeHtml(v.modelo)} · ${v.ano}</div>
+        ${detalhes ? `<div class="vehicle-modelo">${escapeHtml(detalhes)}</div>` : ''}
+        <div class="vehicle-modelo">${v.capacidade_kg} kg</div>
+        <div class="vehicle-acoes">
           <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="editarVeiculo(${v.id})">${svgIcone('editar', 12)} Editar</button>
           <button class="btn btn-danger" style="font-size:11px;padding:4px 10px;" onclick="excluirVeiculo(${v.id})">${svgIcone('excluir', 12)} Excluir</button>
-        </td>
-      </tr>
+        </div>
+      </div>
     `;
   }).join('');
 }

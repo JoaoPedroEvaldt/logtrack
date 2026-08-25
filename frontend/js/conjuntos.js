@@ -3,123 +3,173 @@ document.getElementById('usuario-perfil').textContent = localStorage.getItem('pe
 
 let conjuntoEditandoId = null;
 let conjuntosCarregados = [];
+let motoristasCarregados = [];
 let veiculosCarregados = [];
+
+/* ===================== LISTA "CONJUNTOS ATIVOS" ===================== */
 
 async function carregarConjuntos() {
   const data = await get('/conjuntos') || [];
   conjuntosCarregados = data;
-  const container = document.getElementById('cards-conjuntos');
+  renderizarListaConjuntos();
+}
 
-  if (data.length === 0) {
-    container.innerHTML = `<div style="grid-column:1/-1;">${estadoVazio(null, 'Nenhum conjunto cadastrado', 'Monte seu primeiro conjunto vinculando motorista, cavalo mecânico e semirreboques.', 'link')}</div>`;
+function renderizarListaConjuntos() {
+  const container = document.getElementById('lista-conjuntos');
+
+  if (conjuntosCarregados.length === 0) {
+    container.innerHTML = estadoVazio(null, 'Nenhum conjunto cadastrado', 'Monte seu primeiro conjunto ali em cima, vinculando motorista, cavalo mecânico e semirreboques.', 'link');
     return;
   }
 
-  container.innerHTML = data.map(c => `
-    <div class="card" style="border-left:4px solid var(--primary);">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
-        <div>
-          <div style="font-size:16px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px;">${svgIcone('link', 17)} ${escapeHtml(c.nome)}</div>
-          <span class="badge badge-entregue" style="margin-top:6px;">ativo</span>
-        </div>
-        <div style="display:flex;gap:6px;">
-          <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="editarConjunto(${c.id})">${svgIcone('editar', 12)} Editar</button>
-          <button class="btn btn-danger" style="font-size:11px;padding:4px 10px;" onclick="excluirConjunto(${c.id})">${svgIcone('excluir', 12)} Excluir</button>
-        </div>
+  container.innerHTML = conjuntosCarregados.map(c => `
+    <div class="conjunto-linha">
+      <div class="conjunto-linha-nome">${escapeHtml(c.nome)}</div>
+      <div class="conjunto-linha-col">
+        <span class="conjunto-linha-label">Motorista</span>
+        <span class="conjunto-linha-valor">${c.motorista ? escapeHtml(c.motorista.nome || 'Sem nome') : '—'}</span>
       </div>
-
-      <div style="display:flex;flex-direction:column;gap:10px;">
-        <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg);border-radius:8px;">
-          <span class="info-icon">${svgIcone('usuario', 16)}</span>
-          <div>
-            <div style="font-size:11px;color:var(--text-light);text-transform:uppercase;">Motorista</div>
-            <div style="font-size:13px;font-weight:500;color:var(--text);">
-              ${c.motorista ? `${escapeHtml(c.motorista.nome) || 'Sem nome'} <span style="color:var(--text-light);font-weight:400;">— CPF: ${escapeHtml(c.motorista.cpf)}</span>` : '<span style="color:var(--text-light);">Não atribuído</span>'}
-            </div>
-          </div>
-        </div>
-
-        ${c.motorista ? `
-        <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg);border-radius:8px;">
-          <span class="info-icon">${svgIcone('caminhao', 16)}</span>
-          <div>
-            <div style="font-size:11px;color:var(--text-light);text-transform:uppercase;">Viagem atual</div>
-            <div style="font-size:13px;font-weight:500;color:var(--text);">
-              ${c.viagem_atual
-                ? `${escapeHtml(c.viagem_atual.cliente)} → ${escapeHtml(c.viagem_atual.destino)} ${badgeStatus(c.viagem_atual.status)}`
-                : '<span class="badge badge-entregue">Disponível</span>'}
-            </div>
-          </div>
-        </div>` : ''}
-
-        <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg);border-radius:8px;">
-          <span class="info-icon">${svgIcone('caminhao', 16)}</span>
-          <div>
-            <div style="font-size:11px;color:var(--text-light);text-transform:uppercase;">Cavalo Mecânico</div>
-            <div style="font-size:13px;font-weight:500;color:var(--text);">
-              ${c.cavalo ? `${escapeHtml(c.cavalo.placa)} — ${escapeHtml(c.cavalo.modelo)} ${escapeHtml(c.cavalo.marca)}` : '<span style="color:var(--text-light);">Não atribuído</span>'}
-            </div>
-          </div>
-        </div>
-
-        ${c.semirreboque1 ? `
-        <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg);border-radius:8px;">
-          <span class="info-icon">${svgIcone('reboque', 16)}</span>
-          <div>
-            <div style="font-size:11px;color:var(--text-light);text-transform:uppercase;">Semirreboque 1</div>
-            <div style="font-size:13px;font-weight:500;color:var(--text);">${escapeHtml(c.semirreboque1.placa)} — ${escapeHtml(c.semirreboque1.modelo)} ${escapeHtml(c.semirreboque1.marca)}</div>
-          </div>
-        </div>` : ''}
-
-        ${c.semirreboque2 ? `
-        <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg);border-radius:8px;">
-          <span class="info-icon">${svgIcone('reboque', 16)}</span>
-          <div>
-            <div style="font-size:11px;color:var(--text-light);text-transform:uppercase;">Semirreboque 2</div>
-            <div style="font-size:13px;font-weight:500;color:var(--text);">${escapeHtml(c.semirreboque2.placa)} — ${escapeHtml(c.semirreboque2.modelo)} ${escapeHtml(c.semirreboque2.marca)}</div>
-          </div>
-        </div>` : ''}
+      <div class="conjunto-linha-col">
+        <span class="conjunto-linha-label">Cavalo</span>
+        <span class="conjunto-linha-valor">${c.cavalo ? escapeHtml(c.cavalo.placa) : '—'}</span>
+      </div>
+      <div class="conjunto-linha-col">
+        <span class="conjunto-linha-label">Semirreboque 1</span>
+        <span class="conjunto-linha-valor">${c.semirreboque1 ? escapeHtml(c.semirreboque1.placa) : '—'}</span>
+      </div>
+      <div class="conjunto-linha-col">
+        <span class="conjunto-linha-label">Semirreboque 2</span>
+        <span class="conjunto-linha-valor">${c.semirreboque2 ? escapeHtml(c.semirreboque2.placa) : '—'}</span>
+      </div>
+      <span class="badge badge-entregue">Ativo</span>
+      <div class="conjunto-linha-acoes">
+        <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="editarConjunto(${c.id})">${svgIcone('editar', 12)} Editar</button>
+        <button class="btn btn-danger" style="font-size:11px;padding:4px 10px;" onclick="excluirConjunto(${c.id})">${svgIcone('excluir', 12)} Excluir</button>
       </div>
     </div>
   `).join('');
 }
 
-async function carregarSelects() {
-  const motoristas = await get('/motoristas') || [];
-  veiculosCarregados = await get('/veiculos') || [];
-
-  const selMotorista = document.getElementById('motorista-id');
-  while (selMotorista.options.length > 1) selMotorista.remove(1);
-  motoristas.forEach(m => {
-    const opt = document.createElement('option');
-    opt.value = m.id;
-    opt.textContent = `${m.nome || 'Sem nome'} — CPF: ${m.cpf}`;
-    selMotorista.appendChild(opt);
-  });
-
-  preencherSelectsVeiculo();
+async function excluirConjunto(id) {
+  if (!(await confirmarAcao('Deseja desativar este conjunto?'))) return;
+  await del(`/conjuntos/${id}`);
+  await carregarConjuntos();
+  await carregarBuilder();
 }
 
-/* Mapa veiculoId -> nome do conjunto ativo que já o está usando.
-   excluirConjuntoId ignora o próprio conjunto (para não travar seus próprios veículos ao editar). */
+/* ===================== BUILDER "COMPOR NOVO CONJUNTO" ===================== */
+
 function veiculosEmUso(excluirConjuntoId) {
   const mapa = {};
   conjuntosCarregados.forEach(c => {
     if (excluirConjuntoId && c.id === excluirConjuntoId) return;
-    [c.cavalo_id, c.semirreboque1_id, c.semirreboque2_id].forEach(id => {
-      if (id) mapa[id] = c.nome;
-    });
+    [c.cavalo_id, c.semirreboque1_id, c.semirreboque2_id].forEach(id => { if (id) mapa[id] = c.nome; });
   });
   return mapa;
 }
 
-function preencherSelectsVeiculo(excluirConjuntoId) {
+function preencherSelectVeiculoBuilder(selId, tipoEsperado) {
+  const sel = document.getElementById(selId);
+  const valorAtual = sel.value;
+  const emUso = veiculosEmUso();
+  sel.innerHTML = '<option value="">+ Selecionar</option>' + veiculosCarregados
+    .filter(v => v.tipo === tipoEsperado)
+    .map(v => {
+      const bloqueado = emUso[v.id] && String(v.id) !== valorAtual;
+      return `<option value="${v.id}" ${bloqueado ? 'disabled' : ''}>${escapeHtml(v.placa)} — ${escapeHtml(v.modelo)}${bloqueado ? ` (em uso em "${escapeHtml(emUso[v.id])}")` : ''}</option>`;
+    }).join('');
+  if ([...sel.options].some(o => o.value === valorAtual)) sel.value = valorAtual;
+}
+
+function preencherSelectMotoristaBuilder() {
+  const sel = document.getElementById('build-motorista-id');
+  const valorAtual = sel.value;
+  sel.innerHTML = '<option value="">+ Selecionar</option>' + motoristasCarregados
+    .map(m => `<option value="${m.id}">${escapeHtml(m.nome || 'Sem nome')}</option>`).join('');
+  if ([...sel.options].some(o => o.value === valorAtual)) sel.value = valorAtual;
+}
+
+const CAMPOS_SLOT = {
+  motorista: { select: 'build-motorista-id', sub: 'build-motorista-sub', slot: 'slot-motorista' },
+  cavalo: { select: 'build-cavalo-id', sub: 'build-cavalo-sub', slot: 'slot-cavalo' },
+  semirreboque1: { select: 'build-semi1-id', sub: 'build-semi1-sub', slot: 'slot-semi1' },
+  semirreboque2: { select: 'build-semi2-id', sub: 'build-semi2-sub', slot: 'slot-semi2' },
+};
+
+function atualizarSubBuilder(tipo) {
+  const campos = CAMPOS_SLOT[tipo];
+  const id = parseInt(document.getElementById(campos.select).value) || null;
+
+  if (tipo === 'motorista') {
+    const m = motoristasCarregados.find(m => m.id === id);
+    document.getElementById(campos.sub).textContent = m ? `CNH categoria ${m.cnh_categoria}` : '';
+  } else {
+    const v = veiculosCarregados.find(v => v.id === id);
+    document.getElementById(campos.sub).textContent = v ? `${escapeHtml(v.marca)} ${escapeHtml(v.modelo)}` : '';
+  }
+
+  document.getElementById(campos.slot).classList.toggle('vazio', !id);
+}
+
+function limparBuilder() {
+  Object.values(CAMPOS_SLOT).forEach(({ select, sub, slot }) => {
+    document.getElementById(select).value = '';
+    document.getElementById(sub).textContent = '';
+    document.getElementById(slot).classList.add('vazio');
+  });
+}
+
+async function carregarBuilder() {
+  motoristasCarregados = await get('/motoristas') || [];
+  veiculosCarregados = await get('/veiculos') || [];
+  preencherSelectMotoristaBuilder();
+  preencherSelectVeiculoBuilder('build-cavalo-id', 'cavalo');
+  preencherSelectVeiculoBuilder('build-semi1-id', 'semirreboque');
+  preencherSelectVeiculoBuilder('build-semi2-id', 'semirreboque');
+}
+
+function proximoNomeConjunto() {
+  const nomesExistentes = new Set(conjuntosCarregados.map(c => c.nome));
+  let n = conjuntosCarregados.length + 1;
+  while (nomesExistentes.has(`Conjunto ${String(n).padStart(2, '0')}`)) n++;
+  return `Conjunto ${String(n).padStart(2, '0')}`;
+}
+
+async function salvarConjuntoBuilder() {
+  const dados = {
+    nome: proximoNomeConjunto(),
+    motorista_id: parseInt(document.getElementById('build-motorista-id').value) || null,
+    cavalo_id: parseInt(document.getElementById('build-cavalo-id').value) || null,
+    semirreboque1_id: parseInt(document.getElementById('build-semi1-id').value) || null,
+    semirreboque2_id: parseInt(document.getElementById('build-semi2-id').value) || null,
+  };
+
+  if (!dados.motorista_id && !dados.cavalo_id) {
+    toastAviso('Selecione ao menos um motorista ou cavalo-mecânico para montar o conjunto!');
+    return;
+  }
+
+  const res = await post('/conjuntos', dados);
+  if (res && res.detail) {
+    toastErro('Erro: ' + extrairErro(res));
+    return;
+  }
+
+  toastSucesso(`"${dados.nome}" criado com sucesso!`);
+  limparBuilder();
+  await carregarConjuntos();
+  await carregarBuilder();
+}
+
+/* ===================== MODAL DE EDIÇÃO ===================== */
+
+function preencherSelectsModal(excluirConjuntoId) {
   const emUso = veiculosEmUso(excluirConjuntoId);
   const tipoPorSelect = { 'cavalo-id': 'cavalo', 'semirreboque1-id': 'semirreboque', 'semirreboque2-id': 'semirreboque' };
   Object.keys(tipoPorSelect).forEach(selId => {
     const sel = document.getElementById(selId);
     const tipoEsperado = tipoPorSelect[selId];
-    while (sel.options.length > 1) sel.remove(1);
+    sel.innerHTML = '<option value="">Sem veículo</option>';
     veiculosCarregados.filter(v => v.tipo === tipoEsperado).forEach(v => {
       const opt = document.createElement('option');
       opt.value = v.id;
@@ -131,18 +181,10 @@ function preencherSelectsVeiculo(excluirConjuntoId) {
       sel.appendChild(opt);
     });
   });
-}
 
-function abrirModal() {
-  conjuntoEditandoId = null;
-  document.getElementById('modal-titulo').textContent = 'Novo Conjunto';
-  document.getElementById('nome').value = '';
-  document.getElementById('motorista-id').value = '';
-  preencherSelectsVeiculo();
-  document.getElementById('cavalo-id').value = '';
-  document.getElementById('semirreboque1-id').value = '';
-  document.getElementById('semirreboque2-id').value = '';
-  document.getElementById('modal').classList.add('aberto');
+  const selMotorista = document.getElementById('motorista-id');
+  selMotorista.innerHTML = '<option value="">Sem motorista</option>' + motoristasCarregados
+    .map(m => `<option value="${m.id}">${escapeHtml(m.nome || 'Sem nome')} — CPF: ${escapeHtml(m.cpf)}</option>`).join('');
 }
 
 function fecharModal() {
@@ -153,20 +195,13 @@ function editarConjunto(id) {
   const c = conjuntosCarregados.find(c => c.id === id);
   if (!c) return;
   conjuntoEditandoId = id;
-  document.getElementById('modal-titulo').textContent = 'Editar Conjunto';
+  preencherSelectsModal(id);
   document.getElementById('nome').value = c.nome;
   document.getElementById('motorista-id').value = c.motorista_id || '';
-  preencherSelectsVeiculo(id);
   document.getElementById('cavalo-id').value = c.cavalo_id || '';
   document.getElementById('semirreboque1-id').value = c.semirreboque1_id || '';
   document.getElementById('semirreboque2-id').value = c.semirreboque2_id || '';
   document.getElementById('modal').classList.add('aberto');
-}
-
-async function excluirConjunto(id) {
-  if (!(await confirmarAcao('Deseja desativar este conjunto?'))) return;
-  await del(`/conjuntos/${id}`);
-  carregarConjuntos();
 }
 
 async function salvarConjunto() {
@@ -183,12 +218,7 @@ async function salvarConjunto() {
     return;
   }
 
-  let res;
-  if (conjuntoEditandoId) {
-    res = await put(`/conjuntos/${conjuntoEditandoId}`, dados);
-  } else {
-    res = await post('/conjuntos', dados);
-  }
+  const res = await put(`/conjuntos/${conjuntoEditandoId}`, dados);
 
   if (res && res.detail) {
     toastErro('Erro: ' + extrairErro(res));
@@ -196,11 +226,12 @@ async function salvarConjunto() {
   }
 
   fecharModal();
-  carregarConjuntos();
+  await carregarConjuntos();
+  await carregarBuilder();
 }
 
 async function iniciar() {
   await carregarConjuntos();
-  await carregarSelects();
+  await carregarBuilder();
 }
 iniciar();

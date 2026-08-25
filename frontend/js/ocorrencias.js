@@ -15,6 +15,16 @@ const TIPOS_OCORRENCIA = {
   outro: 'Outro'
 };
 
+/* Sem campo de gravidade no banco — usa o tipo para aproximar a urgência visual. */
+const DOT_POR_TIPO = {
+  acidente: 'alta',
+  problema_mecanico: 'alta',
+  atraso: 'media',
+  extravio: 'media',
+  cliente_ausente: 'baixa',
+  outro: 'baixa'
+};
+
 function veiculoDaEntrega(entregaId) {
   const entrega = entregasCompletas.find(e => e.id === entregaId);
   if (!entrega) return null;
@@ -24,28 +34,31 @@ function veiculoDaEntrega(entregaId) {
 async function carregarOcorrencias() {
   const data = await get('/ocorrencias') || [];
   ocorrenciasCarregadas = data;
-  const tbody = document.getElementById('tabela-ocorrencias');
+  const lista = document.getElementById('lista-ocorrencias');
 
   if (data.length === 0) {
-    tbody.innerHTML = estadoVazio(7, 'Nenhuma ocorrência registrada', 'Ótimo sinal — nenhum problema reportado até agora.', 'check');
+    lista.innerHTML = estadoVazio(null, 'Nenhuma ocorrência registrada', 'Ótimo sinal — nenhum problema reportado até agora.', 'check');
     return;
   }
 
-  tbody.innerHTML = data.map(o => {
+  lista.innerHTML = data.slice().reverse().map(o => {
     const veiculo = veiculoDaEntrega(o.entrega_id);
     return `
-    <tr>
-      <td>#${o.id}</td>
-      <td>${veiculo ? escapeHtml(veiculo.placa) : '—'}</td>
-      <td>Entrega #${o.entrega_id}</td>
-      <td><span class="badge badge-atrasado">${TIPOS_OCORRENCIA[o.tipo] || escapeHtml(o.tipo)}</span></td>
-      <td>${escapeHtml(o.descricao)}</td>
-      <td>${formatarDataHora(o.criado_em)}</td>
-      <td style="display:flex;gap:6px;">
-        <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="editarOcorrencia(${o.id})">${svgIcone('editar', 12)} Editar</button>
-        <button class="btn btn-danger" style="font-size:11px;padding:4px 10px;" onclick="excluirOcorrencia(${o.id})">${svgIcone('excluir', 12)} Excluir</button>
-      </td>
-    </tr>
+    <div class="ocorrencia-card">
+      <span class="ocorrencia-dot ocorrencia-dot-${DOT_POR_TIPO[o.tipo] || 'baixa'}"></span>
+      <div class="ocorrencia-corpo">
+        <div class="ocorrencia-topo">
+          <div class="ocorrencia-titulo">${TIPOS_OCORRENCIA[o.tipo] || escapeHtml(o.tipo)}</div>
+          <span class="ocorrencia-data">${formatarDataHora(o.criado_em)}</span>
+        </div>
+        <div class="ocorrencia-ref">Entrega #${o.entrega_id}${veiculo ? ' · Veículo ' + escapeHtml(veiculo.placa) : ''}</div>
+        <div class="ocorrencia-desc">${escapeHtml(o.descricao)}</div>
+        <div class="ocorrencia-acoes">
+          <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="editarOcorrencia(${o.id})">${svgIcone('editar', 12)} Editar</button>
+          <button class="btn btn-danger" style="font-size:11px;padding:4px 10px;" onclick="excluirOcorrencia(${o.id})">${svgIcone('excluir', 12)} Excluir</button>
+        </div>
+      </div>
+    </div>
   `;
   }).join('');
 }

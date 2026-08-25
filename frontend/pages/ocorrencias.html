@@ -24,25 +24,8 @@
   <aside class="sidebar">
     <div class="sidebar-logo">
       <span>
-      <svg viewBox="0 0 56 66" width="30" height="36" role="img" aria-label="LogTrack">
-        <defs>
-          <linearGradient id="lt-grad" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="#2E75B6"/>
-            <stop offset="100%" stop-color="#1E4D78"/>
-          </linearGradient>
-        </defs>
-        <path d="M28 2C14.7 2 4 12.5 4 25.5 4 42 28 62 28 62S52 42 52 25.5C52 12.5 41.3 2 28 2Z" fill="url(#lt-grad)"/>
-        <g fill="#FFFFFF">
-          <rect x="10" y="18" width="6" height="9"/>
-          <rect x="17" y="15" width="23" height="12" rx="1"/>
-          <circle cx="14" cy="29" r="2.3"/>
-          <circle cx="31" cy="29" r="2.3"/>
-          <circle cx="38" cy="29" r="2.3"/>
-        </g>
-        <circle cx="45" cy="9" r="7" fill="#27AE60" opacity="0.25"/>
-        <circle cx="45" cy="9" r="4" fill="#27AE60"/>
-      </svg>
-    </span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="#1B2740" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+      </span>
       <h2>LogTrack</h2>
     </div>
     <nav class="sidebar-menu">
@@ -54,6 +37,7 @@
       <a class="menu-item" href="relatorios.html"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="20" x2="6" y2="14"/><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/></svg></span> Relatórios</a>
       <a class="menu-item" href="conjuntos.html"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span> Conjuntos</a>
       <a class="menu-item" href="manutencoes.html"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span> Manutenções</a>
+      <a class="menu-item" href="abastecimentos.html"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 22h12"/><path d="M4 9h9v11H4z"/><path d="M4 9V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v5"/><path d="M13 7h2l3 3v7a1 1 0 0 1-1 1h-1"/><circle cx="16.5" cy="17.5" r="1.5"/></svg></span> Abastecimento</a>
       <a class="menu-item" href="usuarios.html" data-admin-only><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span> Usuários</a>
     </nav>
     <div class="sidebar-user">
@@ -65,31 +49,35 @@
   </aside>
 
   <main class="main-content">
-    <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
-      <div>
+    <div class="topbar">
+      <div class="topbar-titulo">
+        <span class="topbar-categoria">Operação</span>
         <h1>Ocorrências</h1>
-        <p>Acompanhe todas as ocorrências registradas</p>
       </div>
+      <div class="topbar-acoes">
+        <div class="topbar-busca">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" placeholder="Buscar..." disabled />
+        </div>
+        <div class="topbar-sino">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        </div>
+        <div class="topbar-usuario">
+          <div class="topbar-avatar" id="topbar-avatar">--</div>
+          <div class="topbar-usuario-info">
+            <div class="topbar-usuario-nome" id="topbar-nome">Usuário</div>
+            <div class="topbar-usuario-perfil" id="topbar-perfil">Perfil</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="toolbar" style="justify-content:flex-end;">
       <button class="btn btn-primary" onclick="abrirModal()">+ Nova Ocorrência</button>
     </div>
 
-    <div class="table-container">
-      <table>
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Veículo</th>
-            <th>Entrega</th>
-            <th>Tipo</th>
-            <th>Descrição</th>
-            <th>Data</th>
-            <th>Ações</th>
-          </tr>
-        </thead>
-        <tbody id="tabela-ocorrencias">
-          <tr><td colspan="7" style="padding:0;"><div class="loading-state"><span class="spinner"></span> Carregando...</div></td></tr>
-        </tbody>
-      </table>
+    <div class="ocorrencias-lista" id="lista-ocorrencias">
+      <div class="loading-state"><span class="spinner"></span> Carregando...</div>
     </div>
   </main>
 

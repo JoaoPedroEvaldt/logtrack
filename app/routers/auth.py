@@ -23,7 +23,7 @@ def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
             detail="Usuário inativo"
         )
     token = auth.criar_token({"sub": str(usuario.id), "perfil": usuario.perfil})
-    return {"access_token": token, "token_type": "bearer", "perfil": usuario.perfil}
+    return {"access_token": token, "token_type": "bearer", "perfil": usuario.perfil, "nome": usuario.nome}
 
 def get_usuario_atual(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     payload = auth.verificar_token(token)

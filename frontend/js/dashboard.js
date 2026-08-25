@@ -5,149 +5,179 @@ document.getElementById('data-hoje').textContent = new Date().toLocaleDateString
   weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
 });
 
-async function carregarResumo() {
-  const data = await get('/dashboard/resumo');
-  if (!data) return;
+const STATUS_ATIVOS = ['aguardando', 'em_rota', 'atrasado', 'ocorrencia'];
+const NOMES_MES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
-  document.getElementById('entregas-hoje').textContent = data.entregas_hoje;
-  document.getElementById('concluidas-hoje').textContent = data.concluidas_hoje;
-  document.getElementById('em-rota').textContent = data.em_rota;
-  document.getElementById('atrasadas').textContent = data.atrasadas;
-  document.getElementById('ocorrencias').textContent = data.ocorrencias_abertas;
-  document.getElementById('veiculos').textContent = data.veiculos_disponiveis;
-  document.getElementById('motoristas-disponiveis').textContent = data.motoristas_disponiveis;
+function ultimosMeses(qtd) {
+  const hoje = new Date();
+  const meses = [];
+  for (let i = qtd - 1; i >= 0; i--) {
+    const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+    meses.push({ ano: d.getFullYear(), mes: d.getMonth(), label: NOMES_MES[d.getMonth()] });
+  }
+  return meses;
 }
 
-async function carregarGraficoStatus() {
-  const data = await get('/dashboard/entregas-por-status');
-  if (!data) return;
-
-  const labels = data.map(d => {
-    const nomes = {
-      aguardando: 'Aguardando', em_rota: 'Em Rota',
-      entregue: 'Entregue', atrasado: 'Atrasado',
-      ocorrencia: 'Ocorrência', cancelado: 'Cancelado'
-    };
-    return nomes[d.status] || d.status;
-  });
-
-  new Chart(document.getElementById('grafico-status'), {
-    type: 'doughnut',
-    data: {
-      labels,
-      datasets: [{
-        data: data.map(d => d.total),
-        backgroundColor: data.map(d => corPorStatus(d.status)),
-        borderWidth: 0
-      }]
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { position: 'bottom' } }
-    }
-  });
+function conjuntoDaEntrega(entrega, conjuntos) {
+  return conjuntos.find(c =>
+    (entrega.motorista_id && c.motorista_id === entrega.motorista_id) ||
+    (entrega.veiculo_id && (c.cavalo_id === entrega.veiculo_id || c.semirreboque1_id === entrega.veiculo_id || c.semirreboque2_id === entrega.veiculo_id))
+  );
 }
 
-async function carregarGraficoDias() {
-  const data = await get('/dashboard/entregas-por-dia');
-  if (!data) return;
+function renderizarGraficoMensal(entregas) {
+  const meses = ultimosMeses(6);
+  const hoje = new Date();
 
-  new Chart(document.getElementById('grafico-dias'), {
-    type: 'line',
+  const dados = meses.map(m => entregas.filter(e => {
+    if (e.status !== 'entregue' || !e.concluido_em) return false;
+    const d = new Date(e.concluido_em);
+    return d.getFullYear() === m.ano && d.getMonth() === m.mes;
+  }).length);
+
+  const cores = meses.map(m => (m.ano === hoje.getFullYear() && m.mes === hoje.getMonth()) ? '#F2A93B' : '#2E3E60');
+
+  new Chart(document.getElementById('grafico-mensal'), {
+    type: 'bar',
     data: {
-      labels: data.map(d => d.dia),
-      datasets: [{
-        label: 'Entregas',
-        data: data.map(d => d.total),
-        borderColor: '#2E75B6',
-        backgroundColor: 'rgba(46,117,182,0.1)',
-        tension: 0.4,
-        fill: true
-      }]
+      labels: meses.map(m => m.label),
+      datasets: [{ data: dados, backgroundColor: cores, borderRadius: 6, maxBarThickness: 42 }]
     },
     options: {
       responsive: true,
       plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true } }
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
     }
   });
 }
 
-async function carregarEntregas() {
-  const data = await get('/entregas');
-  if (!data) return;
+function renderizarGraficoStatus(entregas) {
+  const concluidas = entregas.filter(e => e.status === 'entregue').length;
+  const emTransito = entregas.filter(e => e.status === 'em_rota').length;
+  const pendentes = entregas.filter(e => ['aguardando', 'atrasado', 'ocorrencia'].includes(e.status)).length;
+  const total = concluidas + emTransito + pendentes;
 
+  const textoCentral = {
+    id: 'textoCentral',
+    afterDraw(chart) {
+      const { ctx, chartArea } = chart;
+      if (!chartArea) return;
+      const cx = (chartArea.left + chartArea.right) / 2;
+      const cy = (chartArea.top + chartArea.bottom) / 2;
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text').trim() || '#1E2A44';
+      ctx.font = "700 26px 'Segoe UI'";
+      ctx.fillText(String(total), cx, cy);
+      ctx.restore();
+    }
+  };
+
+  new Chart(document.getElementById('grafico-status'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Concluídas', 'Em trânsito', 'Pendentes'],
+      datasets: [{ data: [concluidas, emTransito, pendentes], backgroundColor: ['#1E2A44', '#F2A93B', '#D8DCE6'], borderWidth: 0 }]
+    },
+    options: {
+      responsive: true,
+      cutout: '68%',
+      plugins: { legend: { position: 'bottom' } }
+    },
+    plugins: [textoCentral]
+  });
+}
+
+function renderizarTabela(entregas, conjuntos) {
   const tbody = document.getElementById('tabela-entregas');
 
-  if (data.length === 0) {
-    tbody.innerHTML = estadoVazio(6, 'Nenhuma entrega cadastrada', 'Cadastre a primeira entrega para ver o painel ganhar vida.', 'vazio');
+  if (entregas.length === 0) {
+    tbody.innerHTML = estadoVazio(4, 'Nenhuma entrega cadastrada', 'Cadastre a primeira entrega para ver o painel ganhar vida.', 'vazio');
     return;
   }
 
-  const recentes = data.slice(-10).reverse();
-  tbody.innerHTML = recentes.map(e => `
-    <tr>
-      <td>#${e.id}</td>
-      <td>${escapeHtml(e.cliente)}</td>
-      <td>${escapeHtml(e.origem)}</td>
-      <td>${escapeHtml(e.destino)}</td>
-      <td>${badgeStatus(e.status)}</td>
-      <td>${formatarDataHora(e.previsao)}</td>
-    </tr>
-  `).join('');
-
-  calcularFaturamentoMes(data);
+  const recentes = entregas.slice(-8).reverse();
+  tbody.innerHTML = recentes.map(e => {
+    const conjunto = conjuntoDaEntrega(e, conjuntos);
+    return `
+      <tr>
+        <td>#E-${e.id}</td>
+        <td>${escapeHtml(e.origem)} → ${escapeHtml(e.destino)}</td>
+        <td>${conjunto ? escapeHtml(conjunto.nome) : '—'}</td>
+        <td>${badgeStatus(e.status)}</td>
+      </tr>
+    `;
+  }).join('');
 }
 
-function calcularFaturamentoMes(entregas) {
-  const hoje = new Date();
-  const total = entregas
-    .filter(e => {
-      if (e.status !== 'entregue' || !e.concluido_em) return false;
-      const data = new Date(e.concluido_em);
-      return data.getMonth() === hoje.getMonth() && data.getFullYear() === hoje.getFullYear();
-    })
-    .reduce((soma, e) => soma + (parseFloat(e.valor_frete) || 0), 0);
+const NOMES_MES_EXTENSO = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 
-  document.getElementById('faturamento-mes').textContent =
-    'R$ ' + total.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+function formatarMoeda(valor) {
+  return 'R$ ' + (valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-async function carregarTopMotoristas() {
-  const data = await get('/dashboard/desempenho-motoristas');
-  const container = document.getElementById('top-motoristas');
-  if (!container) return;
+function renderizarFaturamento(fat) {
+  const [ano, mes] = fat.periodo.split('-').map(Number);
+  document.getElementById('faturamento-periodo').textContent = `${NOMES_MES_EXTENSO[mes - 1]} de ${ano}`;
 
-  const comFaturamento = (data || []).filter(m => m.faturamento > 0);
+  document.getElementById('fat-receita').textContent = formatarMoeda(fat.receita_bruta);
+  document.getElementById('fat-custos').textContent = formatarMoeda(fat.custo_manutencao + fat.custo_abastecimento);
+  document.getElementById('fat-liquido').textContent = formatarMoeda(fat.faturamento_liquido);
 
-  if (comFaturamento.length === 0) {
-    container.innerHTML = estadoVazio(null, 'Sem dados ainda', 'O ranking aparece assim que houver entregas concluídas com valor de frete.', 'usuario');
-    return;
+  const tbodyConjunto = document.getElementById('tabela-faturamento-conjunto');
+  if (fat.por_conjunto.length === 0) {
+    tbodyConjunto.innerHTML = estadoVazio(4, 'Sem movimento no mês', null, 'vazio');
+  } else {
+    tbodyConjunto.innerHTML = fat.por_conjunto.map(c => `
+      <tr>
+        <td>${escapeHtml(c.conjunto)}</td>
+        <td>${formatarMoeda(c.receita)}</td>
+        <td>${formatarMoeda(c.custo)}</td>
+        <td><strong>${formatarMoeda(c.liquido)}</strong></td>
+      </tr>
+    `).join('');
   }
 
-  const top5 = comFaturamento.slice(0, 5);
-  const max = Math.max(...top5.map(m => m.faturamento), 1);
-
-  container.innerHTML = top5.map((m, i) => `
-    <div class="ranking-item">
-      <span class="ranking-pos">${i + 1}º</span>
-      <div class="ranking-info">
-        <div class="ranking-nome">${escapeHtml(m.motorista || 'Motorista')}</div>
-        <div class="ranking-bar-track"><div class="ranking-bar-fill" style="width:${(m.faturamento / max * 100)}%;"></div></div>
-      </div>
-      <span class="ranking-valor">R$ ${m.faturamento.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
-    </div>
-  `).join('');
+  const tbodyMotorista = document.getElementById('tabela-faturamento-motorista');
+  if (fat.por_motorista.length === 0) {
+    tbodyMotorista.innerHTML = estadoVazio(4, 'Sem movimento no mês', null, 'vazio');
+  } else {
+    tbodyMotorista.innerHTML = fat.por_motorista.map(m => `
+      <tr>
+        <td>${escapeHtml(m.motorista)}</td>
+        <td>${formatarMoeda(m.receita)}</td>
+        <td>${formatarMoeda(m.custo)}</td>
+        <td><strong>${formatarMoeda(m.liquido)}</strong></td>
+      </tr>
+    `).join('');
+  }
 }
 
-carregarResumo();
-carregarGraficoStatus();
-carregarGraficoDias();
-carregarEntregas();
-carregarTopMotoristas();
+async function carregarPainel() {
+  const [motoristas, veiculos, ocorrencias, entregas, conjuntos, faturamento] = await Promise.all([
+    get('/motoristas'), get('/veiculos'), get('/ocorrencias'), get('/entregas'), get('/conjuntos'), get('/dashboard/faturamento')
+  ]);
 
-setInterval(() => {
-  carregarResumo();
-  carregarEntregas();
-  carregarTopMotoristas();
-}, 30000);
+  const listaMotoristas = motoristas || [];
+  const listaVeiculos = veiculos || [];
+  const listaOcorrencias = ocorrencias || [];
+  const listaEntregas = entregas || [];
+  const listaConjuntos = conjuntos || [];
+
+  const emAndamento = listaEntregas.filter(e => STATUS_ATIVOS.includes(e.status)).length;
+  const motoristasDisp = listaMotoristas.filter(m => m.status === 'disponivel').length;
+  const veiculosDisp = listaVeiculos.filter(v => v.status === 'disponivel').length;
+
+  document.getElementById('card-em-andamento').textContent = emAndamento;
+  document.getElementById('card-motoristas').textContent = `${motoristasDisp} / ${listaMotoristas.length}`;
+  document.getElementById('card-veiculos').textContent = `${veiculosDisp} / ${listaVeiculos.length}`;
+  document.getElementById('card-ocorrencias').textContent = listaOcorrencias.length;
+
+  renderizarGraficoMensal(listaEntregas);
+  renderizarGraficoStatus(listaEntregas);
+  renderizarTabela(listaEntregas, listaConjuntos);
+  if (faturamento && !faturamento.detail) renderizarFaturamento(faturamento);
+}
+
+carregarPainel();

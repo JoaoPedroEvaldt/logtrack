@@ -127,6 +127,18 @@ UPDATE motoristas SET nome = 'Motorista #' || id WHERE nome IS NULL;
 ALTER TABLE motoristas ALTER COLUMN nome SET NOT NULL;
 ALTER TABLE motoristas ALTER COLUMN usuario_id DROP NOT NULL;
 
+CREATE TABLE IF NOT EXISTS abastecimentos (
+    id SERIAL PRIMARY KEY,
+    veiculo_id INTEGER NOT NULL REFERENCES veiculos(id) ON DELETE CASCADE,
+    motorista_id INTEGER REFERENCES motoristas(id) ON DELETE SET NULL,
+    data_abastecimento DATE NOT NULL,
+    litros DECIMAL(10,2) NOT NULL CHECK (litros > 0),
+    valor_total DECIMAL(10,2) NOT NULL CHECK (valor_total >= 0),
+    quilometragem INTEGER,
+    posto VARCHAR(100),
+    criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
 INSERT INTO usuarios (nome, email, senha_hash, perfil)
 VALUES (
     'Administrador',

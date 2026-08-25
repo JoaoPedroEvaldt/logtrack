@@ -8,9 +8,27 @@ from app.models.veiculo import Veiculo
 from app.models.motorista import Motorista
 from app.models.ocorrencia import Ocorrencia
 from app.models.usuario import Usuario
+from app.models.conjunto import Conjunto
+from app.models.manutencao import Manutencao
+from app.models.abastecimento import Abastecimento
 from app.routers.auth import get_usuario_atual
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
+
+@router.get("/publico/resumo")
+def resumo_publico(db: Session = Depends(get_db)):
+    """Contagens agregadas sem autenticação, usadas só como vitrine na tela de login."""
+    entregas_ativas = db.query(Entrega).filter(
+        Entrega.status.in_(["aguardando", "em_rota", "atrasado", "ocorrencia"])
+    ).count()
+    motoristas = db.query(Motorista).filter(Motorista.status != "inativo").count()
+    veiculos = db.query(Veiculo).filter(Veiculo.status != "inativo").count()
+
+    return {
+        "entregas_ativas": entregas_ativas,
+        "motoristas": motoristas,
+        "veiculos": veiculos
+    }
 
 @router.get("/resumo")
 def resumo(db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
@@ -85,3 +103,94 @@ def desempenho_motoristas(db: Session = Depends(get_db), atual: Usuario = Depend
         {"motorista": r.nome, "total": r.total, "concluidas": r.concluidas, "atrasadas": r.atrasadas, "faturamento": float(r.faturamento)}
         for r in resultado
     ]
+
+@router.get("/faturamento")
+def faturamento(db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
+    """Faturamento líquido do mês atual: receita das entregas concluídas menos
+    custos de manutenção e abastecimento no período, com detalhamento por
+    conjunto (via veículos do conjunto) e por motorista (via entregas/abastecimentos)."""
+    hoje = date.today()
+    inicio_mes = date(hoje.year, hoje.month, 1)
+    fim_mes = date(hoje.year + 1, 1, 1) if hoje.month == 12 else date(hoje.year, hoje.month + 1, 1)
+
+    entregas = db.query(Entrega).filter(
+        Entrega.status == "entregue",
+        Entrega.concluido_em >= inicio_mes,
+        Entrega.concluido_em < fim_mes
+    ).all()
+    manutencoes = db.query(Manutencao).filter(
+        Manutencao.data_manutencao >= inicio_mes,
+        Manutencao.data_manutencao < fim_mes
+    ).all()
+    abastecimentos = db.query(Abastecimento).filter(
+        Abastecimento.data_abastecimento >= inicio_mes,
+        Abastecimento.data_abastecimento < fim_mes
+    ).all()
+    conjuntos = db.query(Conjunto).filter(Conjunto.status != "inativo").all()
+    motoristas = {m.id: m.nome for m in db.query(Motorista).all()}
+
+    receita_bruta = sum(float(e.valor_frete or 0) for e in entregas)
+    custo_manutencao = sum(float(m.custo or 0) for m in manutencoes)
+    custo_abastecimento = sum(float(a.valor_total or 0) for a in abastecimentos)
+
+    def veiculos_do_conjunto(c):
+        return {c.cavalo_id, c.semirreboque1_id, c.semirreboque2_id} - {None}
+
+    def conjunto_da_entrega(e, mapa_veiculos):
+        for c in conjuntos:
+            if e.motorista_id and c.motorista_id == e.motorista_id:
+                return c
+            if e.veiculo_id and e.veiculo_id in mapa_veiculos[c.id]:
+                return c
+        return None
+
+    mapa_veiculos = {c.id: veiculos_do_conjunto(c) for c in conjuntos}
+
+    conjunto_por_entrega = {e.id: conjunto_da_entrega(e, mapa_veiculos) for e in entregas}
+
+    por_conjunto = []
+    for c in conjuntos:
+        veic_ids = mapa_veiculos[c.id]
+        receita = sum(
+            float(e.valor_frete or 0) for e in entregas
+            if conjunto_por_entrega[e.id] and conjunto_por_entrega[e.id].id == c.id
+        )
+        custo = sum(float(m.custo or 0) for m in manutencoes if m.veiculo_id in veic_ids) + \
+                sum(float(a.valor_total or 0) for a in abastecimentos if a.veiculo_id in veic_ids)
+        if receita or custo:
+            por_conjunto.append({
+                "conjunto_id": c.id,
+                "conjunto": c.nome,
+                "receita": receita,
+                "custo": custo,
+                "liquido": receita - custo
+            })
+    por_conjunto.sort(key=lambda x: x["liquido"], reverse=True)
+
+    por_motorista = []
+    motoristas_com_movimento = {e.motorista_id for e in entregas if e.motorista_id} | \
+                                {a.motorista_id for a in abastecimentos if a.motorista_id}
+    for mid in motoristas_com_movimento:
+        nome = motoristas.get(mid)
+        if not nome:
+            continue
+        receita = sum(float(e.valor_frete or 0) for e in entregas if e.motorista_id == mid)
+        custo = sum(float(a.valor_total or 0) for a in abastecimentos if a.motorista_id == mid)
+        por_motorista.append({
+            "motorista_id": mid,
+            "motorista": nome,
+            "receita": receita,
+            "custo": custo,
+            "liquido": receita - custo
+        })
+    por_motorista.sort(key=lambda x: x["liquido"], reverse=True)
+
+    return {
+        "periodo": f"{hoje.year}-{hoje.month:02d}",
+        "receita_bruta": receita_bruta,
+        "custo_manutencao": custo_manutencao,
+        "custo_abastecimento": custo_abastecimento,
+        "faturamento_liquido": receita_bruta - custo_manutencao - custo_abastecimento,
+        "por_conjunto": por_conjunto,
+        "por_motorista": por_motorista
+    }

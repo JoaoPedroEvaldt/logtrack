@@ -1,0 +1,162 @@
+checarAuth();
+document.getElementById('usuario-perfil').textContent = localStorage.getItem('perfil') || '';
+aplicarMascaraMoeda(document.getElementById('litros'));
+aplicarMascaraMoeda(document.getElementById('valor-total'));
+
+let abastecimentos = [];
+let abastecimentoEditandoId = null;
+
+function mesAtual(dataStr) {
+  if (!dataStr) return false;
+  const hoje = new Date();
+  const d = new Date(dataStr + 'T00:00:00');
+  return d.getFullYear() === hoje.getFullYear() && d.getMonth() === hoje.getMonth();
+}
+
+async function carregarAbastecimentos() {
+  abastecimentos = await get('/abastecimentos') || [];
+  renderizar(abastecimentos);
+  atualizarCards(abastecimentos);
+}
+
+async function carregarVeiculos() {
+  const data = await get('/veiculos') || [];
+  const sel = document.getElementById('veiculo-id');
+  while (sel.options.length > 1) sel.remove(1);
+  data.forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v.id;
+    opt.textContent = `${v.placa} — ${v.modelo} ${v.marca}`;
+    sel.appendChild(opt);
+  });
+}
+
+async function carregarMotoristas() {
+  const data = await get('/motoristas') || [];
+  const sel = document.getElementById('motorista-id');
+  while (sel.options.length > 1) sel.remove(1);
+  data.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.id;
+    opt.textContent = m.nome;
+    sel.appendChild(opt);
+  });
+}
+
+function atualizarCards(lista) {
+  const doMes = lista.filter(a => mesAtual(a.data_abastecimento));
+  document.getElementById('total-abastecimentos').textContent = doMes.length;
+  const litros = doMes.reduce((s, a) => s + (parseFloat(a.litros) || 0), 0);
+  const custo = doMes.reduce((s, a) => s + (parseFloat(a.valor_total) || 0), 0);
+  document.getElementById('total-litros').textContent = litros.toLocaleString('pt-BR', { minimumFractionDigits: 0 }) + ' L';
+  document.getElementById('total-custo').textContent = 'R$ ' + custo.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+}
+
+function renderizar(lista) {
+  const tbody = document.getElementById('tabela-abastecimentos');
+
+  if (lista.length === 0) {
+    tbody.innerHTML = estadoVazio(9, 'Nenhum abastecimento registrado', 'O histórico de abastecimentos da frota aparecerá aqui.', 'usuario');
+    return;
+  }
+
+  tbody.innerHTML = lista.map(a => `
+    <tr>
+      <td>#${a.id}</td>
+      <td>${a.veiculo ? `<strong>${escapeHtml(a.veiculo.placa)}</strong><br><small>${escapeHtml(a.veiculo.modelo)} ${escapeHtml(a.veiculo.marca)}</small>` : '—'}</td>
+      <td>${a.motorista ? escapeHtml(a.motorista.nome) : '—'}</td>
+      <td>${formatarData(a.data_abastecimento)}</td>
+      <td>${parseFloat(a.litros).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} L</td>
+      <td>${a.quilometragem ? a.quilometragem.toLocaleString('pt-BR') + ' km' : '—'}</td>
+      <td>${escapeHtml(a.posto) || '—'}</td>
+      <td>R$ ${parseFloat(a.valor_total).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+      <td style="display:flex;gap:6px;">
+        <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="editarAbastecimento(${a.id})">${svgIcone('editar', 12)} Editar</button>
+        <button class="btn btn-danger" style="font-size:11px;padding:4px 10px;" onclick="excluirAbastecimento(${a.id})">${svgIcone('excluir', 12)} Excluir</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function filtrar() {
+  const veiculo = document.getElementById('filtro-veiculo').value.toLowerCase();
+  const filtrados = abastecimentos.filter(a => {
+    const placaModelo = a.veiculo ? `${a.veiculo.placa} ${a.veiculo.modelo} ${a.veiculo.marca}`.toLowerCase() : '';
+    return !veiculo || placaModelo.includes(veiculo);
+  });
+  renderizar(filtrados);
+}
+
+function abrirModal() {
+  abastecimentoEditandoId = null;
+  document.getElementById('modal-titulo').textContent = 'Novo Abastecimento';
+  document.getElementById('veiculo-id').value = '';
+  document.getElementById('motorista-id').value = '';
+  document.getElementById('data-abastecimento').value = '';
+  document.getElementById('quilometragem').value = '';
+  document.getElementById('litros').value = '';
+  document.getElementById('valor-total').value = '';
+  document.getElementById('posto').value = '';
+  document.getElementById('modal').classList.add('aberto');
+}
+
+function fecharModal() {
+  document.getElementById('modal').classList.remove('aberto');
+}
+
+function editarAbastecimento(id) {
+  const a = abastecimentos.find(a => a.id === id);
+  if (!a) return;
+  abastecimentoEditandoId = id;
+  document.getElementById('modal-titulo').textContent = 'Editar Abastecimento';
+  document.getElementById('veiculo-id').value = a.veiculo_id;
+  document.getElementById('motorista-id').value = a.motorista_id || '';
+  document.getElementById('data-abastecimento').value = a.data_abastecimento;
+  document.getElementById('quilometragem').value = a.quilometragem || '';
+  document.getElementById('litros').value = numeroParaMoeda(a.litros);
+  document.getElementById('valor-total').value = numeroParaMoeda(a.valor_total);
+  document.getElementById('posto').value = a.posto || '';
+  document.getElementById('modal').classList.add('aberto');
+}
+
+async function excluirAbastecimento(id) {
+  if (!(await confirmarAcao('Deseja excluir este abastecimento?'))) return;
+  await del(`/abastecimentos/${id}`);
+  carregarAbastecimentos();
+}
+
+async function salvarAbastecimento() {
+  const dados = {
+    veiculo_id: parseInt(document.getElementById('veiculo-id').value),
+    motorista_id: parseInt(document.getElementById('motorista-id').value) || null,
+    data_abastecimento: document.getElementById('data-abastecimento').value,
+    quilometragem: parseInt(document.getElementById('quilometragem').value) || null,
+    litros: moedaParaNumero(document.getElementById('litros').value),
+    valor_total: moedaParaNumero(document.getElementById('valor-total').value),
+    posto: document.getElementById('posto').value || null,
+  };
+
+  if (!dados.veiculo_id || !dados.data_abastecimento || !dados.litros || !dados.valor_total) {
+    toastAviso('Preencha todos os campos obrigatórios!');
+    return;
+  }
+
+  let res;
+  if (abastecimentoEditandoId) {
+    res = await put(`/abastecimentos/${abastecimentoEditandoId}`, dados);
+  } else {
+    res = await post('/abastecimentos', dados);
+  }
+
+  if (res.detail) {
+    toastErro('Erro: ' + extrairErro(res));
+    return;
+  }
+
+  fecharModal();
+  carregarAbastecimentos();
+}
+
+carregarAbastecimentos();
+carregarVeiculos();
+carregarMotoristas();

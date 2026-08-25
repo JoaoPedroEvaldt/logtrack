@@ -178,11 +178,11 @@ function badgeStatus(status) {
 /* Mesmas cores usadas nos badges/kanban (.badge-*, .kanban-card-*) em style.css,
    para que os gráficos (Chart.js) fiquem sempre consistentes com o resto da interface. */
 const CORES_STATUS = {
-  aguardando: '#3B6D11',
-  em_rota: '#1E4D78',
-  entregue: '#0F6E56',
-  atrasado: '#993C1D',
-  ocorrencia: '#854F0B',
+  aguardando: '#5B6478',
+  em_rota: '#2E4F8F',
+  entregue: '#1D8348',
+  atrasado: '#B36A17',
+  ocorrencia: '#A13E1F',
   cancelado: '#888888'
 };
 
@@ -211,6 +211,29 @@ function aplicarTema() {
   atualizarBtnTema(dark);
 }
 
+/* ===================== TOPBAR ===================== */
+function iniciais(nome) {
+  if (!nome) return '?';
+  const partes = nome.trim().split(/\s+/);
+  const primeira = partes[0][0] || '';
+  const ultima = partes.length > 1 ? partes[partes.length - 1][0] : '';
+  return (primeira + ultima).toUpperCase();
+}
+
+function renderizarTopbar() {
+  const nome = localStorage.getItem('nome');
+  const perfil = localStorage.getItem('perfil') || '';
+  const perfilLabel = perfil ? perfil.charAt(0).toUpperCase() + perfil.slice(1) : '';
+  const nomeExibido = nome || perfilLabel || 'Usuário';
+
+  const avatar = document.getElementById('topbar-avatar');
+  const nomeEl = document.getElementById('topbar-nome');
+  const perfilEl = document.getElementById('topbar-perfil');
+  if (avatar) avatar.textContent = iniciais(nomeExibido);
+  if (nomeEl) nomeEl.textContent = nomeExibido;
+  if (perfilEl) perfilEl.textContent = perfilLabel;
+}
+
 /* ===================== MENU MOBILE ===================== */
 function toggleMenu() {
   const sidebar = document.querySelector('.sidebar');
@@ -228,8 +251,10 @@ function fecharMenu() {
 
 aplicarTema();
 aplicarVisibilidadePorPerfil();
+renderizarTopbar();
 
 document.addEventListener('DOMContentLoaded', () => {
   aplicarTema();
   aplicarVisibilidadePorPerfil();
+  renderizarTopbar();
 });
