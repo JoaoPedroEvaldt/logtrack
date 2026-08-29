@@ -84,12 +84,7 @@ function renderizarVeiculos(data) {
 
   const tipoLabel = {
     cavalo: 'Cavalo-mecânico',
-    semirreboque: 'Semirreboque',
-    van: 'Van',
-    utilitario: 'Utilitário',
-    moto: 'Moto',
-    caminhao: 'Caminhão',
-    carro: 'Carro'
+    semirreboque: 'Semirreboque'
   };
 
   grid.innerHTML = data.map(v => {
