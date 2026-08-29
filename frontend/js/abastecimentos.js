@@ -2,9 +2,65 @@ checarAuth();
 document.getElementById('usuario-perfil').textContent = localStorage.getItem('perfil') || '';
 aplicarMascaraMoeda(document.getElementById('litros'));
 aplicarMascaraMoeda(document.getElementById('valor-total'));
+document.getElementById('litros').addEventListener('input', () => recalcularValorTotal());
 
 let abastecimentos = [];
 let abastecimentoEditandoId = null;
+let conjuntosCarregados = [];
+
+const ESTADOS_UF = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
+let precosDieselPorUF = null;
+let precoDieselAtual = null;
+
+function preencherEstados() {
+  const sel = document.getElementById('estado');
+  ESTADOS_UF.forEach(uf => {
+    const opt = document.createElement('option');
+    opt.value = uf;
+    opt.textContent = uf;
+    sel.appendChild(opt);
+  });
+}
+
+async function carregarPrecosDiesel() {
+  if (precosDieselPorUF) return precosDieselPorUF;
+  try {
+    const res = await fetch('https://combustivelapi.com.br/api/precos/');
+    const data = await res.json();
+    precosDieselPorUF = (data.precos && data.precos.diesel) || null;
+  } catch (e) {
+    precosDieselPorUF = null;
+  }
+  return precosDieselPorUF;
+}
+
+async function atualizarPrecoDiesel(recalcular = true) {
+  const uf = document.getElementById('estado').value.toLowerCase();
+  const infoEl = document.getElementById('preco-diesel-info');
+  precoDieselAtual = null;
+  if (!uf) { infoEl.value = ''; return; }
+
+  infoEl.value = 'Buscando preço...';
+  const precos = await carregarPrecosDiesel();
+  const precoStr = precos ? precos[uf] : null;
+  const preco = precoStr ? parseFloat(precoStr.replace(',', '.')) : null;
+
+  if (!preco) {
+    infoEl.value = 'Preço indisponível';
+    return;
+  }
+
+  precoDieselAtual = preco;
+  infoEl.value = `R$ ${preco.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / L`;
+  if (recalcular) recalcularValorTotal();
+}
+
+function recalcularValorTotal() {
+  if (!precoDieselAtual) return;
+  const litros = moedaParaNumero(document.getElementById('litros').value);
+  if (!litros) return;
+  document.getElementById('valor-total').value = numeroParaMoeda(litros * precoDieselAtual);
+}
 
 function mesAtual(dataStr) {
   if (!dataStr) return false;
@@ -23,12 +79,14 @@ async function carregarVeiculos() {
   const data = await get('/veiculos') || [];
   const sel = document.getElementById('veiculo-id');
   while (sel.options.length > 1) sel.remove(1);
-  data.forEach(v => {
-    const opt = document.createElement('option');
-    opt.value = v.id;
-    opt.textContent = `${v.placa} — ${v.modelo} ${v.marca}`;
-    sel.appendChild(opt);
-  });
+  data
+    .filter(v => v.tipo !== 'semirreboque')
+    .forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v.id;
+      opt.textContent = `${v.placa} — ${v.modelo} ${v.marca}`;
+      sel.appendChild(opt);
+    });
 }
 
 async function carregarMotoristas() {
@@ -41,6 +99,24 @@ async function carregarMotoristas() {
     opt.textContent = m.nome;
     sel.appendChild(opt);
   });
+}
+
+async function carregarConjuntos() {
+  conjuntosCarregados = await get('/conjuntos') || [];
+}
+
+function vincularPorMotorista() {
+  const motoristaId = parseInt(document.getElementById('motorista-id').value) || null;
+  if (!motoristaId) return;
+  const conjunto = conjuntosCarregados.find(c => c.motorista_id === motoristaId && c.cavalo_id);
+  if (conjunto) document.getElementById('veiculo-id').value = conjunto.cavalo_id;
+}
+
+function vincularPorVeiculo() {
+  const veiculoId = parseInt(document.getElementById('veiculo-id').value) || null;
+  if (!veiculoId) return;
+  const conjunto = conjuntosCarregados.find(c => c.cavalo_id === veiculoId && c.motorista_id);
+  if (conjunto) document.getElementById('motorista-id').value = conjunto.motorista_id;
 }
 
 function atualizarCards(lista) {
@@ -94,6 +170,9 @@ function abrirModal() {
   document.getElementById('motorista-id').value = '';
   document.getElementById('data-abastecimento').value = '';
   document.getElementById('quilometragem').value = '';
+  document.getElementById('estado').value = '';
+  document.getElementById('preco-diesel-info').value = '';
+  precoDieselAtual = null;
   document.getElementById('litros').value = '';
   document.getElementById('valor-total').value = '';
   document.getElementById('posto').value = '';
@@ -113,6 +192,10 @@ function editarAbastecimento(id) {
   document.getElementById('motorista-id').value = a.motorista_id || '';
   document.getElementById('data-abastecimento').value = a.data_abastecimento;
   document.getElementById('quilometragem').value = a.quilometragem || '';
+  document.getElementById('estado').value = a.estado || '';
+  document.getElementById('preco-diesel-info').value = '';
+  precoDieselAtual = null;
+  if (a.estado) atualizarPrecoDiesel(false);
   document.getElementById('litros').value = numeroParaMoeda(a.litros);
   document.getElementById('valor-total').value = numeroParaMoeda(a.valor_total);
   document.getElementById('posto').value = a.posto || '';
@@ -134,6 +217,7 @@ async function salvarAbastecimento() {
     litros: moedaParaNumero(document.getElementById('litros').value),
     valor_total: moedaParaNumero(document.getElementById('valor-total').value),
     posto: document.getElementById('posto').value || null,
+    estado: document.getElementById('estado').value || null,
   };
 
   if (!dados.veiculo_id || !dados.data_abastecimento || !dados.litros || !dados.valor_total) {
@@ -157,6 +241,8 @@ async function salvarAbastecimento() {
   carregarAbastecimentos();
 }
 
+preencherEstados();
 carregarAbastecimentos();
 carregarVeiculos();
 carregarMotoristas();
+carregarConjuntos();

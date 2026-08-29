@@ -14,6 +14,7 @@ class Abastecimento(Base):
     valor_total        = Column(Numeric(10, 2), nullable=False)
     quilometragem      = Column(Integer, nullable=True)
     posto              = Column(String(100), nullable=True)
+    estado             = Column(String(2), nullable=True)
     criado_em          = Column(DateTime, server_default=func.now())
 
     veiculo            = relationship("Veiculo")

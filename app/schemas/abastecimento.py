@@ -10,6 +10,7 @@ class AbastecimentoCreate(BaseModel):
     valor_total: float
     quilometragem: Optional[int] = None
     posto: Optional[str] = None
+    estado: Optional[str] = None
 
 class AbastecimentoUpdate(BaseModel):
     veiculo_id: Optional[int] = None
@@ -19,6 +20,7 @@ class AbastecimentoUpdate(BaseModel):
     valor_total: Optional[float] = None
     quilometragem: Optional[int] = None
     posto: Optional[str] = None
+    estado: Optional[str] = None
 
 class VeiculoInfo(BaseModel):
     id: int
@@ -47,6 +49,7 @@ class AbastecimentoResponse(BaseModel):
     valor_total: float
     quilometragem: Optional[int]
     posto: Optional[str]
+    estado: Optional[str] = None
     criado_em: datetime
 
     class Config:

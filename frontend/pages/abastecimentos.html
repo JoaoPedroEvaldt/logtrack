@@ -132,13 +132,13 @@
       <div class="form-grid">
         <div class="form-group">
           <label>Veículo *</label>
-          <select id="veiculo-id">
+          <select id="veiculo-id" onchange="vincularPorVeiculo()">
             <option value="">Selecionar veículo</option>
           </select>
         </div>
         <div class="form-group">
           <label>Motorista</label>
-          <select id="motorista-id">
+          <select id="motorista-id" onchange="vincularPorMotorista()">
             <option value="">Não informado</option>
           </select>
         </div>
@@ -149,6 +149,16 @@
         <div class="form-group">
           <label>Quilometragem</label>
           <input type="number" id="quilometragem" placeholder="Ex: 150000" />
+        </div>
+        <div class="form-group">
+          <label>Estado (para preço do diesel)</label>
+          <select id="estado" onchange="atualizarPrecoDiesel()">
+            <option value="">Selecionar estado</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Preço do diesel</label>
+          <input type="text" id="preco-diesel-info" placeholder="Selecione o estado" readonly />
         </div>
         <div class="form-group">
           <label>Litros *</label>
