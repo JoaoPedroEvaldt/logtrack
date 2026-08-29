@@ -133,7 +133,10 @@ function moedaParaNumero(valor) {
 /* ===================== MÁSCARAS SOMENTE NÚMEROS ===================== */
 function aplicarMascaraSomenteDigitos(input, maxLength) {
   input.addEventListener('input', () => {
+    const digitosAntesDoCursor = input.value.slice(0, input.selectionStart).replace(/\D/g, '').length;
     input.value = input.value.replace(/\D/g, '').slice(0, maxLength);
+    const novaPos = Math.min(digitosAntesDoCursor, input.value.length);
+    input.setSelectionRange(novaPos, novaPos);
   });
 }
 

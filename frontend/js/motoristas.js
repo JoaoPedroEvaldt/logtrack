@@ -160,11 +160,11 @@ async function salvarMotorista() {
       return;
     }
     if (dados.cpf.replace(/\D/g, '').length !== 11) {
-      toastAviso('CPF incompleto! Informe os 11 dígitos.');
+      toastAviso(`CPF incompleto! Você digitou ${dados.cpf.replace(/\D/g, '').length} dígito(s), são necessários 11.`);
       return;
     }
     if (dados.cnh_numero.length !== 11) {
-      toastAviso('Número da CNH incompleto! Informe os 11 dígitos.');
+      toastAviso(`Número da CNH incompleto! Você digitou ${dados.cnh_numero.length} dígito(s), são necessários 11.`);
       return;
     }
     if (criarAcesso && (!dados.email || !dados.senha)) {
