@@ -141,13 +141,14 @@ function renderizarFaturamento(fat) {
 
   const tbodyMotorista = document.getElementById('tabela-faturamento-motorista');
   if (fat.por_motorista.length === 0) {
-    tbodyMotorista.innerHTML = estadoVazio(4, 'Sem movimento no mês', null, 'vazio');
+    tbodyMotorista.innerHTML = estadoVazio(5, 'Sem movimento no mês', null, 'vazio');
   } else {
     tbodyMotorista.innerHTML = fat.por_motorista.map(m => `
       <tr>
         <td>${escapeHtml(m.motorista)}</td>
         <td>${formatarMoeda(m.receita)}</td>
         <td>${formatarMoeda(m.custo)}</td>
+        <td>${formatarMoeda(m.comissao)}</td>
         <td><strong>${formatarMoeda(m.liquido)}</strong></td>
       </tr>
     `).join('');

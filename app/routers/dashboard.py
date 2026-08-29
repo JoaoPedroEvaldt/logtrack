@@ -127,7 +127,7 @@ def faturamento(db: Session = Depends(get_db), atual: Usuario = Depends(get_usua
         Abastecimento.data_abastecimento < fim_mes
     ).all()
     conjuntos = db.query(Conjunto).filter(Conjunto.status != "inativo").all()
-    motoristas = {m.id: m.nome for m in db.query(Motorista).all()}
+    motoristas = {m.id: m.nome for m in db.query(Motorista).filter(Motorista.status != "inativo").all()}
 
     receita_bruta = sum(float(e.valor_frete or 0) for e in entregas)
     custo_manutencao = sum(float(m.custo or 0) for m in manutencoes)
@@ -181,6 +181,7 @@ def faturamento(db: Session = Depends(get_db), atual: Usuario = Depends(get_usua
             "motorista": nome,
             "receita": receita,
             "custo": custo,
+            "comissao": receita * 0.13,
             "liquido": receita - custo
         })
     por_motorista.sort(key=lambda x: x["liquido"], reverse=True)
