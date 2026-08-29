@@ -56,12 +56,6 @@ def _validar_veiculos_disponiveis(cavalo_id, semi1_id, semi2_id, db: Session, ex
 
 def _enriquecer_conjuntos(conjuntos: List[Conjunto], db: Session) -> List[Conjunto]:
     motorista_ids = [c.motorista_id for c in conjuntos if c.motorista_id]
-    usuario_ids = [c.motorista.usuario_id for c in conjuntos if c.motorista]
-
-    nomes = {}
-    if usuario_ids:
-        usuarios = db.query(Usuario).filter(Usuario.id.in_(usuario_ids)).all()
-        nomes = {u.id: u.nome for u in usuarios}
 
     viagem_por_motorista = {}
     if motorista_ids:
@@ -75,8 +69,6 @@ def _enriquecer_conjuntos(conjuntos: List[Conjunto], db: Session) -> List[Conjun
                 viagem_por_motorista[v.motorista_id] = v
 
     for c in conjuntos:
-        if c.motorista:
-            c.motorista.nome = nomes.get(c.motorista.usuario_id)
         c.viagem_atual = viagem_por_motorista.get(c.motorista_id)
 
     return conjuntos
