@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS veiculos (
     modelo VARCHAR(80) NOT NULL,
     marca VARCHAR(60) NOT NULL,
     ano INTEGER NOT NULL,
-    tipo VARCHAR(30) NOT NULL CHECK (tipo IN ('cavalo', 'semirreboque', 'van', 'utilitario', 'moto', 'caminhao', 'carro')),
+    tipo VARCHAR(30) NOT NULL CHECK (tipo IN ('cavalo', 'semirreboque')),
     subtipo VARCHAR(50),
     eixos INTEGER,
     tipo_eixo VARCHAR(20),
@@ -136,6 +136,7 @@ CREATE TABLE IF NOT EXISTS abastecimentos (
     valor_total DECIMAL(10,2) NOT NULL CHECK (valor_total >= 0),
     quilometragem INTEGER,
     posto VARCHAR(100),
+    estado VARCHAR(2),
     criado_em TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
