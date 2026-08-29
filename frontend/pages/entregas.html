@@ -78,6 +78,15 @@
       <button class="btn btn-primary" onclick="abrirModal()">+ Nova Entrega</button>
     </div>
 
+    <div class="cards-grid" id="cards-resumo-entregas">
+      <div class="card azul"><div class="card-icon" data-icone="relogio"></div><div class="card-valor" id="resumo-aguardando">—</div><div class="card-label">Aguardando</div></div>
+      <div class="card verde"><div class="card-icon" data-icone="caminhao"></div><div class="card-valor" id="resumo-em_rota">—</div><div class="card-label">Em Rota</div></div>
+      <div class="card laranja"><div class="card-icon" data-icone="check"></div><div class="card-valor" id="resumo-entregue">—</div><div class="card-label">Entregue</div></div>
+      <div class="card vermelho"><div class="card-icon" data-icone="alerta"></div><div class="card-valor" id="resumo-atrasado">—</div><div class="card-label">Atrasado</div></div>
+      <div class="card vermelho"><div class="card-icon" data-icone="alerta"></div><div class="card-valor" id="resumo-ocorrencia">—</div><div class="card-label">Ocorrência</div></div>
+      <div class="card azul"><div class="card-icon" data-icone="erro"></div><div class="card-valor" id="resumo-cancelado">—</div><div class="card-label">Cancelado</div></div>
+    </div>
+
     <div class="filtros">
       <input type="text" id="filtro-cliente" placeholder="Buscar por cliente..." onkeyup="filtrar()"
         style="min-width:200px;" />
@@ -89,6 +98,15 @@
         <label style="font-size:12px;color:var(--text-light);">Até</label>
         <input type="date" id="filtro-data-fim" onchange="filtrar()" />
       </div>
+      <select id="filtro-status" onchange="filtrar()">
+        <option value="">Todos os status</option>
+        <option value="aguardando">Aguardando</option>
+        <option value="em_rota">Em Rota</option>
+        <option value="entregue">Entregue</option>
+        <option value="atrasado">Atrasado</option>
+        <option value="ocorrencia">Ocorrência</option>
+        <option value="cancelado">Cancelado</option>
+      </select>
       <select id="filtro-veiculo" onchange="filtrar()">
         <option value="">Todos os veículos</option>
       </select>
@@ -98,8 +116,25 @@
       <button class="btn btn-outline" onclick="limparFiltros()" style="font-size:12px;">Limpar filtros</button>
     </div>
 
-    <div class="kanban-board" id="kanban-board">
-      <div class="loading-state"><span class="spinner"></span> Carregando...</div>
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Cliente</th>
+            <th>Origem → Destino</th>
+            <th>Motorista</th>
+            <th>Veículo</th>
+            <th>Previsão</th>
+            <th>Valor Frete</th>
+            <th>Status</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="tabela-entregas">
+          <tr><td colspan="9" style="padding:0;"><div class="loading-state"><span class="spinner"></span> Carregando...</div></td></tr>
+        </tbody>
+      </table>
     </div>
   </main>
 

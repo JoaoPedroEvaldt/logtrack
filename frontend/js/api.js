@@ -178,7 +178,7 @@ function badgeStatus(status) {
   return `<span class="badge badge-${status}">${labels[status] || status}</span>`;
 }
 
-/* Mesmas cores usadas nos badges/kanban (.badge-*, .kanban-card-*) em style.css,
+/* Mesmas cores usadas nos badges de status (.badge-*) em style.css,
    para que os gráficos (Chart.js) fiquem sempre consistentes com o resto da interface. */
 const CORES_STATUS = {
   aguardando: '#5B6478',

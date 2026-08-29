@@ -1,6 +1,9 @@
 checarAuth();
 document.getElementById('usuario-perfil').textContent = localStorage.getItem('perfil') || '';
 aplicarMascaraMoeda(document.getElementById('valor-frete'));
+document.querySelectorAll('#cards-resumo-entregas .card-icon').forEach(el => {
+  el.innerHTML = svgIcone(el.dataset.icone, 21);
+});
 
 let entregas = [];
 let entregaIdSelecionada = null;
@@ -97,14 +100,7 @@ function atualizarVeiculoPorMotorista() {
   }
 }
 
-const COLUNAS_STATUS = [
-  { status: 'aguardando', label: 'Aguardando' },
-  { status: 'em_rota', label: 'Em Rota' },
-  { status: 'entregue', label: 'Entregue' },
-  { status: 'atrasado', label: 'Atrasado' },
-  { status: 'ocorrencia', label: 'Ocorrência' },
-  { status: 'cancelado', label: 'Cancelado' },
-];
+const STATUS_LISTA = ['aguardando', 'em_rota', 'entregue', 'atrasado', 'ocorrencia', 'cancelado'];
 
 function veiculoLabel(veiculoId) {
   if (!veiculoId) return null;
@@ -112,52 +108,52 @@ function veiculoLabel(veiculoId) {
   return v ? `${escapeHtml(v.placa)} — ${escapeHtml(v.modelo)}` : `Veículo #${veiculoId}`;
 }
 
-function renderizarKanban(lista) {
-  const board = document.getElementById('kanban-board');
+function motoristaLabel(motoristaId) {
+  if (!motoristaId) return null;
+  const m = motoristasCompletos.find(m => m.id === motoristaId);
+  return m ? escapeHtml(m.nome) : `Motorista #${motoristaId}`;
+}
+
+function atualizarResumo(lista) {
+  STATUS_LISTA.forEach(status => {
+    const el = document.getElementById(`resumo-${status}`);
+    if (el) el.textContent = lista.filter(e => e.status === status).length;
+  });
+}
+
+function renderizarTabela(lista) {
+  const tbody = document.getElementById('tabela-entregas');
 
   if (lista.length === 0) {
-    board.innerHTML = `<div style="width:100%;">${estadoVazio(null, 'Nenhuma entrega encontrada', 'Ajuste os filtros ou cadastre uma nova entrega para começar.', 'vazio')}</div>`;
+    tbody.innerHTML = estadoVazio(9, 'Nenhuma entrega encontrada', 'Ajuste os filtros ou cadastre uma nova entrega para começar.', 'vazio');
     return;
   }
 
-  board.innerHTML = COLUNAS_STATUS.map(col => {
-    const itens = lista.filter(e => e.status === col.status);
-    return `
-      <div class="kanban-column">
-        <div class="kanban-column-header">
-          <span>${col.label}</span>
-          <span class="badge badge-${col.status}">${itens.length}</span>
-        </div>
-        <div class="kanban-cards">
-          ${itens.length === 0
-            ? '<div style="text-align:center;color:var(--text-light);font-size:12px;padding:12px;">Vazio</div>'
-            : itens.map(e => `
-              <div class="kanban-card kanban-card-${col.status}">
-                <div style="font-weight:600;color:var(--text);font-size:13px;">#${e.id} ${escapeHtml(e.cliente)}</div>
-                <div style="font-size:12px;color:var(--text-light);margin-top:4px;display:flex;align-items:center;gap:5px;">${svgIcone('local', 13)} ${escapeHtml(e.destino)}</div>
-                <div style="font-size:12px;color:var(--text-light);margin-top:2px;display:flex;align-items:center;gap:5px;">${svgIcone('relogio', 13)} ${formatarDataHora(e.previsao)}</div>
-                <div style="font-size:12px;color:var(--text-light);margin-top:2px;display:flex;align-items:center;gap:5px;">${svgIcone('caminhao', 13)} ${veiculoLabel(e.veiculo_id) || 'Sem veículo definido'}</div>
-                ${e.valor_frete ? `<div style="font-size:12px;color:var(--text-light);margin-top:2px;display:flex;align-items:center;gap:5px;">${svgIcone('dinheiro', 13)} R$ ${parseFloat(e.valor_frete).toLocaleString('pt-BR', {minimumFractionDigits:2})}</div>` : ''}
-                <div style="display:flex;gap:6px;margin-top:10px;">
-                  <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;flex:1;" onclick="abrirModal(${e.id})">
-                    ${svgIcone('editar', 12)} Editar
-                  </button>
-                  <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;flex:1;" onclick="abrirModalStatus(${e.id})">
-                    Status
-                  </button>
-                </div>
-              </div>
-            `).join('')}
-        </div>
-      </div>
-    `;
-  }).join('');
+  const ordenada = [...lista].sort((a, b) => new Date(b.previsao) - new Date(a.previsao));
+
+  tbody.innerHTML = ordenada.map(e => `
+    <tr>
+      <td>#${e.id}</td>
+      <td>${escapeHtml(e.cliente)}</td>
+      <td>${escapeHtml(e.origem)} → ${escapeHtml(e.destino)}</td>
+      <td>${motoristaLabel(e.motorista_id) || '—'}</td>
+      <td>${veiculoLabel(e.veiculo_id) || '—'}</td>
+      <td>${formatarDataHora(e.previsao)}</td>
+      <td>${e.valor_frete ? 'R$ ' + parseFloat(e.valor_frete).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'}</td>
+      <td>${badgeStatus(e.status)}</td>
+      <td style="display:flex;gap:6px;">
+        <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="abrirModal(${e.id})">${svgIcone('editar', 12)} Editar</button>
+        <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="abrirModalStatus(${e.id})">Status</button>
+      </td>
+    </tr>
+  `).join('');
 }
 
 function filtrar() {
   const cliente = document.getElementById('filtro-cliente').value.toLowerCase();
   const inicio = document.getElementById('filtro-data-inicio').value;
   const fim = document.getElementById('filtro-data-fim').value;
+  const status = document.getElementById('filtro-status').value;
   const veiculoId = document.getElementById('filtro-veiculo').value;
   const motoristaId = document.getElementById('filtro-motorista').value;
 
@@ -165,18 +161,21 @@ function filtrar() {
     if (cliente && !e.cliente.toLowerCase().includes(cliente)) return false;
     if (inicio && new Date(e.previsao) < new Date(inicio)) return false;
     if (fim && new Date(e.previsao) > new Date(fim + 'T23:59:59')) return false;
+    if (status && e.status !== status) return false;
     if (veiculoId && String(e.veiculo_id) !== veiculoId) return false;
     if (motoristaId && String(e.motorista_id) !== motoristaId) return false;
     return true;
   });
 
-  renderizarKanban(filtradas);
+  atualizarResumo(filtradas);
+  renderizarTabela(filtradas);
 }
 
 function limparFiltros() {
   document.getElementById('filtro-cliente').value = '';
   document.getElementById('filtro-data-inicio').value = '';
   document.getElementById('filtro-data-fim').value = '';
+  document.getElementById('filtro-status').value = '';
   document.getElementById('filtro-veiculo').value = '';
   document.getElementById('filtro-motorista').value = '';
   filtrar();
