@@ -11,6 +11,56 @@ let entregaEditandoId = null;
 let veiculosCompletos = [];
 let motoristasCompletos = [];
 let mapaConjuntoPorMotorista = {};
+let mapaMotoristasEmRota = {};
+let mapaVeiculosEmRota = {};
+let mapaVeiculosEmManutencao = {};
+
+async function carregarManutencoesAtivas() {
+  const manutencoes = await get('/manutencoes') || [];
+  mapaVeiculosEmManutencao = {};
+  manutencoes.filter(m => m.status !== 'concluida').forEach(m => {
+    mapaVeiculosEmManutencao[m.veiculo_id] = m.tipo;
+  });
+}
+
+function calcularEmRota(excluirEntregaId) {
+  mapaMotoristasEmRota = {};
+  mapaVeiculosEmRota = {};
+  entregas.forEach(e => {
+    if (e.status !== 'em_rota' || e.id === excluirEntregaId) return;
+    if (e.motorista_id) mapaMotoristasEmRota[e.motorista_id] = e.cliente;
+    if (e.veiculo_id) mapaVeiculosEmRota[e.veiculo_id] = e.cliente;
+  });
+}
+
+function atualizarDisponibilidadeMotoristas() {
+  const sel = document.getElementById('motorista-id');
+  [...sel.options].forEach(opt => {
+    if (!opt.value) return;
+    const m = motoristasCompletos.find(m => String(m.id) === opt.value);
+    const nomeBase = m ? (m.nome || `Motorista #${m.id}`) : opt.textContent;
+    const emRota = mapaMotoristasEmRota[opt.value];
+    /* Mesmo que o motorista esteja livre, o veículo do conjunto dele pode não estar —
+       e como o vínculo trava a escolha de veículo, selecioná-lo levaria a um erro ao salvar. */
+    const vinculo = mapaConjuntoPorMotorista[opt.value];
+    const veiculoEmRota = vinculo && mapaVeiculosEmRota[vinculo.veiculoId];
+    const veiculoEmManutencao = vinculo && mapaVeiculosEmManutencao[vinculo.veiculoId];
+
+    if (emRota) {
+      opt.textContent = `${nomeBase} (em rota — ${emRota})`;
+      opt.disabled = true;
+    } else if (veiculoEmRota) {
+      opt.textContent = `${nomeBase} (veículo em rota — ${veiculoEmRota})`;
+      opt.disabled = true;
+    } else if (veiculoEmManutencao) {
+      opt.textContent = `${nomeBase} (veículo em manutenção — ${veiculoEmManutencao})`;
+      opt.disabled = true;
+    } else {
+      opt.textContent = nomeBase;
+      opt.disabled = false;
+    }
+  });
+}
 
 async function carregarEntregas() {
   entregas = await get('/entregas') || [];
@@ -61,7 +111,17 @@ function preencherOpcoesVeiculo(lista) {
   lista.forEach(v => {
     const opt = document.createElement('option');
     opt.value = v.id;
-    opt.textContent = `${v.placa} — ${v.modelo}`;
+    const emRota = mapaVeiculosEmRota[v.id];
+    const emManutencao = mapaVeiculosEmManutencao[v.id];
+    if (emRota) {
+      opt.textContent = `${v.placa} — ${v.modelo} (em rota — ${emRota})`;
+      opt.disabled = true;
+    } else if (emManutencao) {
+      opt.textContent = `${v.placa} — ${v.modelo} (em manutenção — ${emManutencao})`;
+      opt.disabled = true;
+    } else {
+      opt.textContent = `${v.placa} — ${v.modelo}`;
+    }
     sel.appendChild(opt);
   });
   if (lista.some(v => String(v.id) === valorAtual)) {
@@ -92,7 +152,16 @@ function atualizarVeiculoPorMotorista() {
     preencherOpcoesVeiculo(veiculosCompletos.filter(v => v.id === vinculo.veiculoId));
     selVeiculo.value = vinculo.veiculoId;
     selVeiculo.disabled = true;
-    if (info) info.innerHTML = `${svgIcone('link', 12)} Vinculado ao conjunto "${escapeHtml(vinculo.conjuntoNome)}". Para trocar o veículo, altere o conjunto na aba Conjuntos.`;
+    const bloqueio = mapaVeiculosEmRota[vinculo.veiculoId]
+      ? `está em rota (entrega para ${escapeHtml(mapaVeiculosEmRota[vinculo.veiculoId])})`
+      : mapaVeiculosEmManutencao[vinculo.veiculoId]
+        ? `está em manutenção (${escapeHtml(mapaVeiculosEmManutencao[vinculo.veiculoId])})`
+        : null;
+    if (info) {
+      info.innerHTML = bloqueio
+        ? `${svgIcone('alerta', 12)} Vinculado ao conjunto "${escapeHtml(vinculo.conjuntoNome)}", mas o veículo ${bloqueio} — não vai ser possível salvar até resolver isso.`
+        : `${svgIcone('link', 12)} Vinculado ao conjunto "${escapeHtml(vinculo.conjuntoNome)}". Para trocar o veículo, altere o conjunto na aba Conjuntos.`;
+    }
   } else {
     preencherOpcoesVeiculo(veiculosCompletos);
     selVeiculo.disabled = false;
@@ -130,6 +199,7 @@ function renderizarTabela(lista) {
   }
 
   const ordenada = [...lista].sort((a, b) => new Date(b.previsao) - new Date(a.previsao));
+  const ehMotorista = localStorage.getItem('perfil') === 'motorista';
 
   tbody.innerHTML = ordenada.map(e => `
     <tr>
@@ -142,7 +212,7 @@ function renderizarTabela(lista) {
       <td>${e.valor_frete ? 'R$ ' + parseFloat(e.valor_frete).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'}</td>
       <td>${badgeStatus(e.status)}</td>
       <td style="display:flex;gap:6px;">
-        <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="abrirModal(${e.id})">${svgIcone('editar', 12)} Editar</button>
+        ${ehMotorista ? '' : `<button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="abrirModal(${e.id})">${svgIcone('editar', 12)} Editar</button>`}
         <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="abrirModalStatus(${e.id})">Status</button>
       </td>
     </tr>
@@ -183,6 +253,7 @@ function limparFiltros() {
 
 function abrirModal(id) {
   entregaEditandoId = id || null;
+  calcularEmRota(entregaEditandoId);
 
   document.getElementById('cliente').value = '';
   document.getElementById('origem').value = '';
@@ -195,6 +266,7 @@ function abrirModal(id) {
   preencherOpcoesVeiculo(veiculosCompletos);
   document.getElementById('veiculo-id').value = '';
   document.getElementById('veiculo-id').disabled = false;
+  atualizarDisponibilidadeMotoristas();
   const info = document.getElementById('conjunto-info');
   if (info) info.textContent = '';
 
@@ -268,17 +340,26 @@ async function salvarEntrega() {
 
 async function confirmarStatus() {
   const status = document.getElementById('novo-status').value;
-  await fetch(`http://127.0.0.1:8000/entregas/${entregaIdSelecionada}/status?status=${status}`, {
+  const res = await fetch(`http://127.0.0.1:8000/entregas/${entregaIdSelecionada}/status?status=${status}`, {
     method: 'PUT',
     headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
   });
+  const corpo = await res.json();
+  if (!res.ok) {
+    toastErro('Erro: ' + extrairErro(corpo));
+    return;
+  }
   fecharModalStatus();
   carregarEntregas();
 }
 
 async function iniciar() {
   definirPeriodoPadrao();
-  await Promise.all([carregarVeiculos(), carregarMotoristas(), carregarConjuntosMotoristas()]);
+  /* Motorista só vê as próprias entregas; cadastros de veículo/motorista/conjunto
+     ficam bloqueados pra esse perfil, então nem tenta carregar (e nem precisa). */
+  if (localStorage.getItem('perfil') !== 'motorista') {
+    await Promise.all([carregarVeiculos(), carregarMotoristas(), carregarConjuntosMotoristas(), carregarManutencoesAtivas()]);
+  }
   carregarEntregas();
 }
 iniciar();
