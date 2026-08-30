@@ -17,6 +17,7 @@ class VeiculoCreate(BaseModel):
     seguro_validade: Optional[date] = None
 
 class VeiculoUpdate(BaseModel):
+    placa: Optional[str] = None
     modelo: Optional[str] = None
     marca: Optional[str] = None
     ano: Optional[int] = None

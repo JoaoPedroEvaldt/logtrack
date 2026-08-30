@@ -6,6 +6,12 @@ aplicarMascaraSomenteDigitos(document.getElementById('cnh-numero'), 11);
 let motoristaEditandoId = null;
 let motoristasCarregados = [];
 
+function formatarCPF(valor) {
+  const digitos = (valor || '').replace(/\D/g, '');
+  if (digitos.length !== 11) return valor || '';
+  return digitos.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+}
+
 const PALETA_AVATAR = ['#5B6478', '#8B5CF6', '#10B981', '#EC4899', '#64748B', '#0EA5A4', '#3B82F6', '#F59E0B'];
 function corAvatar(id) { return PALETA_AVATAR[id % PALETA_AVATAR.length]; }
 function iniciaisNome(nome) {
@@ -118,6 +124,8 @@ function editarMotorista(id) {
   motoristaEditandoId = id;
   document.querySelector('#modal .modal-header h2').textContent = 'Editar Motorista';
   document.getElementById('nome').value = m.nome || '';
+  document.getElementById('cpf').value = formatarCPF(m.cpf);
+  document.getElementById('cnh-numero').value = m.cnh_numero || '';
   document.getElementById('telefone').value = m.telefone || '';
   document.getElementById('cnh-categoria').value = m.cnh_categoria;
   document.getElementById('cnh-validade').value = m.cnh_validade;
@@ -135,12 +143,40 @@ async function salvarMotorista() {
   let res;
 
   if (motoristaEditandoId) {
+    const original = motoristasCarregados.find(m => m.id === motoristaEditandoId);
+    /* Compara só dígitos dos dois lados: cadastros antigos podem ter o CPF/CNH salvo com
+       ponto/traço no meio, tamanho errado, ou dígito verificador que nunca foi validado.
+       Se o usuário não mexeu no valor (mesmos dígitos de antes), não reaplicamos as regras
+       novas nem reenviamos o campo — só travamos quando ele digita algo realmente diferente. */
+    const cpfOriginalDigitos = ((original && original.cpf) || '').replace(/\D/g, '');
+    const cnhOriginalDigitos = ((original && original.cnh_numero) || '').replace(/\D/g, '');
+    const cpfDigitado = document.getElementById('cpf').value.replace(/\D/g, '');
+    const cnhDigitada = document.getElementById('cnh-numero').value.replace(/\D/g, '');
+    const cpfMudou = cpfDigitado !== cpfOriginalDigitos;
+    const cnhMudou = cnhDigitada !== cnhOriginalDigitos;
+
+    if (!document.getElementById('nome').value || !cpfDigitado || !cnhDigitada || !document.getElementById('cnh-categoria').value || !document.getElementById('cnh-validade').value) {
+      toastAviso('Preencha todos os campos obrigatórios!');
+      return;
+    }
+    if (cpfMudou && cpfDigitado.length !== 11) {
+      toastAviso(`CPF incompleto! Você digitou ${cpfDigitado.length} dígito(s), são necessários 11.`);
+      return;
+    }
+    if (cnhMudou && cnhDigitada.length !== 11) {
+      toastAviso(`Número da CNH incompleto! Você digitou ${cnhDigitada.length} dígito(s), são necessários 11.`);
+      return;
+    }
+
     const dados = {
       nome: document.getElementById('nome').value,
       telefone: document.getElementById('telefone').value || null,
       cnh_categoria: document.getElementById('cnh-categoria').value,
       cnh_validade: document.getElementById('cnh-validade').value,
     };
+    if (cpfMudou) dados.cpf = cpfDigitado;
+    if (cnhMudou) dados.cnh_numero = cnhDigitada;
+
     res = await put(`/motoristas/${motoristaEditandoId}`, dados);
   } else {
     const criarAcesso = document.getElementById('criar-acesso').checked;

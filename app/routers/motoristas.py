@@ -73,11 +73,15 @@ def criar_motorista(dados: MotoristaCreate, db: Session = Depends(get_db), atual
 
 @router.get("/", response_model=List[MotoristaResponse])
 def listar_motoristas(db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
+    if atual.perfil == "motorista":
+        raise HTTPException(status_code=403, detail="Acesso negado")
     motoristas = db.query(Motorista).filter(Motorista.status != "inativo").all()
     return [_serializar_motorista(m, db) for m in motoristas]
 
 @router.get("/{id}", response_model=MotoristaResponse)
 def buscar_motorista(id: int, db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
+    if atual.perfil == "motorista":
+        raise HTTPException(status_code=403, detail="Acesso negado")
     motorista = db.query(Motorista).filter(Motorista.id == id).first()
     if not motorista:
         raise HTTPException(status_code=404, detail="Motorista não encontrado")
@@ -90,6 +94,14 @@ def atualizar_motorista(id: int, dados: MotoristaUpdate, db: Session = Depends(g
     motorista = db.query(Motorista).filter(Motorista.id == id).first()
     if not motorista:
         raise HTTPException(status_code=404, detail="Motorista não encontrado")
+    if dados.cpf and db.query(Motorista).filter(
+        Motorista.cpf == dados.cpf, Motorista.status != "inativo", Motorista.id != id
+    ).first():
+        raise HTTPException(status_code=400, detail="CPF já cadastrado para outro motorista")
+    if dados.cnh_numero and db.query(Motorista).filter(
+        Motorista.cnh_numero == dados.cnh_numero, Motorista.status != "inativo", Motorista.id != id
+    ).first():
+        raise HTTPException(status_code=400, detail="CNH já cadastrada para outro motorista")
     for campo, valor in dados.model_dump(exclude_none=True).items():
         setattr(motorista, campo, valor)
     db.commit()

@@ -23,10 +23,14 @@ def criar_veiculo(dados: VeiculoCreate, db: Session = Depends(get_db), atual: Us
 
 @router.get("/", response_model=List[VeiculoResponse])
 def listar_veiculos(db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
+    if atual.perfil == "motorista":
+        raise HTTPException(status_code=403, detail="Acesso negado")
     return db.query(Veiculo).filter(Veiculo.status != "inativo").all()
 
 @router.get("/{id}", response_model=VeiculoResponse)
 def buscar_veiculo(id: int, db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
+    if atual.perfil == "motorista":
+        raise HTTPException(status_code=403, detail="Acesso negado")
     veiculo = db.query(Veiculo).filter(Veiculo.id == id).first()
     if not veiculo:
         raise HTTPException(status_code=404, detail="Veículo não encontrado")
@@ -39,6 +43,8 @@ def atualizar_veiculo(id: int, dados: VeiculoUpdate, db: Session = Depends(get_d
     veiculo = db.query(Veiculo).filter(Veiculo.id == id).first()
     if not veiculo:
         raise HTTPException(status_code=404, detail="Veículo não encontrado")
+    if dados.placa and db.query(Veiculo).filter(Veiculo.placa == dados.placa, Veiculo.id != id).first():
+        raise HTTPException(status_code=400, detail="Placa já cadastrada para outro veículo")
     for campo, valor in dados.model_dump(exclude_none=True).items():
         setattr(veiculo, campo, valor)
     db.commit()

@@ -41,10 +41,32 @@ class MotoristaCreate(BaseModel):
 
 class MotoristaUpdate(BaseModel):
     nome: Optional[str] = None
+    cpf: Optional[str] = None
+    cnh_numero: Optional[str] = None
     telefone: Optional[str] = None
     cnh_categoria: Optional[str] = None
     cnh_validade: Optional[date] = None
     status: Optional[str] = None
+
+    @field_validator("cpf")
+    @classmethod
+    def validar_cpf(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        digitos = re.sub(r"\D", "", v)
+        if not _cpf_valido(digitos):
+            raise ValueError("CPF inválido. Informe os 11 dígitos numéricos de um CPF real")
+        return digitos
+
+    @field_validator("cnh_numero")
+    @classmethod
+    def validar_cnh_numero(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        digitos = re.sub(r"\D", "", v)
+        if len(digitos) != 11:
+            raise ValueError("Número da CNH deve conter 11 dígitos numéricos")
+        return digitos
 
 class MotoristaResponse(BaseModel):
     id: int

@@ -6,6 +6,7 @@ from app.models.entrega import Entrega
 from app.models.usuario import Usuario
 from app.schemas.ocorrencia import OcorrenciaCreate, OcorrenciaUpdate, OcorrenciaResponse
 from app.routers.auth import get_usuario_atual
+from app.routers.entregas import _garantir_acesso_entrega
 from typing import List
 
 router = APIRouter(prefix="/ocorrencias", tags=["Ocorrências"])
@@ -15,6 +16,7 @@ def criar_ocorrencia(dados: OcorrenciaCreate, db: Session = Depends(get_db), atu
     entrega = db.query(Entrega).filter(Entrega.id == dados.entrega_id).first()
     if not entrega:
         raise HTTPException(status_code=404, detail="Entrega não encontrada")
+    _garantir_acesso_entrega(entrega, atual, db)
     ocorrencia = Ocorrencia(
         entrega_id=dados.entrega_id,
         usuario_id=atual.id,
@@ -29,6 +31,10 @@ def criar_ocorrencia(dados: OcorrenciaCreate, db: Session = Depends(get_db), atu
 
 @router.get("/entrega/{entrega_id}", response_model=List[OcorrenciaResponse])
 def listar_ocorrencias_entrega(entrega_id: int, db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
+    entrega = db.query(Entrega).filter(Entrega.id == entrega_id).first()
+    if not entrega:
+        raise HTTPException(status_code=404, detail="Entrega não encontrada")
+    _garantir_acesso_entrega(entrega, atual, db)
     return db.query(Ocorrencia).filter(Ocorrencia.entrega_id == entrega_id).all()
 
 @router.get("/", response_model=List[OcorrenciaResponse])
