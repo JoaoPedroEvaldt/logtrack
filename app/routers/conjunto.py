@@ -93,6 +93,8 @@ def criar_conjunto(dados: ConjuntoCreate, db: Session = Depends(get_db), atual: 
 
 @router.get("/", response_model=List[ConjuntoResponse])
 def listar_conjuntos(db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
+    if atual.perfil == "motorista":
+        raise HTTPException(status_code=403, detail="Acesso negado")
     conjuntos = db.query(Conjunto).options(
         joinedload(Conjunto.motorista),
         joinedload(Conjunto.cavalo),
@@ -103,6 +105,8 @@ def listar_conjuntos(db: Session = Depends(get_db), atual: Usuario = Depends(get
 
 @router.get("/{id}", response_model=ConjuntoResponse)
 def buscar_conjunto(id: int, db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
+    if atual.perfil == "motorista":
+        raise HTTPException(status_code=403, detail="Acesso negado")
     conjunto = db.query(Conjunto).options(
         joinedload(Conjunto.motorista),
         joinedload(Conjunto.cavalo),

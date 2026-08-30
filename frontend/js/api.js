@@ -39,6 +39,9 @@ function aplicarVisibilidadePorPerfil() {
   document.querySelectorAll('[data-admin-only]').forEach(el => {
     if (perfil !== 'administrador') el.style.display = 'none';
   });
+  document.querySelectorAll('[data-staff-only]').forEach(el => {
+    if (perfil === 'motorista') el.style.display = 'none';
+  });
 }
 
 async function get(endpoint) {

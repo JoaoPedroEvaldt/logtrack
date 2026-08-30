@@ -25,14 +25,20 @@ def criar_manutencao(dados: ManutencaoCreate, db: Session = Depends(get_db), atu
 
 @router.get("/", response_model=List[ManutencaoResponse])
 def listar_manutencoes(db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
+    if atual.perfil == "motorista":
+        raise HTTPException(status_code=403, detail="Acesso negado")
     return db.query(Manutencao).options(joinedload(Manutencao.veiculo)).order_by(Manutencao.data_manutencao.desc()).all()
 
 @router.get("/veiculo/{veiculo_id}", response_model=List[ManutencaoResponse])
 def listar_por_veiculo(veiculo_id: int, db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
+    if atual.perfil == "motorista":
+        raise HTTPException(status_code=403, detail="Acesso negado")
     return db.query(Manutencao).options(joinedload(Manutencao.veiculo)).filter(Manutencao.veiculo_id == veiculo_id).order_by(Manutencao.data_manutencao.desc()).all()
 
 @router.get("/{id}", response_model=ManutencaoResponse)
 def buscar_manutencao(id: int, db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
+    if atual.perfil == "motorista":
+        raise HTTPException(status_code=403, detail="Acesso negado")
     manutencao = db.query(Manutencao).options(joinedload(Manutencao.veiculo)).filter(Manutencao.id == id).first()
     if not manutencao:
         raise HTTPException(status_code=404, detail="Manutenção não encontrada")

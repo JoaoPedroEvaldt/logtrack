@@ -111,6 +111,27 @@ function renderizarTabela(entregas, conjuntos) {
   }).join('');
 }
 
+const TIPO_LABEL_VENCIMENTO = { cnh: 'CNH', crlv: 'CRLV', seguro: 'Seguro' };
+
+function renderizarVencimentos(lista) {
+  const tbody = document.getElementById('tabela-vencimentos');
+  if (!tbody) return;
+
+  if (lista.length === 0) {
+    tbody.innerHTML = estadoVazio(4, 'Nenhum vencimento próximo', 'CNHs, CRLVs e seguros estão em dia nos próximos 30 dias.', 'check');
+    return;
+  }
+
+  tbody.innerHTML = lista.map(item => `
+    <tr>
+      <td>${TIPO_LABEL_VENCIMENTO[item.tipo] || item.tipo}</td>
+      <td>${escapeHtml(item.referencia)}</td>
+      <td>${formatarData(item.validade)}</td>
+      <td>${item.vencido ? '<span class="badge badge-ocorrencia">Vencido</span>' : '<span class="badge badge-atrasado">Vence em breve</span>'}</td>
+    </tr>
+  `).join('');
+}
+
 const NOMES_MES_EXTENSO = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 
 function formatarMoeda(valor) {
@@ -156,29 +177,48 @@ function renderizarFaturamento(fat) {
 }
 
 async function carregarPainel() {
-  const [motoristas, veiculos, ocorrencias, entregas, conjuntos, faturamento] = await Promise.all([
-    get('/motoristas'), get('/veiculos'), get('/ocorrencias'), get('/entregas'), get('/conjuntos'), get('/dashboard/faturamento')
+  /* Motorista só enxerga as próprias entregas — o resto (cadastros de colegas,
+     faturamento, vencimentos) é bloqueado pela API pra esse perfil, então nem pedimos. */
+  const ehMotorista = localStorage.getItem('perfil') === 'motorista';
+
+  const [entregas, motoristas, veiculos, ocorrencias, conjuntos, faturamento, vencimentos] = await Promise.all([
+    get('/entregas'),
+    ehMotorista ? Promise.resolve(null) : get('/motoristas'),
+    ehMotorista ? Promise.resolve(null) : get('/veiculos'),
+    ehMotorista ? Promise.resolve(null) : get('/ocorrencias'),
+    ehMotorista ? Promise.resolve(null) : get('/conjuntos'),
+    ehMotorista ? Promise.resolve(null) : get('/dashboard/faturamento'),
+    ehMotorista ? Promise.resolve(null) : get('/dashboard/vencimentos'),
   ]);
 
-  const listaMotoristas = motoristas || [];
-  const listaVeiculos = veiculos || [];
-  const listaOcorrencias = ocorrencias || [];
   const listaEntregas = entregas || [];
   const listaConjuntos = conjuntos || [];
 
   const emAndamento = listaEntregas.filter(e => STATUS_ATIVOS.includes(e.status)).length;
-  const motoristasDisp = listaMotoristas.filter(m => m.status === 'disponivel').length;
-  const veiculosDisp = listaVeiculos.filter(v => v.status === 'disponivel').length;
-
   document.getElementById('card-em-andamento').textContent = emAndamento;
-  document.getElementById('card-motoristas').textContent = `${motoristasDisp} / ${listaMotoristas.length}`;
-  document.getElementById('card-veiculos').textContent = `${veiculosDisp} / ${listaVeiculos.length}`;
-  document.getElementById('card-ocorrencias').textContent = listaOcorrencias.length;
+
+  if (!ehMotorista) {
+    const listaMotoristas = motoristas || [];
+    const listaVeiculos = veiculos || [];
+    const listaOcorrencias = ocorrencias || [];
+
+    /* "Disponível" no cadastro só vira "em rota" quando existe uma entrega em_rota
+       usando aquele motorista/veículo agora — o campo status sozinho não reflete isso. */
+    const motoristasEmRota = new Set(listaEntregas.filter(e => e.status === 'em_rota' && e.motorista_id).map(e => e.motorista_id));
+    const veiculosEmRota = new Set(listaEntregas.filter(e => e.status === 'em_rota' && e.veiculo_id).map(e => e.veiculo_id));
+    const motoristasDisp = listaMotoristas.filter(m => m.status === 'disponivel' && !motoristasEmRota.has(m.id)).length;
+    const veiculosDisp = listaVeiculos.filter(v => v.status === 'disponivel' && !veiculosEmRota.has(v.id)).length;
+
+    document.getElementById('card-motoristas').textContent = `${motoristasDisp} / ${listaMotoristas.length}`;
+    document.getElementById('card-veiculos').textContent = `${veiculosDisp} / ${listaVeiculos.length}`;
+    document.getElementById('card-ocorrencias').textContent = listaOcorrencias.length;
+    renderizarVencimentos(vencimentos || []);
+    if (faturamento && !faturamento.detail) renderizarFaturamento(faturamento);
+  }
 
   renderizarGraficoMensal(listaEntregas);
   renderizarGraficoStatus(listaEntregas);
   renderizarTabela(listaEntregas, listaConjuntos);
-  if (faturamento && !faturamento.detail) renderizarFaturamento(faturamento);
 }
 
 carregarPainel();

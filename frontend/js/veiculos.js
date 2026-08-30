@@ -26,6 +26,13 @@ function atualizarTipoEixo() {
   grupoTipoEixo.style.display = eixos === '3' ? 'block' : 'none';
 }
 
+function diasParaVencer(dataStr) {
+  if (!dataStr) return null;
+  const validade = new Date(dataStr);
+  const hoje = new Date();
+  return Math.ceil((validade - hoje) / (1000 * 60 * 60 * 24));
+}
+
 let veiculosEmRota = new Set();
 let veiculosEmManutencao = new Set();
 
@@ -93,6 +100,11 @@ function renderizarVeiculos(data) {
       v.eixos ? `${v.eixos} eixos${v.tipo_eixo ? ' (' + v.tipo_eixo.toUpperCase() + ')' : ''}` : null
     ].filter(Boolean).join(' · ');
 
+    const diasCrlv = diasParaVencer(v.crlv_validade);
+    const diasSeguro = diasParaVencer(v.seguro_validade);
+    const alertaDocs = (diasCrlv !== null && diasCrlv <= 30) || (diasSeguro !== null && diasSeguro <= 30);
+    const iconeAlerta = alertaDocs ? `<span style="color:var(--warning);display:inline-flex;vertical-align:-3px;margin-right:3px;" title="CRLV ou seguro vencendo">${svgIcone('alerta', 13)}</span>` : '';
+
     return `
       <div class="vehicle-card">
         <div class="vehicle-topo">
@@ -100,7 +112,7 @@ function renderizarVeiculos(data) {
           <span class="badge badge-${statusBadge[statusEfetivoVeiculo(v)] || 'aguardando'}">${statusLabel[statusEfetivoVeiculo(v)] || escapeHtml(v.status)}</span>
         </div>
         <div class="vehicle-imagem">${svgIcone('caminhao', 34)}</div>
-        <div class="vehicle-placa">${escapeHtml(v.placa)}</div>
+        <div class="vehicle-placa">${iconeAlerta}${escapeHtml(v.placa)}</div>
         <div class="vehicle-modelo">${escapeHtml(v.marca)} ${escapeHtml(v.modelo)} · ${v.ano}</div>
         ${detalhes ? `<div class="vehicle-modelo">${escapeHtml(detalhes)}</div>` : ''}
         <div class="vehicle-modelo">${v.capacidade_kg} kg</div>

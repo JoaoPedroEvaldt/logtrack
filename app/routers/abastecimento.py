@@ -31,10 +31,14 @@ def criar_abastecimento(dados: AbastecimentoCreate, db: Session = Depends(get_db
 
 @router.get("/", response_model=List[AbastecimentoResponse])
 def listar_abastecimentos(db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
+    if atual.perfil == "motorista":
+        raise HTTPException(status_code=403, detail="Acesso negado")
     return _com_relacoes(db.query(Abastecimento)).order_by(Abastecimento.data_abastecimento.desc()).all()
 
 @router.get("/{id}", response_model=AbastecimentoResponse)
 def buscar_abastecimento(id: int, db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
+    if atual.perfil == "motorista":
+        raise HTTPException(status_code=403, detail="Acesso negado")
     abastecimento = _com_relacoes(db.query(Abastecimento)).filter(Abastecimento.id == id).first()
     if not abastecimento:
         raise HTTPException(status_code=404, detail="Abastecimento não encontrado")
