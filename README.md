@@ -164,4 +164,11 @@ pip install -r requirements-dev.txt
 pytest tests/ -v
 ```
 
-A suite cobre autenticação (login válido/inválido, usuário inativo, token expirado/ausente) e a restrição de acesso por perfil (motorista só enxerga Dashboard e as próprias entregas — todo outro endpoint retorna 403). Os testes rodam contra um SQLite isolado em memória via override de `get_db`; nunca tocam no Postgres real.
+A suite cobre:
+- **Autenticação** — login válido/inválido, usuário inativo, token expirado/ausente.
+- **Acesso por perfil** — motorista só enxerga Dashboard e as próprias entregas; todo outro endpoint retorna 403.
+- **Motoristas** — validação de CPF (dígito verificador) e CNH, CPF/e-mail duplicado, permissões de criação/edição/exclusão por perfil.
+- **Veículos** — placa duplicada, criação restrita a administrador.
+- **Entregas** — bloqueio de motorista/veículo já em rota ou em manutenção ao criar uma nova entrega.
+
+Os testes rodam contra um SQLite isolado em memória via override de `get_db`; nunca tocam no Postgres real.
