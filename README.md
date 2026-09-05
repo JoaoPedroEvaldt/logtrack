@@ -36,6 +36,91 @@ app/
 
 O controle de acesso por perfil é reforçado tanto no frontend (itens de menu escondidos por perfil) quanto na API (cada endpoint sensível valida o perfil do usuário autenticado antes de responder).
 
+## Modelo de dados
+
+```mermaid
+erDiagram
+    USUARIOS ||--o| MOTORISTAS : "login (opcional)"
+    USUARIOS ||--o{ OCORRENCIAS : registra
+    USUARIOS ||--o{ LOG_ACESSO : gera
+
+    MOTORISTAS ||--o{ ENTREGAS : realiza
+    MOTORISTAS ||--o{ ABASTECIMENTOS : abastece
+    MOTORISTAS ||--o| CONJUNTOS : conduz
+
+    VEICULOS ||--o{ ENTREGAS : transporta
+    VEICULOS ||--o{ MANUTENCOES : recebe
+    VEICULOS ||--o{ ABASTECIMENTOS : "é abastecido"
+    VEICULOS ||--o{ CONJUNTOS : "compõe (cavalo / semirreboque)"
+
+    ENTREGAS ||--o{ OCORRENCIAS : gera
+
+    USUARIOS {
+        int id PK
+        string email
+        string perfil "administrador | operador | motorista"
+        bool ativo
+    }
+    MOTORISTAS {
+        int id PK
+        int usuario_id FK
+        string cpf
+        string cnh_numero
+        date cnh_validade
+        string status "disponivel | em_rota | inativo"
+    }
+    VEICULOS {
+        int id PK
+        string placa
+        string tipo "cavalo | semirreboque"
+        string status "disponivel | em_rota | em_manutencao | inativo"
+    }
+    ENTREGAS {
+        int id PK
+        int motorista_id FK
+        int veiculo_id FK
+        string status "aguardando | em_rota | entregue | atrasado | ocorrencia | cancelado"
+        decimal valor_frete
+        timestamp previsao
+    }
+    MANUTENCOES {
+        int id PK
+        int veiculo_id FK
+        string tipo
+        decimal custo
+        string status "agendada | em_andamento | concluida"
+    }
+    OCORRENCIAS {
+        int id PK
+        int entrega_id FK
+        int usuario_id FK
+        string tipo
+    }
+    CONJUNTOS {
+        int id PK
+        int motorista_id FK
+        int cavalo_id FK
+        int semirreboque1_id FK
+        int semirreboque2_id FK
+    }
+    ABASTECIMENTOS {
+        int id PK
+        int veiculo_id FK
+        int motorista_id FK
+        decimal litros
+        decimal valor_total
+        string estado
+    }
+    LOG_ACESSO {
+        int id PK
+        int usuario_id FK
+        string ip
+        bool tentativa_ok
+    }
+```
+
+Schema completo em [logtrack_banco.sql](logtrack_banco.sql).
+
 ## Como rodar
 
 ### Opção 1 — Docker
