@@ -95,6 +95,32 @@
       </div>
     </div>
 
+    <!-- HISTÓRICO POR VEÍCULO -->
+    <div class="table-container" style="padding:20px 24px;margin-bottom:24px;">
+      <h3 style="font-size:15px;font-weight:700;margin-bottom:14px;">Histórico por veículo</h3>
+      <div class="filtros" style="margin-bottom:0;">
+        <select id="historico-veiculo" onchange="consultarHistoricoVeiculo()">
+          <option value="">Selecionar veículo</option>
+        </select>
+        <input type="month" id="historico-periodo" onchange="consultarHistoricoVeiculo()" />
+      </div>
+      <div class="cards-grid" id="historico-resultado" style="margin-top:16px;display:none;">
+        <div class="card azul">
+          <div class="card-valor" id="historico-total">—</div>
+          <div class="card-label">Abastecimentos no período</div>
+        </div>
+        <div class="card verde">
+          <div class="card-valor" id="historico-litros">—</div>
+          <div class="card-label">Litros no período</div>
+        </div>
+        <div class="card vermelho">
+          <div class="card-valor" id="historico-valor">—</div>
+          <div class="card-label">Valor no período</div>
+        </div>
+      </div>
+      <p id="historico-vazio" style="display:none;color:var(--text-light);font-size:13px;margin-top:12px;">Nenhum abastecimento encontrado para esse veículo no período selecionado.</p>
+    </div>
+
     <!-- FILTROS -->
     <div class="filtros">
       <input type="text" id="filtro-veiculo" placeholder="Buscar por veículo..." onkeyup="filtrar()" style="min-width:220px;" autocomplete="off" />

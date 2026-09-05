@@ -73,20 +73,54 @@ async function carregarAbastecimentos() {
   abastecimentos = await get('/abastecimentos') || [];
   renderizar(abastecimentos);
   atualizarCards(abastecimentos);
+  consultarHistoricoVeiculo();
 }
 
 async function carregarVeiculos() {
   const data = await get('/veiculos') || [];
-  const sel = document.getElementById('veiculo-id');
-  while (sel.options.length > 1) sel.remove(1);
-  data
-    .filter(v => v.tipo !== 'semirreboque')
-    .forEach(v => {
-      const opt = document.createElement('option');
-      opt.value = v.id;
-      opt.textContent = `${v.placa} — ${v.modelo} ${v.marca}`;
-      sel.appendChild(opt);
-    });
+  const selects = [document.getElementById('veiculo-id'), document.getElementById('historico-veiculo')];
+  selects.forEach(sel => {
+    while (sel.options.length > 1) sel.remove(1);
+    data
+      .filter(v => v.tipo !== 'semirreboque')
+      .forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v.id;
+        opt.textContent = `${v.placa} — ${v.modelo} ${v.marca}`;
+        sel.appendChild(opt);
+      });
+  });
+}
+
+function consultarHistoricoVeiculo() {
+  const veiculoId = parseInt(document.getElementById('historico-veiculo').value) || null;
+  const periodo = document.getElementById('historico-periodo').value; // "YYYY-MM"
+  const resultado = document.getElementById('historico-resultado');
+  const vazio = document.getElementById('historico-vazio');
+
+  if (!veiculoId || !periodo) {
+    resultado.style.display = 'none';
+    vazio.style.display = 'none';
+    return;
+  }
+
+  const registros = abastecimentos.filter(a =>
+    a.veiculo_id === veiculoId && a.data_abastecimento && a.data_abastecimento.slice(0, 7) === periodo
+  );
+
+  if (registros.length === 0) {
+    resultado.style.display = 'none';
+    vazio.style.display = 'block';
+    return;
+  }
+
+  vazio.style.display = 'none';
+  resultado.style.display = 'grid';
+  const litros = registros.reduce((s, a) => s + (parseFloat(a.litros) || 0), 0);
+  const valor = registros.reduce((s, a) => s + (parseFloat(a.valor_total) || 0), 0);
+  document.getElementById('historico-total').textContent = registros.length;
+  document.getElementById('historico-litros').textContent = litros.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) + ' L';
+  document.getElementById('historico-valor').textContent = 'R$ ' + valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
 }
 
 async function carregarMotoristas() {
