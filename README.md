@@ -156,3 +156,12 @@ O frontend é HTML/CSS/JS estático (sem build). Basta abrir `frontend/index.htm
 ## Documentação da API
 
 Com o backend rodando, a documentação interativa (Swagger) fica disponível em `http://localhost:8000/docs`.
+
+## Testes
+
+```bash
+pip install -r requirements-dev.txt
+pytest tests/ -v
+```
+
+A suite cobre autenticação (login válido/inválido, usuário inativo, token expirado/ausente) e a restrição de acesso por perfil (motorista só enxerga Dashboard e as próprias entregas — todo outro endpoint retorna 403). Os testes rodam contra um SQLite isolado em memória via override de `get_db`; nunca tocam no Postgres real.
