@@ -12,6 +12,7 @@ class Conjunto(Base):
     cavalo_id         = Column(Integer, ForeignKey("veiculos.id"), nullable=True)
     semirreboque1_id  = Column(Integer, ForeignKey("veiculos.id"), nullable=True)
     semirreboque2_id  = Column(Integer, ForeignKey("veiculos.id"), nullable=True)
+    foto_path         = Column(String(255), nullable=True)
     status            = Column(String(20), nullable=False, default="ativo")
     criado_em         = Column(DateTime, server_default=func.now())
     atualizado_em     = Column(DateTime, server_default=func.now(), onupdate=func.now())

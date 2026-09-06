@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS veiculos (
     tipo_eixo VARCHAR(20),
     cor VARCHAR(50),
     capacidade_kg DECIMAL(10,2) NOT NULL CHECK (capacidade_kg > 0),
+    foto_path VARCHAR(255),
     status VARCHAR(20) NOT NULL DEFAULT 'disponivel' CHECK (status IN ('disponivel', 'em_rota', 'em_manutencao', 'inativo')),
     crlv_validade DATE,
     seguro_validade DATE,
@@ -105,6 +106,7 @@ CREATE TABLE IF NOT EXISTS conjuntos (
     cavalo_id INTEGER REFERENCES veiculos(id) ON DELETE SET NULL,
     semirreboque1_id INTEGER REFERENCES veiculos(id) ON DELETE SET NULL,
     semirreboque2_id INTEGER REFERENCES veiculos(id) ON DELETE SET NULL,
+    foto_path VARCHAR(255),
     status VARCHAR(20) NOT NULL DEFAULT 'ativo' CHECK (status IN ('ativo', 'inativo')),
     criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
     atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
@@ -117,6 +119,8 @@ ALTER TABLE manutencoes ADD COLUMN IF NOT EXISTS quilometragem INTEGER;
 ALTER TABLE manutencoes ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'concluida';
 ALTER TABLE manutencoes ADD COLUMN IF NOT EXISTS proxima_revisao DATE;
 ALTER TABLE entregas ADD COLUMN IF NOT EXISTS valor_frete DECIMAL(10,2) CHECK (valor_frete >= 0);
+ALTER TABLE conjuntos ADD COLUMN IF NOT EXISTS foto_path VARCHAR(255);
+ALTER TABLE veiculos ADD COLUMN IF NOT EXISTS foto_path VARCHAR(255);
 
 -- Motorista deixa de exigir login: nome passa a ser campo próprio de motoristas
 -- (antes vinha só do usuário vinculado) e usuario_id vira opcional, para permitir

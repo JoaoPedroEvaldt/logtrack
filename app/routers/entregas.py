@@ -6,7 +6,7 @@ from app.models.entrega import Entrega
 from app.models.manutencao import Manutencao
 from app.models.usuario import Usuario
 from app.schemas.entrega import EntregaCreate, EntregaUpdate, EntregaResponse
-from app.routers.auth import get_usuario_atual
+from app.routers.auth import exigir_admin, exigir_staff, get_usuario_atual
 from typing import List
 
 router = APIRouter(prefix="/entregas", tags=["Entregas"])
@@ -46,9 +46,7 @@ def _validar_veiculo_sem_manutencao(veiculo_id, db: Session):
         )
 
 @router.post("/", response_model=EntregaResponse)
-def criar_entrega(dados: EntregaCreate, db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
-    if atual.perfil not in ["administrador", "operador"]:
-        raise HTTPException(status_code=403, detail="Acesso negado")
+def criar_entrega(dados: EntregaCreate, db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     _validar_motorista_veiculo_livres(dados.motorista_id, dados.veiculo_id, db)
     _validar_veiculo_sem_manutencao(dados.veiculo_id, db)
     entrega = Entrega(**dados.model_dump())
@@ -92,6 +90,8 @@ def atualizar_status(id: int, status: str, db: Session = Depends(get_db), atual:
     status_validos = ["aguardando", "em_rota", "entregue", "atrasado", "ocorrencia", "cancelado"]
     if status not in status_validos:
         raise HTTPException(status_code=400, detail=f"Status inválido. Use: {status_validos}")
+    if status == "cancelado" and atual.perfil == "motorista":
+        raise HTTPException(status_code=403, detail="Motorista não pode cancelar uma entrega. Peça a um operador ou administrador.")
     if status == "em_rota":
         _validar_motorista_veiculo_livres(entrega.motorista_id, entrega.veiculo_id, db, excluir_id=entrega.id)
         _validar_veiculo_sem_manutencao(entrega.veiculo_id, db)
@@ -105,14 +105,15 @@ def atualizar_status(id: int, status: str, db: Session = Depends(get_db), atual:
     return {"message": f"Status atualizado para {status}"}
 
 @router.put("/{id}", response_model=EntregaResponse)
-def atualizar_entrega(id: int, dados: EntregaUpdate, db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
-    if atual.perfil not in ["administrador", "operador"]:
-        raise HTTPException(status_code=403, detail="Acesso negado")
+def atualizar_entrega(id: int, dados: EntregaUpdate, db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     entrega = db.query(Entrega).filter(Entrega.id == id).first()
     if not entrega:
         raise HTTPException(status_code=404, detail="Entrega não encontrada")
 
-    atualizacoes = dados.model_dump(exclude_none=True)
+    # exclude_unset (não exclude_none): o formulário manda motorista_id/veiculo_id
+    # explicitamente como null pra "desvincular" — exclude_none descartaria esse
+    # null e deixaria o vínculo antigo preso, sem erro nenhum pro usuário.
+    atualizacoes = dados.model_dump(exclude_unset=True)
     motorista_id = atualizacoes.get("motorista_id", entrega.motorista_id)
     veiculo_id = atualizacoes.get("veiculo_id", entrega.veiculo_id)
     status_final = atualizacoes.get("status", entrega.status)
@@ -127,9 +128,7 @@ def atualizar_entrega(id: int, dados: EntregaUpdate, db: Session = Depends(get_d
     return entrega
 
 @router.delete("/{id}")
-def deletar_entrega(id: int, db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
-    if atual.perfil != "administrador":
-        raise HTTPException(status_code=403, detail="Acesso negado")
+def deletar_entrega(id: int, db: Session = Depends(get_db), atual: Usuario = Depends(exigir_admin)):
     entrega = db.query(Entrega).filter(Entrega.id == id).first()
     if not entrega:
         raise HTTPException(status_code=404, detail="Entrega não encontrada")

@@ -6,7 +6,7 @@ from app.models.veiculo import Veiculo
 from app.models.motorista import Motorista
 from app.models.usuario import Usuario
 from app.schemas.abastecimento import AbastecimentoCreate, AbastecimentoUpdate, AbastecimentoResponse
-from app.routers.auth import get_usuario_atual
+from app.routers.auth import exigir_admin, exigir_staff
 from typing import List
 
 router = APIRouter(prefix="/abastecimentos", tags=["Abastecimentos"])
@@ -15,9 +15,7 @@ def _com_relacoes(query):
     return query.options(joinedload(Abastecimento.veiculo), joinedload(Abastecimento.motorista))
 
 @router.post("/", response_model=AbastecimentoResponse)
-def criar_abastecimento(dados: AbastecimentoCreate, db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
-    if atual.perfil not in ["administrador", "operador"]:
-        raise HTTPException(status_code=403, detail="Acesso negado")
+def criar_abastecimento(dados: AbastecimentoCreate, db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     if not db.query(Veiculo).filter(Veiculo.id == dados.veiculo_id).first():
         raise HTTPException(status_code=404, detail="Veículo não encontrado")
     if dados.motorista_id and not db.query(Motorista).filter(Motorista.id == dados.motorista_id).first():
@@ -30,24 +28,18 @@ def criar_abastecimento(dados: AbastecimentoCreate, db: Session = Depends(get_db
     return _com_relacoes(db.query(Abastecimento)).filter(Abastecimento.id == abastecimento.id).first()
 
 @router.get("/", response_model=List[AbastecimentoResponse])
-def listar_abastecimentos(db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
-    if atual.perfil == "motorista":
-        raise HTTPException(status_code=403, detail="Acesso negado")
+def listar_abastecimentos(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     return _com_relacoes(db.query(Abastecimento)).order_by(Abastecimento.data_abastecimento.desc()).all()
 
 @router.get("/{id}", response_model=AbastecimentoResponse)
-def buscar_abastecimento(id: int, db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
-    if atual.perfil == "motorista":
-        raise HTTPException(status_code=403, detail="Acesso negado")
+def buscar_abastecimento(id: int, db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     abastecimento = _com_relacoes(db.query(Abastecimento)).filter(Abastecimento.id == id).first()
     if not abastecimento:
         raise HTTPException(status_code=404, detail="Abastecimento não encontrado")
     return abastecimento
 
 @router.put("/{id}", response_model=AbastecimentoResponse)
-def atualizar_abastecimento(id: int, dados: AbastecimentoUpdate, db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
-    if atual.perfil not in ["administrador", "operador"]:
-        raise HTTPException(status_code=403, detail="Acesso negado")
+def atualizar_abastecimento(id: int, dados: AbastecimentoUpdate, db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     abastecimento = db.query(Abastecimento).filter(Abastecimento.id == id).first()
     if not abastecimento:
         raise HTTPException(status_code=404, detail="Abastecimento não encontrado")
@@ -58,9 +50,7 @@ def atualizar_abastecimento(id: int, dados: AbastecimentoUpdate, db: Session = D
     return _com_relacoes(db.query(Abastecimento)).filter(Abastecimento.id == id).first()
 
 @router.delete("/{id}")
-def deletar_abastecimento(id: int, db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
-    if atual.perfil != "administrador":
-        raise HTTPException(status_code=403, detail="Acesso negado")
+def deletar_abastecimento(id: int, db: Session = Depends(get_db), atual: Usuario = Depends(exigir_admin)):
     abastecimento = db.query(Abastecimento).filter(Abastecimento.id == id).first()
     if not abastecimento:
         raise HTTPException(status_code=404, detail="Abastecimento não encontrado")

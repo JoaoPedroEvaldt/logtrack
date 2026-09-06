@@ -52,6 +52,7 @@ class ConjuntoResponse(BaseModel):
     cavalo_id: Optional[int]
     semirreboque1_id: Optional[int]
     semirreboque2_id: Optional[int]
+    foto_path: Optional[str] = None
     status: str
     motorista: Optional[MotoristaInfo]
     cavalo: Optional[VeiculoInfo]

@@ -4,17 +4,14 @@ from app.database import get_db
 from app.models.motorista import Motorista
 from app.models.usuario import Usuario
 from app.schemas.motorista import MotoristaCreate, MotoristaUpdate, MotoristaResponse
-from app.routers.auth import get_usuario_atual
+from app.routers.auth import exigir_admin, exigir_staff
 from app import auth
 from typing import List
 
 router = APIRouter(prefix="/motoristas", tags=["Motoristas"])
 
 @router.post("/", response_model=MotoristaResponse)
-def criar_motorista(dados: MotoristaCreate, db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
-    if atual.perfil not in ["administrador", "operador"]:
-        raise HTTPException(status_code=403, detail="Acesso negado")
-
+def criar_motorista(dados: MotoristaCreate, db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     if bool(dados.email) != bool(dados.senha):
         raise HTTPException(status_code=400, detail="Para criar acesso ao sistema, informe e-mail e senha juntos")
 
@@ -72,25 +69,19 @@ def criar_motorista(dados: MotoristaCreate, db: Session = Depends(get_db), atual
     return _serializar_motorista(motorista, db)
 
 @router.get("/", response_model=List[MotoristaResponse])
-def listar_motoristas(db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
-    if atual.perfil == "motorista":
-        raise HTTPException(status_code=403, detail="Acesso negado")
+def listar_motoristas(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     motoristas = db.query(Motorista).filter(Motorista.status != "inativo").all()
     return [_serializar_motorista(m, db) for m in motoristas]
 
 @router.get("/{id}", response_model=MotoristaResponse)
-def buscar_motorista(id: int, db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
-    if atual.perfil == "motorista":
-        raise HTTPException(status_code=403, detail="Acesso negado")
+def buscar_motorista(id: int, db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     motorista = db.query(Motorista).filter(Motorista.id == id).first()
     if not motorista:
         raise HTTPException(status_code=404, detail="Motorista não encontrado")
     return _serializar_motorista(motorista, db)
 
 @router.put("/{id}", response_model=MotoristaResponse)
-def atualizar_motorista(id: int, dados: MotoristaUpdate, db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
-    if atual.perfil not in ["administrador", "operador"]:
-        raise HTTPException(status_code=403, detail="Acesso negado")
+def atualizar_motorista(id: int, dados: MotoristaUpdate, db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     motorista = db.query(Motorista).filter(Motorista.id == id).first()
     if not motorista:
         raise HTTPException(status_code=404, detail="Motorista não encontrado")
@@ -109,9 +100,7 @@ def atualizar_motorista(id: int, dados: MotoristaUpdate, db: Session = Depends(g
     return _serializar_motorista(motorista, db)
 
 @router.delete("/{id}")
-def deletar_motorista(id: int, db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
-    if atual.perfil != "administrador":
-        raise HTTPException(status_code=403, detail="Acesso negado")
+def deletar_motorista(id: int, db: Session = Depends(get_db), atual: Usuario = Depends(exigir_admin)):
     motorista = db.query(Motorista).filter(Motorista.id == id).first()
     if not motorista:
         raise HTTPException(status_code=404, detail="Motorista não encontrado")

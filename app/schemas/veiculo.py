@@ -43,6 +43,7 @@ class VeiculoResponse(BaseModel):
     tipo_eixo: Optional[str]
     cor: Optional[str]
     capacidade_kg: float
+    foto_path: Optional[str] = None
     status: str
     crlv_validade: Optional[date]
     seguro_validade: Optional[date]

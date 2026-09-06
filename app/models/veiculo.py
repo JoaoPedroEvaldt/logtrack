@@ -17,6 +17,7 @@ class Veiculo(Base):
     tipo_eixo       = Column(String(20), nullable=True)
     cor             = Column(String(50), nullable=True)
     capacidade_kg   = Column(Numeric(10, 2), nullable=False)
+    foto_path       = Column(String(255), nullable=True)
     status          = Column(String(20), nullable=False, default="disponivel")
     crlv_validade   = Column(Date)
     seguro_validade = Column(Date)

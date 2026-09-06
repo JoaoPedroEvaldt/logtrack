@@ -1,3 +1,5 @@
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -25,7 +27,7 @@ def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
     token = auth.criar_token({"sub": str(usuario.id), "perfil": usuario.perfil})
     return {"access_token": token, "token_type": "bearer", "perfil": usuario.perfil, "nome": usuario.nome}
 
-def get_usuario_atual(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+def _resolver_usuario_do_token(token: str, db: Session) -> Usuario:
     payload = auth.verificar_token(token)
     if not payload:
         raise HTTPException(
@@ -39,3 +41,30 @@ def get_usuario_atual(token: str = Depends(oauth2_scheme), db: Session = Depends
             detail="Usuário não encontrado"
         )
     return usuario
+
+def get_usuario_atual(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    return _resolver_usuario_do_token(token, db)
+
+# Fotos (<img src>) não conseguem mandar um header Authorization — usado pela
+# rota estática de uploads (app/routers/uploads.py), que recebe o token via
+# querystring em vez do header Bearer padrão.
+def get_usuario_via_query_token(token: Optional[str] = None, db: Session = Depends(get_db)):
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Não autenticado")
+    return _resolver_usuario_do_token(token, db)
+
+def exigir_perfil(*perfis_permitidos: str):
+    """Fábrica de dependency pra checagem de permissão por perfil — substitui o
+    `if atual.perfil not in [...]: raise HTTPException(403, "Acesso negado")`
+    que estava copiado à mão em cada router. Uso: Depends(exigir_perfil("administrador")).
+    """
+    def verificador(atual: Usuario = Depends(get_usuario_atual)) -> Usuario:
+        if atual.perfil not in perfis_permitidos:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso negado")
+        return atual
+    return verificador
+
+# As duas combinações usadas em todo o app: qualquer endpoint de staff
+# (administrador ou operador — motorista fica de fora) e os admin-only.
+exigir_staff = exigir_perfil("administrador", "operador")
+exigir_admin = exigir_perfil("administrador")

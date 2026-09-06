@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from datetime import datetime, date, timedelta
+from datetime import date, timedelta
 from app.database import get_db
 from app.models.entrega import Entrega
 from app.models.veiculo import Veiculo
@@ -11,7 +11,7 @@ from app.models.usuario import Usuario
 from app.models.conjunto import Conjunto
 from app.models.manutencao import Manutencao
 from app.models.abastecimento import Abastecimento
-from app.routers.auth import get_usuario_atual
+from app.routers.auth import exigir_staff
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
@@ -31,9 +31,7 @@ def resumo_publico(db: Session = Depends(get_db)):
     }
 
 @router.get("/resumo")
-def resumo(db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
-    if atual.perfil == "motorista":
-        raise HTTPException(status_code=403, detail="Acesso negado")
+def resumo(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     hoje = date.today()
 
     entregas_hoje = db.query(Entrega).filter(
@@ -78,10 +76,8 @@ def resumo(db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_a
     }
 
 @router.get("/vencimentos")
-def vencimentos(db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
+def vencimentos(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     """CNH de motoristas e CRLV/seguro de veículos vencidos ou vencendo nos próximos 30 dias."""
-    if atual.perfil == "motorista":
-        raise HTTPException(status_code=403, detail="Acesso negado")
     hoje = date.today()
     limite = hoje + timedelta(days=30)
     alertas = []
@@ -118,9 +114,7 @@ def vencimentos(db: Session = Depends(get_db), atual: Usuario = Depends(get_usua
     return alertas
 
 @router.get("/entregas-por-status")
-def entregas_por_status(db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
-    if atual.perfil == "motorista":
-        raise HTTPException(status_code=403, detail="Acesso negado")
+def entregas_por_status(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     resultado = db.query(
         Entrega.status,
         func.count(Entrega.id).label("total")
@@ -129,9 +123,7 @@ def entregas_por_status(db: Session = Depends(get_db), atual: Usuario = Depends(
     return [{"status": r.status, "total": r.total} for r in resultado]
 
 @router.get("/entregas-por-dia")
-def entregas_por_dia(db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
-    if atual.perfil == "motorista":
-        raise HTTPException(status_code=403, detail="Acesso negado")
+def entregas_por_dia(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     resultado = db.query(
         func.date(Entrega.criado_em).label("dia"),
         func.count(Entrega.id).label("total")
@@ -140,9 +132,7 @@ def entregas_por_dia(db: Session = Depends(get_db), atual: Usuario = Depends(get
     return [{"dia": str(r.dia), "total": r.total} for r in resultado]
 
 @router.get("/desempenho-motoristas")
-def desempenho_motoristas(db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
-    if atual.perfil == "motorista":
-        raise HTTPException(status_code=403, detail="Acesso negado")
+def desempenho_motoristas(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     faturamento = func.coalesce(
         func.sum(Entrega.valor_frete).filter(Entrega.status == "entregue"), 0
     )
@@ -164,12 +154,10 @@ def desempenho_motoristas(db: Session = Depends(get_db), atual: Usuario = Depend
     ]
 
 @router.get("/faturamento")
-def faturamento(db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
+def faturamento(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     """Faturamento líquido do mês atual: receita das entregas concluídas menos
     custos de manutenção e abastecimento no período, com detalhamento por
     conjunto (via veículos do conjunto) e por motorista (via entregas/abastecimentos)."""
-    if atual.perfil == "motorista":
-        raise HTTPException(status_code=403, detail="Acesso negado")
     hoje = date.today()
     inicio_mes = date(hoje.year, hoje.month, 1)
     fim_mes = date(hoje.year + 1, 1, 1) if hoje.month == 12 else date(hoje.year, hoje.month + 1, 1)

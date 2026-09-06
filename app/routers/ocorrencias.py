@@ -5,7 +5,7 @@ from app.models.ocorrencia import Ocorrencia
 from app.models.entrega import Entrega
 from app.models.usuario import Usuario
 from app.schemas.ocorrencia import OcorrenciaCreate, OcorrenciaUpdate, OcorrenciaResponse
-from app.routers.auth import get_usuario_atual
+from app.routers.auth import exigir_staff, get_usuario_atual
 from app.routers.entregas import _garantir_acesso_entrega
 from typing import List
 
@@ -38,15 +38,11 @@ def listar_ocorrencias_entrega(entrega_id: int, db: Session = Depends(get_db), a
     return db.query(Ocorrencia).filter(Ocorrencia.entrega_id == entrega_id).all()
 
 @router.get("/", response_model=List[OcorrenciaResponse])
-def listar_ocorrencias(db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
-    if atual.perfil not in ["administrador", "operador"]:
-        raise HTTPException(status_code=403, detail="Acesso negado")
+def listar_ocorrencias(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     return db.query(Ocorrencia).all()
 
 @router.put("/{id}", response_model=OcorrenciaResponse)
-def atualizar_ocorrencia(id: int, dados: OcorrenciaUpdate, db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
-    if atual.perfil not in ["administrador", "operador"]:
-        raise HTTPException(status_code=403, detail="Acesso negado")
+def atualizar_ocorrencia(id: int, dados: OcorrenciaUpdate, db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     ocorrencia = db.query(Ocorrencia).filter(Ocorrencia.id == id).first()
     if not ocorrencia:
         raise HTTPException(status_code=404, detail="Ocorrência não encontrada")
@@ -57,9 +53,7 @@ def atualizar_ocorrencia(id: int, dados: OcorrenciaUpdate, db: Session = Depends
     return ocorrencia
 
 @router.delete("/{id}")
-def deletar_ocorrencia(id: int, db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
-    if atual.perfil not in ["administrador", "operador"]:
-        raise HTTPException(status_code=403, detail="Acesso negado")
+def deletar_ocorrencia(id: int, db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     ocorrencia = db.query(Ocorrencia).filter(Ocorrencia.id == id).first()
     if not ocorrencia:
         raise HTTPException(status_code=404, detail="Ocorrência não encontrada")

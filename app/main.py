@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import auth, usuarios, motoristas, veiculos, entregas, ocorrencias, dashboard
+from app.routers import auth, usuarios, motoristas, veiculos, entregas, ocorrencias, dashboard, uploads
 from app.routers import conjunto as conjuntos_router
 from app.routers import manutencao as manutencoes
 from app.routers import abastecimento as abastecimentos
@@ -20,6 +20,7 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+app.include_router(uploads.router)
 app.include_router(usuarios.router)
 app.include_router(motoristas.router)
 app.include_router(veiculos.router)
