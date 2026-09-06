@@ -1,4 +1,5 @@
 checarAuth();
+checarStaff();
 document.getElementById('usuario-perfil').textContent = localStorage.getItem('perfil') || '';
 aplicarMascaraMoeda(document.getElementById('custo'));
 
@@ -61,8 +62,8 @@ function renderizar(lista) {
       <td><span class="badge badge-tipo-${tipoBadge[m.tipo] || 7}">${tipoLabel[m.tipo] || escapeHtml(m.tipo)}</span></td>
       <td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(m.descricao)}</td>
       <td>${escapeHtml(m.mecanico) || '—'}</td>
-      <td>${m.quilometragem ? m.quilometragem.toLocaleString('pt-BR') + ' km' : '—'}</td>
-      <td>${m.custo ? 'R$ ' + parseFloat(m.custo).toLocaleString('pt-BR', {minimumFractionDigits:2}) : '—'}</td>
+      <td>${m.quilometragem != null ? m.quilometragem.toLocaleString('pt-BR') + ' km' : '—'}</td>
+      <td>${m.custo != null ? 'R$ ' + parseFloat(m.custo).toLocaleString('pt-BR', {minimumFractionDigits:2}) : '—'}</td>
       <td><span class="badge ${statusBadge[m.status]}">${statusLabel[m.status] || m.status}</span></td>
       <td>${m.proxima_revisao ? formatarData(m.proxima_revisao) : '—'}</td>
       <td style="display:flex;gap:6px;">
@@ -186,8 +187,8 @@ async function exportarPDF() {
     formatarData(m.data_manutencao),
     m.tipo,
     m.mecanico || '—',
-    m.quilometragem ? m.quilometragem.toLocaleString('pt-BR') + ' km' : '—',
-    m.custo ? 'R$ ' + parseFloat(m.custo).toLocaleString('pt-BR', {minimumFractionDigits:2}) : '—',
+    m.quilometragem != null ? m.quilometragem.toLocaleString('pt-BR') + ' km' : '—',
+    m.custo != null ? 'R$ ' + parseFloat(m.custo).toLocaleString('pt-BR', {minimumFractionDigits:2}) : '—',
     m.status,
   ]);
 

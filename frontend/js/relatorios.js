@@ -1,4 +1,5 @@
 checarAuth();
+checarStaff();
 document.getElementById('usuario-perfil').textContent = localStorage.getItem('perfil') || '';
 
 let todasEntregas = [], todosVeiculos = [], todasManutencoes = [], todasOcorrencias = [], todosConjuntos = [];
@@ -235,7 +236,7 @@ async function exportarPDF() {
           v ? v.placa : `#${m.veiculo_id}`,
           formatarData(m.data_manutencao),
           m.tipo,
-          m.custo ? 'R$ ' + parseFloat(m.custo).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'
+          m.custo != null ? 'R$ ' + parseFloat(m.custo).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'
         ];
       }),
       headStyles: { fillColor: [30, 42, 68], textColor: 255, fontSize: 9 },

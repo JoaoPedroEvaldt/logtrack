@@ -1,4 +1,5 @@
 checarAuth();
+checarStaff();
 document.getElementById('usuario-perfil').textContent = localStorage.getItem('perfil') || '';
 aplicarMascaraMoeda(document.getElementById('litros'));
 aplicarMascaraMoeda(document.getElementById('valor-total'));
@@ -62,23 +63,22 @@ function recalcularValorTotal() {
   document.getElementById('valor-total').value = numeroParaMoeda(litros * precoDieselAtual);
 }
 
-function mesAtual(dataStr) {
-  if (!dataStr) return false;
+function definirPeriodoPadrao() {
   const hoje = new Date();
-  const d = new Date(dataStr + 'T00:00:00');
-  return d.getFullYear() === hoje.getFullYear() && d.getMonth() === hoje.getMonth();
+  const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+  const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
+  document.getElementById('filtro-data-inicio').value = inicioMes.toISOString().slice(0, 10);
+  document.getElementById('filtro-data-fim').value = fimMes.toISOString().slice(0, 10);
 }
 
 async function carregarAbastecimentos() {
   abastecimentos = await get('/abastecimentos') || [];
-  renderizar(abastecimentos);
-  atualizarCards(abastecimentos);
-  consultarHistoricoVeiculo();
+  filtrar();
 }
 
 async function carregarVeiculos() {
   const data = await get('/veiculos') || [];
-  const selects = [document.getElementById('veiculo-id'), document.getElementById('historico-veiculo')];
+  const selects = [document.getElementById('veiculo-id'), document.getElementById('filtro-veiculo')];
   selects.forEach(sel => {
     while (sel.options.length > 1) sel.remove(1);
     data
@@ -90,37 +90,6 @@ async function carregarVeiculos() {
         sel.appendChild(opt);
       });
   });
-}
-
-function consultarHistoricoVeiculo() {
-  const veiculoId = parseInt(document.getElementById('historico-veiculo').value) || null;
-  const periodo = document.getElementById('historico-periodo').value; // "YYYY-MM"
-  const resultado = document.getElementById('historico-resultado');
-  const vazio = document.getElementById('historico-vazio');
-
-  if (!veiculoId || !periodo) {
-    resultado.style.display = 'none';
-    vazio.style.display = 'none';
-    return;
-  }
-
-  const registros = abastecimentos.filter(a =>
-    a.veiculo_id === veiculoId && a.data_abastecimento && a.data_abastecimento.slice(0, 7) === periodo
-  );
-
-  if (registros.length === 0) {
-    resultado.style.display = 'none';
-    vazio.style.display = 'block';
-    return;
-  }
-
-  vazio.style.display = 'none';
-  resultado.style.display = 'grid';
-  const litros = registros.reduce((s, a) => s + (parseFloat(a.litros) || 0), 0);
-  const valor = registros.reduce((s, a) => s + (parseFloat(a.valor_total) || 0), 0);
-  document.getElementById('historico-total').textContent = registros.length;
-  document.getElementById('historico-litros').textContent = litros.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) + ' L';
-  document.getElementById('historico-valor').textContent = 'R$ ' + valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
 }
 
 async function carregarMotoristas() {
@@ -154,10 +123,9 @@ function vincularPorVeiculo() {
 }
 
 function atualizarCards(lista) {
-  const doMes = lista.filter(a => mesAtual(a.data_abastecimento));
-  document.getElementById('total-abastecimentos').textContent = doMes.length;
-  const litros = doMes.reduce((s, a) => s + (parseFloat(a.litros) || 0), 0);
-  const custo = doMes.reduce((s, a) => s + (parseFloat(a.valor_total) || 0), 0);
+  document.getElementById('total-abastecimentos').textContent = lista.length;
+  const litros = lista.reduce((s, a) => s + (parseFloat(a.litros) || 0), 0);
+  const custo = lista.reduce((s, a) => s + (parseFloat(a.valor_total) || 0), 0);
   document.getElementById('total-litros').textContent = litros.toLocaleString('pt-BR', { minimumFractionDigits: 0 }) + ' L';
   document.getElementById('total-custo').textContent = 'R$ ' + custo.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
 }
@@ -177,7 +145,7 @@ function renderizar(lista) {
       <td>${a.motorista ? escapeHtml(a.motorista.nome) : '—'}</td>
       <td>${formatarData(a.data_abastecimento)}</td>
       <td>${parseFloat(a.litros).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} L</td>
-      <td>${a.quilometragem ? a.quilometragem.toLocaleString('pt-BR') + ' km' : '—'}</td>
+      <td>${a.quilometragem != null ? a.quilometragem.toLocaleString('pt-BR') + ' km' : '—'}</td>
       <td>${escapeHtml(a.posto) || '—'}</td>
       <td>R$ ${parseFloat(a.valor_total).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
       <td style="display:flex;gap:6px;">
@@ -188,13 +156,38 @@ function renderizar(lista) {
   `).join('');
 }
 
+function descreverPeriodoAtivo(inicio, fim) {
+  const el = document.getElementById('periodo-resumo');
+  if (!el) return;
+  if (!inicio && !fim) {
+    el.textContent = 'Mostrando todo o histórico (sem filtro de data)';
+  } else {
+    el.textContent = `Período: ${inicio ? formatarData(inicio) : 'início'} até ${fim ? formatarData(fim) : 'hoje'}`;
+  }
+}
+
 function filtrar() {
-  const veiculo = document.getElementById('filtro-veiculo').value.toLowerCase();
+  const veiculoId = document.getElementById('filtro-veiculo').value;
+  const inicio = document.getElementById('filtro-data-inicio').value;
+  const fim = document.getElementById('filtro-data-fim').value;
+  descreverPeriodoAtivo(inicio, fim);
+
   const filtrados = abastecimentos.filter(a => {
-    const placaModelo = a.veiculo ? `${a.veiculo.placa} ${a.veiculo.modelo} ${a.veiculo.marca}`.toLowerCase() : '';
-    return !veiculo || placaModelo.includes(veiculo);
+    if (veiculoId && String(a.veiculo_id) !== veiculoId) return false;
+    if (inicio && a.data_abastecimento < inicio) return false;
+    if (fim && a.data_abastecimento > fim) return false;
+    return true;
   });
+
+  atualizarCards(filtrados);
   renderizar(filtrados);
+}
+
+function limparFiltros() {
+  document.getElementById('filtro-veiculo').value = '';
+  document.getElementById('filtro-data-inicio').value = '';
+  document.getElementById('filtro-data-fim').value = '';
+  filtrar();
 }
 
 function abrirModal() {
@@ -276,6 +269,7 @@ async function salvarAbastecimento() {
 }
 
 preencherEstados();
+definirPeriodoPadrao();
 carregarAbastecimentos();
 carregarVeiculos();
 carregarMotoristas();

@@ -183,6 +183,11 @@ function motoristaLabel(motoristaId) {
   return m ? escapeHtml(m.nome) : `Motorista #${motoristaId}`;
 }
 
+function celulaAtribuicao(label, pendenteRelevante) {
+  if (label) return label;
+  return pendenteRelevante ? '<span class="badge badge-pendente">A definir</span>' : '—';
+}
+
 function atualizarResumo(lista) {
   STATUS_LISTA.forEach(status => {
     const el = document.getElementById(`resumo-${status}`);
@@ -206,10 +211,10 @@ function renderizarTabela(lista) {
       <td>#${e.id}</td>
       <td>${escapeHtml(e.cliente)}</td>
       <td>${escapeHtml(e.origem)} → ${escapeHtml(e.destino)}</td>
-      <td>${motoristaLabel(e.motorista_id) || '—'}</td>
-      <td>${veiculoLabel(e.veiculo_id) || '—'}</td>
+      <td>${celulaAtribuicao(motoristaLabel(e.motorista_id), e.status === 'aguardando')}</td>
+      <td>${celulaAtribuicao(veiculoLabel(e.veiculo_id), e.status === 'aguardando')}</td>
       <td>${formatarDataHora(e.previsao)}</td>
-      <td>${e.valor_frete ? 'R$ ' + parseFloat(e.valor_frete).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'}</td>
+      <td>${e.valor_frete != null ? 'R$ ' + parseFloat(e.valor_frete).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'}</td>
       <td>${badgeStatus(e.status)}</td>
       <td style="display:flex;gap:6px;">
         ${ehMotorista ? '' : `<button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="abrirModal(${e.id})">${svgIcone('editar', 12)} Editar</button>`}
@@ -340,9 +345,9 @@ async function salvarEntrega() {
 
 async function confirmarStatus() {
   const status = document.getElementById('novo-status').value;
-  const res = await fetch(`http://127.0.0.1:8000/entregas/${entregaIdSelecionada}/status?status=${status}`, {
+  const res = await fetch(`${API}/entregas/${entregaIdSelecionada}/status?status=${status}`, {
     method: 'PUT',
-    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+    headers: { 'Authorization': `Bearer ${getToken()}` }
   });
   const corpo = await res.json();
   if (!res.ok) {

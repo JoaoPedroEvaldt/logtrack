@@ -1,4 +1,5 @@
 checarAuth();
+checarStaff();
 document.getElementById('usuario-perfil').textContent = localStorage.getItem('perfil') || '';
 
 let conjuntoEditandoId = null;
@@ -24,6 +25,13 @@ function renderizarListaConjuntos() {
 
   container.innerHTML = conjuntosCarregados.map(c => `
     <div class="conjunto-linha">
+      <div class="conjunto-linha-foto" data-upload-foto ${c.foto_path ? '' : `onclick="acionarUploadFoto(this)" title="Clique para adicionar a foto"`}>
+        ${c.foto_path
+          ? `<img src="${urlFoto(c.foto_path)}" alt="Foto do conjunto ${escapeHtml(c.nome)}" onclick="abrirFotoTelaCheia('${urlFoto(c.foto_path)}')" title="Clique para ampliar" />`
+          : svgIcone('caminhao', 22)}
+        <span class="conjunto-linha-foto-overlay" onclick="event.stopPropagation(); acionarUploadFoto(this)" title="${c.foto_path ? 'Trocar' : 'Adicionar'} foto">${svgIcone('camera', 14)}</span>
+        <input type="file" accept="image/jpeg,image/png,image/webp" onchange="enviarFotoConjunto(${c.id}, this.files[0])" />
+      </div>
       <div class="conjunto-linha-nome">${escapeHtml(c.nome)}</div>
       <div class="conjunto-linha-col">
         <span class="conjunto-linha-label">Motorista</span>
@@ -48,6 +56,31 @@ function renderizarListaConjuntos() {
       </div>
     </div>
   `).join('');
+}
+
+async function enviarFotoConjunto(id, arquivo) {
+  if (!arquivo) return;
+
+  const tiposAceitos = ['image/jpeg', 'image/png', 'image/webp'];
+  if (!tiposAceitos.includes(arquivo.type)) {
+    toastAviso('Formato de imagem inválido. Envie JPEG, PNG ou WebP.');
+    return;
+  }
+  if (arquivo.size > 5 * 1024 * 1024) {
+    toastAviso('A imagem deve ter no máximo 5MB.');
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('foto', arquivo);
+  const res = await enviarArquivo(`/conjuntos/${id}/foto`, formData);
+
+  if (res && res.detail) {
+    toastErro('Erro: ' + extrairErro(res));
+    return;
+  }
+
+  await carregarConjuntos();
 }
 
 async function excluirConjunto(id) {

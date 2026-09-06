@@ -555,6 +555,7 @@ tr:hover td { background: var(--bg); }
 .badge-atrasado   { background: #FDEFDD; color: #B36A17; }
 .badge-ocorrencia { background: #FAECE7; color: #A13E1F; }
 .badge-cancelado  { background: #F5F5F5; color: #888; }
+.badge-pendente   { background: #FDEFDD; color: #B36A17; font-weight: 700; }
 
 body.dark .badge-aguardando { background: rgba(148,163,184,0.16); color: #B7BFCF; }
 body.dark .badge-em_rota    { background: rgba(94,138,224,0.2); color: #8FB0EE; }
@@ -562,6 +563,7 @@ body.dark .badge-entregue   { background: rgba(39,174,96,0.18); color: #4FD07E; 
 body.dark .badge-atrasado   { background: rgba(242,169,59,0.18); color: #F2A93B; }
 body.dark .badge-ocorrencia { background: rgba(192,57,43,0.2); color: #E5776A; }
 body.dark .badge-cancelado  { background: rgba(255,255,255,0.08); color: #9CA3AF; }
+body.dark .badge-pendente   { background: rgba(242,169,59,0.18); color: #F2A93B; }
 
 /* Badges de categoria (tipo de veículo, tipo de manutenção) — paleta categórica
    fixa e distinta das cores de status, para não sobrepor os dois significados. */
@@ -580,6 +582,26 @@ body.dark .badge-tipo-4 { background: rgba(201,133,0,0.22);   color: #c98500; }
 body.dark .badge-tipo-5 { background: rgba(213,81,129,0.22);  color: #d55181; }
 body.dark .badge-tipo-6 { background: rgba(144,133,233,0.22); color: #9085e9; }
 body.dark .badge-tipo-7 { background: rgba(137,135,129,0.22); color: #b3b1a9; }
+
+/* ===================== LIGHTBOX DE FOTO (VEÍCULOS/CONJUNTOS) ===================== */
+.lightbox-foto {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 40px;
+  cursor: zoom-out;
+}
+.lightbox-foto.aberto { display: flex; }
+.lightbox-foto img {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 8px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+}
 
 /* ===================== CONJUNTOS (BUILDER + LISTA) ===================== */
 .conjunto-builder {
@@ -634,6 +656,38 @@ body.dark .badge-tipo-7 { background: rgba(137,135,129,0.22); color: #b3b1a9; }
   margin-bottom: 12px;
   transition: background 0.3s;
 }
+.conjunto-linha-foto {
+  position: relative;
+  flex: 0 0 48px;
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-light);
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+.conjunto-linha-foto:hover { border-color: var(--primary); }
+.conjunto-linha-foto img { width: 100%; height: 100%; object-fit: cover; cursor: zoom-in; }
+.conjunto-linha-foto input[type="file"] { display: none; }
+.conjunto-linha-foto-overlay {
+  position: absolute;
+  inset: auto 0 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 0;
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.conjunto-linha-foto:hover .conjunto-linha-foto-overlay { opacity: 1; }
 .conjunto-linha-nome { font-size: 14px; font-weight: 700; color: var(--text); flex: 0 0 140px; }
 .conjunto-linha-col { flex: 1 1 130px; min-width: 110px; }
 .conjunto-linha-label { display: block; font-size: 10px; font-weight: 700; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 3px; }
@@ -687,14 +741,32 @@ body.dark .badge-tipo-7 { background: rgba(137,135,129,0.22); color: #b3b1a9; }
 }
 
 .vehicle-imagem {
+  position: relative;
   height: 96px;
   border-radius: 9px;
   background: var(--bg);
   display: flex; align-items: center; justify-content: center;
   color: var(--text-light);
   margin-bottom: 12px;
+  overflow: hidden;
+  cursor: pointer;
 }
 .vehicle-imagem svg { width: 34px; height: 34px; }
+.vehicle-imagem img { width: 100%; height: 100%; object-fit: cover; cursor: zoom-in; }
+.vehicle-imagem input[type="file"] { display: none; }
+.vehicle-imagem-overlay {
+  position: absolute;
+  inset: auto 0 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 0;
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.vehicle-imagem:hover .vehicle-imagem-overlay { opacity: 1; }
 
 .vehicle-placa { font-size: 16px; font-weight: 700; color: var(--text); }
 .vehicle-modelo { font-size: 13px; color: var(--text-light); margin-top: 2px; }

@@ -1,4 +1,5 @@
 checarAuth();
+checarStaff();
 document.getElementById('usuario-perfil').textContent = localStorage.getItem('perfil') || '';
 aplicarMascaraCPF(document.getElementById('cpf'));
 aplicarMascaraSomenteDigitos(document.getElementById('cnh-numero'), 11);

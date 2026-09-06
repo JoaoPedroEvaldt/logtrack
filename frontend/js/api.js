@@ -22,6 +22,12 @@ function checarAdmin() {
   }
 }
 
+function checarStaff() {
+  if (localStorage.getItem('perfil') === 'motorista') {
+    window.location.href = 'dashboard.html';
+  }
+}
+
 function obterIdUsuarioLogado() {
   const token = getToken();
   if (!token) return null;
@@ -49,6 +55,11 @@ async function get(endpoint) {
     headers: { 'Authorization': `Bearer ${getToken()}` }
   });
   if (res.status === 401) { logout(); return; }
+  // Sem isso, o corpo de erro ({detail: "Acesso negado"}) volta como se fosse
+  // dado de verdade — quem chamou faz .filter()/.map() nele e quebra a página
+  // em vez de simplesmente ser redirecionado (checarStaff() já deveria ter
+  // pego isso antes, mas essa é a segunda linha de defesa).
+  if (res.status === 403) { window.location.href = 'dashboard.html'; return; }
   return res.json();
 }
 
@@ -72,6 +83,15 @@ async function put(endpoint, dados) {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify(dados)
+  });
+  return res.json();
+}
+
+async function enviarArquivo(endpoint, formData, metodo = 'POST') {
+  const res = await fetch(`${API}${endpoint}`, {
+    method: metodo,
+    headers: { 'Authorization': `Bearer ${getToken()}` },
+    body: formData
   });
   return res.json();
 }
@@ -238,6 +258,36 @@ function renderizarTopbar() {
   if (avatar) avatar.textContent = iniciais(nomeExibido);
   if (nomeEl) nomeEl.textContent = nomeExibido;
   if (perfilEl) perfilEl.textContent = perfilLabel;
+}
+
+/* ===================== FOTOS (upload + visualização em tela cheia) ===================== */
+/* A rota /uploads exige autenticação (como o resto da API), mas uma <img> não
+   manda o header Authorization — por isso o token vai na querystring aqui. */
+function urlFoto(fotoPath) {
+  return `${API}${fotoPath}?token=${encodeURIComponent(getToken())}`;
+}
+
+function acionarUploadFoto(el) {
+  const container = el.closest('[data-upload-foto]');
+  const input = container && container.querySelector('input[type="file"]');
+  if (input) input.click();
+}
+
+function abrirFotoTelaCheia(url) {
+  let overlay = document.getElementById('lightbox-foto');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'lightbox-foto';
+    overlay.className = 'lightbox-foto';
+    overlay.innerHTML = '<img />';
+    overlay.addEventListener('click', () => overlay.classList.remove('aberto'));
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') overlay.classList.remove('aberto');
+    });
+    document.body.appendChild(overlay);
+  }
+  overlay.querySelector('img').src = url;
+  overlay.classList.add('aberto');
 }
 
 /* ===================== MENU MOBILE ===================== */

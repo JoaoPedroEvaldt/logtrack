@@ -77,53 +77,39 @@
     </div>
 
     <!-- CARDS RESUMO -->
+    <p id="periodo-resumo" style="font-size:12px;color:var(--text-light);margin-bottom:8px;"></p>
     <div class="cards-grid" style="margin-bottom:24px;">
       <div class="card azul">
         <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 22h12"/><path d="M4 9h9v11H4z"/><path d="M4 9V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v5"/><path d="M13 7h2l3 3v7a1 1 0 0 1-1 1h-1"/><circle cx="16.5" cy="17.5" r="1.5"/></svg></div>
         <div class="card-valor" id="total-abastecimentos">—</div>
-        <div class="card-label">Abastecimentos no mês</div>
+        <div class="card-label">Abastecimentos no período</div>
       </div>
       <div class="card verde">
         <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
         <div class="card-valor" id="total-litros">—</div>
-        <div class="card-label">Litros no mês</div>
+        <div class="card-label">Litros no período</div>
       </div>
       <div class="card vermelho">
         <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
         <div class="card-valor" id="total-custo">—</div>
-        <div class="card-label">Custo no mês</div>
+        <div class="card-label">Custo no período</div>
       </div>
-    </div>
-
-    <!-- HISTÓRICO POR VEÍCULO -->
-    <div class="table-container" style="padding:20px 24px;margin-bottom:24px;">
-      <h3 style="font-size:15px;font-weight:700;margin-bottom:14px;">Histórico por veículo</h3>
-      <div class="filtros" style="margin-bottom:0;">
-        <select id="historico-veiculo" onchange="consultarHistoricoVeiculo()">
-          <option value="">Selecionar veículo</option>
-        </select>
-        <input type="month" id="historico-periodo" onchange="consultarHistoricoVeiculo()" />
-      </div>
-      <div class="cards-grid" id="historico-resultado" style="margin-top:16px;display:none;">
-        <div class="card azul">
-          <div class="card-valor" id="historico-total">—</div>
-          <div class="card-label">Abastecimentos no período</div>
-        </div>
-        <div class="card verde">
-          <div class="card-valor" id="historico-litros">—</div>
-          <div class="card-label">Litros no período</div>
-        </div>
-        <div class="card vermelho">
-          <div class="card-valor" id="historico-valor">—</div>
-          <div class="card-label">Valor no período</div>
-        </div>
-      </div>
-      <p id="historico-vazio" style="display:none;color:var(--text-light);font-size:13px;margin-top:12px;">Nenhum abastecimento encontrado para esse veículo no período selecionado.</p>
     </div>
 
     <!-- FILTROS -->
     <div class="filtros">
-      <input type="text" id="filtro-veiculo" placeholder="Buscar por veículo..." onkeyup="filtrar()" style="min-width:220px;" autocomplete="off" />
+      <select id="filtro-veiculo" onchange="filtrar()">
+        <option value="">Todos os veículos</option>
+      </select>
+      <div class="form-group">
+        <label style="font-size:12px;color:var(--text-light);">De</label>
+        <input type="date" id="filtro-data-inicio" onchange="filtrar()" />
+      </div>
+      <div class="form-group">
+        <label style="font-size:12px;color:var(--text-light);">Até</label>
+        <input type="date" id="filtro-data-fim" onchange="filtrar()" />
+      </div>
+      <button class="btn btn-outline" onclick="limparFiltros()" style="font-size:12px;">Limpar filtros</button>
     </div>
 
     <div class="table-container">

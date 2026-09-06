@@ -1,4 +1,5 @@
 checarAuth();
+checarStaff();
 document.getElementById('usuario-perfil').textContent = localStorage.getItem('perfil') || '';
 
 let veiculoEditandoId = null;
@@ -111,7 +112,13 @@ function renderizarVeiculos(data) {
           <span class="vehicle-tipo-pill">${tipoLabel[v.tipo] || escapeHtml(v.tipo)}</span>
           <span class="badge badge-${statusBadge[statusEfetivoVeiculo(v)] || 'aguardando'}">${statusLabel[statusEfetivoVeiculo(v)] || escapeHtml(v.status)}</span>
         </div>
-        <div class="vehicle-imagem">${svgIcone('caminhao', 34)}</div>
+        <div class="vehicle-imagem" data-upload-foto ${v.foto_path ? '' : `onclick="acionarUploadFoto(this)" title="Clique para adicionar a foto"`}>
+          ${v.foto_path
+            ? `<img src="${urlFoto(v.foto_path)}" alt="Foto do veículo ${escapeHtml(v.placa)}" onclick="abrirFotoTelaCheia('${urlFoto(v.foto_path)}')" title="Clique para ampliar" />`
+            : svgIcone('caminhao', 34)}
+          <span class="vehicle-imagem-overlay" onclick="event.stopPropagation(); acionarUploadFoto(this)" title="${v.foto_path ? 'Trocar' : 'Adicionar'} foto">${svgIcone('camera', 14)}</span>
+          <input type="file" accept="image/jpeg,image/png,image/webp" onchange="enviarFotoVeiculo(${v.id}, this.files[0])" />
+        </div>
         <div class="vehicle-placa">${iconeAlerta}${escapeHtml(v.placa)}</div>
         <div class="vehicle-modelo">${escapeHtml(v.marca)} ${escapeHtml(v.modelo)} · ${v.ano}</div>
         ${detalhes ? `<div class="vehicle-modelo">${escapeHtml(detalhes)}</div>` : ''}
@@ -179,6 +186,31 @@ function editarVeiculo(id) {
   }
 
   document.getElementById('modal').classList.add('aberto');
+}
+
+async function enviarFotoVeiculo(id, arquivo) {
+  if (!arquivo) return;
+
+  const tiposAceitos = ['image/jpeg', 'image/png', 'image/webp'];
+  if (!tiposAceitos.includes(arquivo.type)) {
+    toastAviso('Formato de imagem inválido. Envie JPEG, PNG ou WebP.');
+    return;
+  }
+  if (arquivo.size > 5 * 1024 * 1024) {
+    toastAviso('A imagem deve ter no máximo 5MB.');
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('foto', arquivo);
+  const res = await enviarArquivo(`/veiculos/${id}/foto`, formData);
+
+  if (res && res.detail) {
+    toastErro('Erro: ' + extrairErro(res));
+    return;
+  }
+
+  await carregarVeiculos();
 }
 
 async function excluirVeiculo(id) {
