@@ -66,6 +66,27 @@ def test_atualizar_motorista_com_cpf_de_outro_retorna_400(client, admin, db_sess
     assert resp.status_code == 400
 
 
+def test_motorista_nao_pode_buscar_motorista_por_id(client, motorista_usuario, db_session):
+    m = criar_motorista_orm(db_session)
+    headers = auth_headers(client, motorista_usuario.email)
+    resp = client.get(f"/motoristas/{m.id}", headers=headers)
+    assert resp.status_code == 403
+
+
+def test_operador_pode_atualizar_motorista(client, operador, db_session):
+    m = criar_motorista_orm(db_session)
+    headers = auth_headers(client, operador.email)
+    resp = client.put(f"/motoristas/{m.id}", headers=headers, json={"telefone": "51999999999"})
+    assert resp.status_code == 200, resp.text
+
+
+def test_motorista_nao_pode_atualizar_motorista(client, motorista_usuario, db_session):
+    m = criar_motorista_orm(db_session)
+    headers = auth_headers(client, motorista_usuario.email)
+    resp = client.put(f"/motoristas/{m.id}", headers=headers, json={"telefone": "51988888888"})
+    assert resp.status_code == 403
+
+
 def test_apenas_admin_pode_deletar_motorista(client, admin, operador, db_session):
     m = criar_motorista_orm(db_session)
     headers_operador = auth_headers(client, operador.email)

@@ -25,6 +25,12 @@ from app.models import abastecimento as _abastecimento  # noqa: F401 - registra 
 CPF_VALIDO_1 = "11144477735"
 CPF_VALIDO_2 = "52998224725"
 
+# Bytes mínimos com a assinatura binária real de cada formato — salvar_foto()
+# valida o conteúdo do arquivo, não só o Content-Type declarado, então um
+# conteúdo arbitrário não passa mais na validação.
+JPEG_MINIMO = b"\xff\xd8\xff\xe0\x00\x10JFIF"
+PNG_MINIMO = b"\x89PNG\r\n\x1a\n" + b"\x00" * 8
+
 engine = create_engine(
     "sqlite:///:memory:",
     connect_args={"check_same_thread": False},
