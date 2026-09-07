@@ -336,6 +336,12 @@ html.dark body {
   gap: 16px;
   flex-wrap: wrap;
   transition: background 0.3s;
+  /* `.main-content > *` (embaixo) anima todo filho direto, o que cria um
+     stacking context novo pra cada um — sem isso, o dropdown de busca/sino
+     (mesmo com z-index alto) ficava preso atrás do stacking context dos
+     cards-grid que vem depois no HTML, porque eles são irmãos separados. */
+  position: relative;
+  z-index: 1;
 }
 
 .topbar-titulo .topbar-categoria {
@@ -362,15 +368,19 @@ html.dark body {
   padding: 8px 14px;
   min-width: 220px;
   color: var(--text-light);
+  position: relative;
+  z-index: 40;
 }
 .topbar-busca svg { width: 15px; height: 15px; flex-shrink: 0; }
 .topbar-busca input {
   border: none; background: none; outline: none; font-size: 13px; color: var(--text);
   width: 100%;
 }
+.topbar-busca input:disabled { cursor: default; }
 
 .topbar-sino {
   position: relative;
+  z-index: 40;
   width: 36px; height: 36px;
   border-radius: 9px;
   display: flex; align-items: center; justify-content: center;
@@ -378,15 +388,59 @@ html.dark body {
   background: var(--bg);
   border: 1px solid var(--border);
   flex-shrink: 0;
+  cursor: pointer;
 }
 .topbar-sino svg { width: 17px; height: 17px; }
-.topbar-sino::after {
-  content: '';
-  position: absolute; top: 7px; right: 8px;
-  width: 7px; height: 7px; border-radius: 50%;
-  background: var(--accent);
+
+/* Contador real de alertas (vencimentos + ocorrencias recentes) — so aparece
+   quando ha algo pra mostrar, ao contrario do pontinho fixo que existia antes. */
+.sino-contador {
+  position: absolute; top: -5px; right: -5px;
+  min-width: 16px; height: 16px; padding: 0 3px;
+  border-radius: 999px;
+  background: #A13E1F; color: #fff;
+  font-size: 10px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
   border: 1.5px solid var(--bg-card);
 }
+
+/* Dropdown compartilhado pelo sino de notificacoes e pela busca do topo. */
+.notificacoes-dropdown, .busca-dropdown {
+  position: absolute; top: calc(100% + 8px); right: 0;
+  width: 320px; max-height: 380px; overflow-y: auto;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: 0 12px 32px rgba(0,0,0,0.18);
+  z-index: 50; text-align: left;
+}
+.busca-dropdown { left: 0; right: auto; width: max(100%, 280px); top: calc(100% + 6px); }
+
+.notificacoes-cabecalho, .busca-grupo-titulo {
+  padding: 10px 14px 6px; font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-light);
+}
+/* .topbar-busca/.topbar-sino definem sua própria `color` (pro ícone/placeholder
+   cinza) — sem sobrescrever aqui, os itens do dropdown herdariam esse cinza
+   em vez do texto normal, ficando com contraste baixo demais pra ler. */
+.notificacao-item, .busca-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 14px; text-decoration: none; color: var(--text);
+  border-top: 1px solid var(--border);
+}
+.notificacao-item:first-child, .busca-item:first-child { border-top: none; }
+.busca-item { flex-direction: column; align-items: flex-start; gap: 2px; }
+.busca-item strong { font-size: 13px; font-weight: 600; color: var(--text); }
+.busca-item:hover, a.busca-item:hover { background: var(--bg); }
+.busca-item span { font-size: 12px; color: var(--text-light); }
+.notificacao-titulo { font-size: 13px; font-weight: 600; color: var(--text); }
+.notificacao-sub { font-size: 12px; color: var(--text-light); margin-top: 1px; }
+.notificacoes-vazio, .busca-vazio { padding: 20px 14px; text-align: center; font-size: 13px; color: var(--text-light); }
+.notificacoes-ver-tudo {
+  display: block; text-align: center; padding: 10px;
+  font-size: 12px; font-weight: 600; color: var(--primary-light);
+  text-decoration: none; border-top: 1px solid var(--border);
+}
+.notificacoes-ver-tudo:hover { text-decoration: underline; }
+body.dark .notificacoes-ver-tudo { color: var(--accent); }
 
 .topbar-usuario { display: flex; align-items: center; gap: 10px; }
 .topbar-avatar {

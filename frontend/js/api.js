@@ -264,6 +264,195 @@ function renderizarTopbar() {
   if (perfilEl) perfilEl.textContent = perfilLabel;
 }
 
+/* ===================== SINO DE NOTIFICAÇÕES =====================
+   O sino existe em todas as páginas mas era só decoração (nem tinha onclick,
+   e o pontinho dourado ficava sempre aceso, tivesse alerta ou não). Aqui ele
+   ganha um contador real — vencimentos de CNH/CRLV/seguro + ocorrências dos
+   últimos 7 dias — sem precisar editar o HTML de cada página uma por uma:
+   o badge e o dropdown são injetados por JS em cima do <div class="topbar-sino">
+   que já existe. Motorista não vê nada aqui: os endpoints usados (vencimentos,
+   ocorrências) são staff-only, e chamar get() sem essa checagem faria a página
+   redirecionar sozinha pro dashboard por causa do tratamento de 403 em get(). */
+const TIPO_LABEL_NOTIFICACAO = { cnh: 'CNH', crlv: 'CRLV', seguro: 'Seguro' };
+
+function fecharNotificacoes(e) {
+  const dropdown = document.getElementById('notificacoes-dropdown');
+  const sino = document.querySelector('.topbar-sino');
+  if (!dropdown || dropdown.hidden) return;
+  if (sino && sino.contains(e.target)) return;
+  dropdown.hidden = true;
+}
+
+function toggleNotificacoes(e) {
+  e.stopPropagation();
+  const dropdown = document.getElementById('notificacoes-dropdown');
+  if (dropdown) dropdown.hidden = !dropdown.hidden;
+}
+
+async function carregarNotificacoes() {
+  const sino = document.querySelector('.topbar-sino');
+  if (!sino || localStorage.getItem('perfil') === 'motorista') return;
+
+  const [vencimentos, ocorrencias] = await Promise.all([get('/dashboard/vencimentos'), get('/ocorrencias')]);
+  const listaVencimentos = (vencimentos && !vencimentos.detail) ? vencimentos : [];
+  const seteDiasAtras = Date.now() - 7 * 86400000;
+  const ocorrenciasRecentes = (ocorrencias && !ocorrencias.detail ? ocorrencias : [])
+    .filter(o => new Date(o.criado_em).getTime() >= seteDiasAtras)
+    .sort((a, b) => new Date(b.criado_em) - new Date(a.criado_em));
+
+  const itens = [
+    ...listaVencimentos.map(v => ({
+      titulo: `${TIPO_LABEL_NOTIFICACAO[v.tipo] || v.tipo} — ${v.referencia}`,
+      sub: v.vencido ? `Vencido em ${formatarData(v.validade)}` : `Vence em ${formatarData(v.validade)}`,
+      classe: v.vencido ? 'badge-ocorrencia' : 'badge-atrasado',
+    })),
+    ...ocorrenciasRecentes.map(o => ({
+      titulo: 'Nova ocorrência registrada',
+      sub: formatarDataHora(o.criado_em),
+      classe: 'badge-em_rota',
+    })),
+  ];
+
+  let contador = sino.querySelector('.sino-contador');
+  if (!contador) {
+    contador = document.createElement('span');
+    contador.className = 'sino-contador';
+    sino.appendChild(contador);
+  }
+  contador.textContent = itens.length > 9 ? '9+' : String(itens.length);
+  contador.hidden = itens.length === 0;
+
+  let dropdown = document.getElementById('notificacoes-dropdown');
+  if (!dropdown) {
+    dropdown = document.createElement('div');
+    dropdown.id = 'notificacoes-dropdown';
+    dropdown.className = 'notificacoes-dropdown';
+    dropdown.hidden = true;
+    sino.appendChild(dropdown);
+    sino.onclick = toggleNotificacoes;
+    document.addEventListener('click', fecharNotificacoes);
+  }
+
+  dropdown.innerHTML = itens.length === 0
+    ? '<div class="notificacoes-vazio">Nenhum alerta no momento</div>'
+    : '<div class="notificacoes-cabecalho">Alertas</div>' +
+      itens.slice(0, 8).map(i => `
+        <div class="notificacao-item">
+          <span class="badge ${i.classe}">!</span>
+          <div>
+            <div class="notificacao-titulo">${escapeHtml(i.titulo)}</div>
+            <div class="notificacao-sub">${escapeHtml(i.sub)}</div>
+          </div>
+        </div>
+      `).join('') +
+      '<a href="dashboard.html" class="notificacoes-ver-tudo">Ver central de alertas</a>';
+}
+
+/* ===================== BUSCA GLOBAL DO TOPO =====================
+   O campo de busca do topo vinha com disabled fixo no HTML em toda página.
+   Ativa aqui e busca em entregas/motoristas/veículos já carregados (uma vez,
+   sob demanda no primeiro uso — não a cada tecla), com resultados agrupados
+   num dropdown que leva pra página de cadastro correspondente. Motorista só
+   busca nas próprias entregas (motoristas/veículos são staff-only). */
+let _buscaCache = null;
+let _buscaPromise = null;
+
+function normalizarBusca(s) {
+  const semAcento = (s || '').toString().toLowerCase().normalize('NFD');
+  let limpo = '';
+  for (const ch of semAcento) {
+    if (ch.codePointAt(0) < 0x0300 || ch.codePointAt(0) > 0x036f) limpo += ch;
+  }
+  return limpo;
+}
+
+async function carregarDadosBusca() {
+  if (_buscaCache) return _buscaCache;
+  if (_buscaPromise) return _buscaPromise;
+
+  const ehMotorista = localStorage.getItem('perfil') === 'motorista';
+  _buscaPromise = Promise.all([
+    get('/entregas'),
+    ehMotorista ? Promise.resolve([]) : get('/motoristas'),
+    ehMotorista ? Promise.resolve([]) : get('/veiculos'),
+  ]).then(([entregas, motoristas, veiculos]) => {
+    _buscaCache = {
+      entregas: (entregas && !entregas.detail) ? entregas : [],
+      motoristas: (motoristas && !motoristas.detail) ? motoristas : [],
+      veiculos: (veiculos && !veiculos.detail) ? veiculos : [],
+    };
+    return _buscaCache;
+  });
+  return _buscaPromise;
+}
+
+async function executarBuscaGlobal(termo) {
+  const dropdown = document.getElementById('busca-dropdown');
+  if (!dropdown) return;
+  const q = normalizarBusca(termo.trim());
+  if (q.length < 2) { dropdown.hidden = true; return; }
+
+  const dados = await carregarDadosBusca();
+  const entregas = dados.entregas.filter(e =>
+    normalizarBusca(e.cliente).includes(q) || normalizarBusca(e.origem).includes(q) || normalizarBusca(e.destino).includes(q)
+  ).slice(0, 5);
+  const motoristas = dados.motoristas.filter(m => normalizarBusca(m.nome).includes(q)).slice(0, 5);
+  const veiculos = dados.veiculos.filter(v => normalizarBusca(v.placa).includes(q) || normalizarBusca(v.modelo).includes(q)).slice(0, 5);
+
+  if (entregas.length + motoristas.length + veiculos.length === 0) {
+    dropdown.innerHTML = '<div class="busca-vazio">Nada encontrado</div>';
+    dropdown.hidden = false;
+    return;
+  }
+
+  const grupo = (titulo, lista, render) => lista.length
+    ? `<div class="busca-grupo-titulo">${titulo}</div>` + lista.map(render).join('')
+    : '';
+
+  dropdown.innerHTML =
+    grupo('Entregas', entregas, e => `<a class="busca-item" href="entregas.html"><strong>${escapeHtml(e.cliente)}</strong><span>${escapeHtml(e.origem)} → ${escapeHtml(e.destino)}</span></a>`) +
+    grupo('Motoristas', motoristas, m => `<a class="busca-item" href="motoristas.html"><strong>${escapeHtml(m.nome || 'Sem nome')}</strong><span>CPF ${escapeHtml(m.cpf)}</span></a>`) +
+    grupo('Veículos', veiculos, v => `<a class="busca-item" href="veiculos.html"><strong>${escapeHtml(v.placa)}</strong><span>${escapeHtml(v.modelo)}</span></a>`);
+  dropdown.hidden = false;
+}
+
+function ativarBuscaGlobal() {
+  const container = document.querySelector('.topbar-busca');
+  const input = container && container.querySelector('input');
+  if (!container || !input) return;
+
+  input.disabled = false;
+  input.placeholder = 'Buscar entregas, motoristas, veículos...';
+  /* type="search" (em vez de "text") faz o Chrome/Edge nunca oferecer o
+     autofill de login salvo nesse campo — em paginas com um formulario de
+     criar acesso (motoristas/usuarios, que tem email+senha escondidos no
+     modal), o navegador pode "vazar" o e-mail logado pra qualquer input de
+     texto solto na pagina, mesmo com autocomplete="off". */
+  input.type = 'search';
+  input.autocomplete = 'off';
+
+  let dropdown = document.getElementById('busca-dropdown');
+  if (!dropdown) {
+    dropdown = document.createElement('div');
+    dropdown.id = 'busca-dropdown';
+    dropdown.className = 'busca-dropdown';
+    dropdown.hidden = true;
+    container.appendChild(dropdown);
+  }
+
+  let debounce = null;
+  input.addEventListener('input', () => {
+    clearTimeout(debounce);
+    debounce = setTimeout(() => executarBuscaGlobal(input.value), 200);
+  });
+  input.addEventListener('focus', () => {
+    if (input.value.trim().length >= 2) executarBuscaGlobal(input.value);
+  });
+  document.addEventListener('click', (e) => {
+    if (!container.contains(e.target)) dropdown.hidden = true;
+  });
+}
+
 /* ===================== FOTOS (upload + visualização em tela cheia) ===================== */
 /* A rota /uploads exige autenticação (como o resto da API), mas uma <img> não
    manda o header Authorization — por isso o token vai na querystring aqui. */
@@ -502,6 +691,8 @@ function fecharMenu() {
 aplicarTema();
 aplicarVisibilidadePorPerfil();
 renderizarTopbar();
+carregarNotificacoes();
+ativarBuscaGlobal();
 
 document.addEventListener('DOMContentLoaded', () => {
   aplicarTema();

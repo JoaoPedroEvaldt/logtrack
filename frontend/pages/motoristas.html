@@ -76,7 +76,7 @@
       <div class="toolbar-esquerda">
         <div class="topbar-busca" style="min-width:260px;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input type="text" id="busca-motorista" placeholder="Buscar por nome ou CNH..." oninput="filtrarMotoristas()" autocomplete="off" />
+          <input type="search" id="busca-motorista" placeholder="Buscar por nome ou CNH..." oninput="filtrarMotoristas()" autocomplete="off" />
         </div>
         <label class="pill-btn">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
@@ -138,8 +138,8 @@
           Criar acesso ao sistema para este motorista (opcional)
         </label>
         <div id="campos-acesso" class="form-grid" style="margin-top:12px;display:none;">
-          <div class="form-group"><label>E-mail *</label><input type="email" id="email" placeholder="email@exemplo.com" /></div>
-          <div class="form-group"><label>Senha *</label><input type="password" id="senha" placeholder="Mínimo 8 caracteres" /></div>
+          <div class="form-group"><label>E-mail *</label><input type="email" id="email" placeholder="email@exemplo.com" autocomplete="off" /></div>
+          <div class="form-group"><label>Senha *</label><input type="password" id="senha" placeholder="Mínimo 8 caracteres" autocomplete="new-password" /></div>
         </div>
       </div>
 
