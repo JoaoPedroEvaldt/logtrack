@@ -1,20 +1,54 @@
+from datetime import datetime, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.usuario import Usuario
+from app.models.log_acesso import LogAcesso
 from app import auth
 
 router = APIRouter(prefix="/auth", tags=["Autenticação"])
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
+# Protecao basica contra forca bruta: depois de N tentativas erradas seguidas
+# pro mesmo e-mail dentro da janela, bloqueia novas tentativas por um tempo -
+# sem isso, nada impedia alguem de tentar milhares de senhas por segundo.
+MAX_TENTATIVAS_LOGIN = 5
+JANELA_BLOQUEIO_MINUTOS = 15
+
 @router.post("/login")
-def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+def login(request: Request, form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    # datetime.now() (hora local), nao utcnow() - o Postgres grava criado_em via
+    # func.now() na timezone da sessao (America/Sao_Paulo aqui), e comparar contra
+    # um limite em UTC deixava a janela sempre 3h "no futuro", nunca disparando.
+    limite = datetime.now() - timedelta(minutes=JANELA_BLOQUEIO_MINUTOS)
+    tentativas_recentes = db.query(LogAcesso).filter(
+        LogAcesso.email_tentado == form.username,
+        LogAcesso.tentativa_ok.is_(False),
+        LogAcesso.criado_em >= limite
+    ).count()
+    if tentativas_recentes >= MAX_TENTATIVAS_LOGIN:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Muitas tentativas de login com esse e-mail. Tente novamente em {JANELA_BLOQUEIO_MINUTOS} minutos."
+        )
+
     usuario = db.query(Usuario).filter(Usuario.email == form.username).first()
-    if not usuario or not auth.verificar_senha(form.password, usuario.senha_hash):
+    senha_ok = bool(usuario and auth.verificar_senha(form.password, usuario.senha_hash))
+    sucesso = senha_ok and usuario.ativo
+
+    db.add(LogAcesso(
+        usuario_id=usuario.id if usuario else None,
+        email_tentado=form.username,
+        ip=request.client.host if request.client else None,
+        tentativa_ok=sucesso
+    ))
+    db.commit()
+
+    if not senha_ok:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="E-mail ou senha incorretos"

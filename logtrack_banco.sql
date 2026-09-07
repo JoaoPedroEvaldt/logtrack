@@ -144,6 +144,20 @@ CREATE TABLE IF NOT EXISTS abastecimentos (
     criado_em TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+-- Registra toda tentativa de login (certa ou errada) — usado pra detectar
+-- forca bruta (bloqueio temporario em app/routers/auth.py) e pra dar
+-- visibilidade real de acesso pro administrador, sem depender de log de
+-- servidor. usuario_id fica NULL quando o e-mail tentado nem existe.
+CREATE TABLE IF NOT EXISTS log_acesso (
+    id SERIAL PRIMARY KEY,
+    usuario_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+    email_tentado VARCHAR(150) NOT NULL,
+    ip VARCHAR(45),
+    tentativa_ok BOOLEAN NOT NULL,
+    criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS log_acesso_email_criado_idx ON log_acesso (email_tentado, criado_em);
+
 INSERT INTO usuarios (nome, email, senha_hash, perfil)
 VALUES (
     'Administrador',
