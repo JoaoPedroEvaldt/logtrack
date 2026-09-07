@@ -79,12 +79,12 @@
     </div>
 
     <div class="cards-grid" id="cards-resumo-entregas">
-      <div class="card azul"><div class="card-icon" data-icone="relogio"></div><div class="card-valor" id="resumo-aguardando">—</div><div class="card-label">Aguardando</div></div>
-      <div class="card verde"><div class="card-icon" data-icone="caminhao"></div><div class="card-valor" id="resumo-em_rota">—</div><div class="card-label">Em Rota</div></div>
-      <div class="card laranja"><div class="card-icon" data-icone="check"></div><div class="card-valor" id="resumo-entregue">—</div><div class="card-label">Entregue</div></div>
-      <div class="card vermelho"><div class="card-icon" data-icone="alerta"></div><div class="card-valor" id="resumo-atrasado">—</div><div class="card-label">Atrasado</div></div>
-      <div class="card vermelho"><div class="card-icon" data-icone="alerta"></div><div class="card-valor" id="resumo-ocorrencia">—</div><div class="card-label">Ocorrência</div></div>
-      <div class="card azul"><div class="card-icon" data-icone="erro"></div><div class="card-valor" id="resumo-cancelado">—</div><div class="card-label">Cancelado</div></div>
+      <div class="card azul" data-status="aguardando" onclick="filtrarPorStatusCard('aguardando')" style="cursor:pointer;" title="Clique para filtrar"><div class="card-icon" data-icone="relogio"></div><div class="card-valor" id="resumo-aguardando">—</div><div class="card-label">Aguardando</div></div>
+      <div class="card verde" data-status="em_rota" onclick="filtrarPorStatusCard('em_rota')" style="cursor:pointer;" title="Clique para filtrar"><div class="card-icon" data-icone="caminhao"></div><div class="card-valor" id="resumo-em_rota">—</div><div class="card-label">Em Rota</div></div>
+      <div class="card laranja" data-status="entregue" onclick="filtrarPorStatusCard('entregue')" style="cursor:pointer;" title="Clique para filtrar"><div class="card-icon" data-icone="check"></div><div class="card-valor" id="resumo-entregue">—</div><div class="card-label">Entregue</div></div>
+      <div class="card vermelho" data-status="atrasado" onclick="filtrarPorStatusCard('atrasado')" style="cursor:pointer;" title="Clique para filtrar"><div class="card-icon" data-icone="alerta"></div><div class="card-valor" id="resumo-atrasado">—</div><div class="card-label">Atrasado</div></div>
+      <div class="card vermelho" data-status="ocorrencia" onclick="filtrarPorStatusCard('ocorrencia')" style="cursor:pointer;" title="Clique para filtrar"><div class="card-icon" data-icone="alerta"></div><div class="card-valor" id="resumo-ocorrencia">—</div><div class="card-label">Ocorrência</div></div>
+      <div class="card azul" data-status="cancelado" onclick="filtrarPorStatusCard('cancelado')" style="cursor:pointer;" title="Clique para filtrar"><div class="card-icon" data-icone="erro"></div><div class="card-valor" id="resumo-cancelado">—</div><div class="card-label">Cancelado</div></div>
     </div>
 
     <div class="filtros">

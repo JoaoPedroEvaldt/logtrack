@@ -224,6 +224,20 @@ function renderizarTabela(lista) {
   `).join('');
 }
 
+/* Clicar num card de status filtra a lista por ele (mesmo efeito do select
+   #filtro-status) — clicar de novo no card já ativo limpa o filtro. */
+function filtrarPorStatusCard(status) {
+  const select = document.getElementById('filtro-status');
+  select.value = select.value === status ? '' : status;
+  filtrar();
+}
+
+function marcarCardStatusAtivo(statusAtivo) {
+  document.querySelectorAll('#cards-resumo-entregas .card').forEach(card => {
+    card.classList.toggle('card-filtro-ativo', !!statusAtivo && card.dataset.status === statusAtivo);
+  });
+}
+
 function filtrar() {
   const cliente = document.getElementById('filtro-cliente').value.toLowerCase();
   const inicio = document.getElementById('filtro-data-inicio').value;
@@ -231,6 +245,7 @@ function filtrar() {
   const status = document.getElementById('filtro-status').value;
   const veiculoId = document.getElementById('filtro-veiculo').value;
   const motoristaId = document.getElementById('filtro-motorista').value;
+  marcarCardStatusAtivo(status);
 
   const filtradas = entregas.filter(e => {
     if (cliente && !e.cliente.toLowerCase().includes(cliente)) return false;

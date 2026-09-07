@@ -531,6 +531,10 @@ body.dark .notificacoes-ver-tudo { color: var(--accent); }
 }
 .card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
 
+/* Card de status clicável (Entregas) usado como filtro — destaca qual está ativo. */
+.card-filtro-ativo { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary) inset; }
+body.dark .card-filtro-ativo { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
+
 /* Cards que também são links (ex.: atalhos do dashboard) — só afeta <a class="card">,
    os cards comuns (<div>, ex. conjuntos.js) continuam sem esse comportamento. */
 a.card { display: block; text-decoration: none; color: inherit; cursor: pointer; }
