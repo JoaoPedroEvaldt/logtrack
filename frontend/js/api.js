@@ -453,6 +453,106 @@ function ativarBuscaGlobal() {
   });
 }
 
+/* ===================== AUTOCOMPLETE DE CIDADE (IBGE) =====================
+   Usado nos campos de Origem/Destino de Entregas. A lista de municípios do
+   IBGE (~5.570 cidades, ~2,4MB) é pesada pra baixar toda vez — fica em cache
+   no localStorage sem expiração, já que a lista de municípios do Brasil não
+   muda (novos municípios são raríssimos, então não vale reforçar isso a
+   cada visita). */
+const IBGE_CACHE_CHAVE = 'ibge_cidades_v1';
+let _cidadesIbgePromise = null;
+
+async function carregarCidadesIBGE() {
+  if (_cidadesIbgePromise) return _cidadesIbgePromise;
+
+  const cacheado = localStorage.getItem(IBGE_CACHE_CHAVE);
+  if (cacheado) {
+    try {
+      _cidadesIbgePromise = Promise.resolve(JSON.parse(cacheado));
+      return _cidadesIbgePromise;
+    } catch (e) { /* cache corrompido — ignora e busca de novo */ }
+  }
+
+  _cidadesIbgePromise = fetch('https://servicodados.ibge.gov.br/api/v1/localidades/municipios')
+    .then(res => res.json())
+    .then(dados => {
+      const cidades = dados
+        // `microrregiao` falta em pelo menos 1 dos 5571 municípios (ex.: Boa
+        // Esperança do Norte/MT) — `regiao-imediata` vem preenchido em 100%.
+        .map(m => `${m.nome} - ${m['regiao-imediata']['regiao-intermediaria'].UF.sigla}`)
+        .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+      try { localStorage.setItem(IBGE_CACHE_CHAVE, JSON.stringify(cidades)); } catch (e) { /* localStorage cheio — segue sem cache */ }
+      return cidades;
+    })
+    .catch(() => []);
+
+  return _cidadesIbgePromise;
+}
+
+/* Liga o autocomplete num <input> — dropdown de sugestões, navegação por
+   seta/Enter/Esc, filtra a lista do IBGE já em cache (sem tecla nenhuma
+   pesquisa de novo na API, só filtra em memória). */
+function ativarAutocompleteCidade(input) {
+  if (!input) return;
+  const container = input.parentElement;
+  container.style.position = 'relative';
+
+  const dropdown = document.createElement('div');
+  dropdown.className = 'cidade-dropdown';
+  dropdown.hidden = true;
+  container.appendChild(dropdown);
+
+  let itens = [];
+  let indiceAtivo = -1;
+  let debounce = null;
+
+  function marcarAtivo() {
+    [...dropdown.children].forEach((el, i) => el.classList.toggle('ativo', i === indiceAtivo));
+  }
+
+  function escolher(cidade) {
+    input.value = cidade;
+    dropdown.hidden = true;
+  }
+
+  function renderizar(lista) {
+    itens = lista;
+    indiceAtivo = -1;
+    if (lista.length === 0) { dropdown.hidden = true; return; }
+    dropdown.innerHTML = lista.map(c => `<div class="cidade-item">${escapeHtml(c)}</div>`).join('');
+    dropdown.hidden = false;
+  }
+
+  async function filtrar(termo) {
+    const q = normalizarBusca(termo.trim());
+    if (q.length < 2) { dropdown.hidden = true; return; }
+    const cidades = await carregarCidadesIBGE();
+    renderizar(cidades.filter(c => normalizarBusca(c).includes(q)).slice(0, 8));
+  }
+
+  input.addEventListener('input', () => {
+    clearTimeout(debounce);
+    debounce = setTimeout(() => filtrar(input.value), 200);
+  });
+  input.addEventListener('focus', () => {
+    if (input.value.trim().length >= 2) filtrar(input.value);
+  });
+  input.addEventListener('keydown', (e) => {
+    if (dropdown.hidden) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); indiceAtivo = Math.min(indiceAtivo + 1, itens.length - 1); marcarAtivo(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); indiceAtivo = Math.max(indiceAtivo - 1, 0); marcarAtivo(); }
+    else if (e.key === 'Enter' && indiceAtivo >= 0) { e.preventDefault(); escolher(itens[indiceAtivo]); }
+    else if (e.key === 'Escape') { dropdown.hidden = true; }
+  });
+  dropdown.addEventListener('click', (e) => {
+    const item = e.target.closest('.cidade-item');
+    if (item) escolher(itens[[...dropdown.children].indexOf(item)]);
+  });
+  document.addEventListener('click', (e) => {
+    if (!container.contains(e.target)) dropdown.hidden = true;
+  });
+}
+
 /* ===================== FOTOS (upload + visualização em tela cheia) ===================== */
 /* A rota /uploads exige autenticação (como o resto da API), mas uma <img> não
    manda o header Authorization — por isso o token vai na querystring aqui. */

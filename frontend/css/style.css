@@ -442,6 +442,18 @@ html.dark body {
 .notificacoes-ver-tudo:hover { text-decoration: underline; }
 body.dark .notificacoes-ver-tudo { color: var(--accent); }
 
+/* Dropdown do autocomplete de cidade (Origem/Destino em Entregas). */
+.cidade-dropdown {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+  max-height: 220px; overflow-y: auto;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: 0 12px 32px rgba(0,0,0,0.18);
+  z-index: 45; text-align: left;
+}
+.cidade-item { padding: 8px 12px; cursor: pointer; font-size: 13px; color: var(--text); border-top: 1px solid var(--border); }
+.cidade-item:first-child { border-top: none; }
+.cidade-item:hover, .cidade-item.ativo { background: var(--bg); }
+
 .topbar-usuario { display: flex; align-items: center; gap: 10px; }
 .topbar-avatar {
   width: 38px; height: 38px; border-radius: 50%;
@@ -548,11 +560,13 @@ a.card { display: block; text-decoration: none; color: inherit; cursor: pointer;
 /* Selo de variação (▲/▼ vs período anterior) nos cards de faturamento do dashboard. */
 .card-variacao { font-size: 12px; font-weight: 600; margin-top: 8px; }
 .card-variacao:empty { display: none; }
-.card-variacao .variacao-positiva { color: #1D8348; }
-.card-variacao .variacao-negativa { color: #A13E1F; }
-.card-variacao .variacao-neutra { color: var(--text-light); font-weight: 500; }
-body.dark .card-variacao .variacao-positiva { color: #4FD07E; }
-body.dark .card-variacao .variacao-negativa { color: #E5776A; }
+/* Classes de cor reutilizáveis (não só dentro do .card-variacao) — usadas
+   também na tabela "Custo por km" pra comparar com a referência cadastrada. */
+.variacao-positiva { color: #1D8348; }
+.variacao-negativa { color: #A13E1F; }
+.variacao-neutra { color: var(--text-light); font-weight: 500; }
+body.dark .variacao-positiva { color: #4FD07E; }
+body.dark .variacao-negativa { color: #E5776A; }
 
 body.dark .card-icon,
 body.dark .card.azul .card-icon,

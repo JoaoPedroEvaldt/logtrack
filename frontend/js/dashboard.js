@@ -271,29 +271,12 @@ function renderizarTopVeiculos(top5) {
   `).join('');
 }
 
-function renderizarCustoPorKm(lista) {
-  const tbody = document.getElementById('tabela-custo-km');
-  if (!tbody) return;
-  if (lista.length === 0) {
-    tbody.innerHTML = estadoVazio(4, 'Sem dados suficientes', 'Precisa de ao menos 2 leituras de quilometragem no mês (em abastecimentos ou manutenções) pra estimar.', 'vazio');
-    return;
-  }
-  tbody.innerHTML = lista.slice(0, 5).map(v => `
-    <tr>
-      <td>${escapeHtml(v.placa)}</td>
-      <td>${v.km_rodado.toLocaleString('pt-BR')} km</td>
-      <td>${formatarMoeda(v.custo_total)}</td>
-      <td><strong>${formatarMoeda(v.custo_por_km)}</strong></td>
-    </tr>
-  `).join('');
-}
-
 async function carregarPainel() {
   /* Motorista só enxerga as próprias entregas — o resto (cadastros de colegas,
      faturamento, vencimentos) é bloqueado pela API pra esse perfil, então nem pedimos. */
   const ehMotorista = localStorage.getItem('perfil') === 'motorista';
 
-  const [entregas, motoristas, veiculos, ocorrencias, conjuntos, faturamento, vencimentos, desempenhoMotoristas, custoPorKm] = await Promise.all([
+  const [entregas, motoristas, veiculos, ocorrencias, conjuntos, faturamento, vencimentos, desempenhoMotoristas] = await Promise.all([
     get('/entregas'),
     ehMotorista ? Promise.resolve(null) : get('/motoristas'),
     ehMotorista ? Promise.resolve(null) : get('/veiculos'),
@@ -302,7 +285,6 @@ async function carregarPainel() {
     ehMotorista ? Promise.resolve(null) : get('/dashboard/faturamento'),
     ehMotorista ? Promise.resolve(null) : get('/dashboard/vencimentos'),
     ehMotorista ? Promise.resolve(null) : get('/dashboard/desempenho-motoristas'),
-    ehMotorista ? Promise.resolve(null) : get('/dashboard/custo-por-km'),
   ]);
 
   const listaEntregas = entregas || [];
@@ -330,7 +312,6 @@ async function carregarPainel() {
     if (faturamento && !faturamento.detail) renderizarFaturamento(faturamento);
     renderizarTopMotoristas(desempenhoMotoristas || []);
     renderizarTopVeiculos(calcularTopVeiculos(listaEntregas, listaVeiculos));
-    renderizarCustoPorKm(custoPorKm || []);
   }
 
   renderizarGraficoMensal(listaEntregas);

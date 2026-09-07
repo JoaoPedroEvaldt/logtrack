@@ -360,6 +360,8 @@ async function confirmarStatus() {
 
 async function iniciar() {
   definirPeriodoPadrao();
+  ativarAutocompleteCidade(document.getElementById('origem'));
+  ativarAutocompleteCidade(document.getElementById('destino'));
   /* Motorista só vê as próprias entregas; cadastros de veículo/motorista/conjunto
      ficam bloqueados pra esse perfil, então nem tenta carregar (e nem precisa). */
   if (localStorage.getItem('perfil') !== 'motorista') {
