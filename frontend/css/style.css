@@ -148,6 +148,21 @@ html.dark body {
 
 .input-group input:focus { border-color: var(--accent); background: var(--bg-card); }
 
+.input-senha-wrapper { position: relative; }
+.input-senha-wrapper input { padding-right: 44px; }
+/* Edge/IE tem um botao nativo de "mostrar senha" que aparece por cima do
+   nosso — sem isso, ficam dois olhos duplicados no mesmo campo. */
+.input-senha-wrapper input::-ms-reveal,
+.input-senha-wrapper input::-ms-clear { display: none; }
+.btn-mostrar-senha {
+  position: absolute; top: 50%; right: 6px; transform: translateY(-50%);
+  width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+  background: none; border: none; cursor: pointer;
+  color: var(--text-light); border-radius: 6px;
+}
+.btn-mostrar-senha:hover { color: var(--text); background: var(--bg); }
+.btn-mostrar-senha svg { width: 18px; height: 18px; }
+
 .login-opcoes {
   display: flex;
   justify-content: space-between;
