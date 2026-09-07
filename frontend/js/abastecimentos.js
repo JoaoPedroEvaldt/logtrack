@@ -35,6 +35,11 @@ async function carregarPrecosDiesel() {
   return precosDieselPorUF;
 }
 
+function parsePrecoDiesel(str) {
+  const n = str ? parseFloat(str.replace(',', '.')) : null;
+  return n || null;
+}
+
 async function atualizarPrecoDiesel(recalcular = true) {
   const uf = document.getElementById('estado').value.toLowerCase();
   const infoEl = document.getElementById('preco-diesel-info');
@@ -43,11 +48,18 @@ async function atualizarPrecoDiesel(recalcular = true) {
 
   infoEl.value = 'Buscando preço...';
   const precos = await carregarPrecosDiesel();
-  const precoStr = precos ? precos[uf] : null;
-  const preco = precoStr ? parseFloat(precoStr.replace(',', '.')) : null;
 
+  const preco = precos ? parsePrecoDiesel(precos[uf]) : null;
+
+  // A API de terceiros nem sempre traz o preço de todos os estados (varia a cada
+  // coleta). Nesse caso não preenchemos automaticamente com nenhuma estimativa —
+  // deixamos precoDieselAtual em null pra forçar o preenchimento manual do valor
+  // total, evitando que um preço não conferido acabe salvo sem o usuário perceber.
   if (!preco) {
-    infoEl.value = 'Preço indisponível';
+    const precoNacional = precos ? parsePrecoDiesel(precos.br) : null;
+    infoEl.value = precoNacional
+      ? `Preço indisponível para ${uf.toUpperCase()} — informe o valor manualmente abaixo (referência nacional: R$ ${precoNacional.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / L)`
+      : 'Preço indisponível — informe o valor manualmente abaixo';
     return;
   }
 

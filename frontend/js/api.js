@@ -209,7 +209,11 @@ const CORES_STATUS = {
   entregue: '#1D8348',
   atrasado: '#B36A17',
   ocorrencia: '#A13E1F',
-  cancelado: '#888888'
+  cancelado: '#888888',
+  // status de manutenção — mesmas cores dos badges equivalentes (badge-aguardando/em_rota/entregue)
+  agendada: '#5B6478',
+  em_andamento: '#2E4F8F',
+  concluida: '#1D8348'
 };
 
 function corPorStatus(status) {
@@ -288,6 +292,196 @@ function abrirFotoTelaCheia(url) {
   }
   overlay.querySelector('img').src = url;
   overlay.classList.add('aberto');
+}
+
+/* ===================== PDF (identidade visual LogTrack) =====================
+   Reaproveita as cores da interface (--primary, --accent etc. em style.css)
+   pra dar aos relatórios exportados a mesma cara do sistema, em vez de texto
+   solto em preto e branco. Usado por relatorios.js e manutencoes.js. */
+const PDF_COR_PRIMARIA = [30, 42, 68];
+const PDF_COR_ACCENT = [242, 169, 59];
+const PDF_COR_TEXTO_CLARO = [124, 133, 152];
+const PDF_COR_FUNDO = [245, 246, 250];
+const PDF_COR_BORDA = [231, 233, 240];
+
+/* Ícone do caminhão (mesmo desenho do logo da sidebar, em icons.js) desenhado
+   com as primitivas do jsPDF, em contorno branco — fica à esquerda do "LogTrack". */
+function pdfLogoCaminhao(doc, x, y, tamanho) {
+  const s = tamanho / 22;
+  doc.setDrawColor(255, 255, 255);
+  doc.setLineWidth(0.9 * s);
+  doc.roundedRect(x + 1 * s, y + 3 * s, 15 * s, 13 * s, 0.8 * s, 0.8 * s, 'S');
+  doc.lines([[4 * s, 0], [3 * s, 3 * s], [0, 5 * s], [-7 * s, 0]], x + 16 * s, y + 8 * s, [1, 1], 'S', true);
+  doc.circle(x + 5.5 * s, y + 18.5 * s, 2.5 * s, 'S');
+  doc.circle(x + 18.5 * s, y + 18.5 * s, 2.5 * s, 'S');
+}
+
+/* Retorna um callback pronto pra passar em autoTable({ didDrawPage }) — desenha
+   a faixa azul do topo com o logo, "LogTrack" + título da seção, e o rodapé com a
+   data de geração. Roda em toda página que a tabela criar (inclusive por estouro de linhas). */
+function pdfCabecalhoRodape(doc, tituloSecao, geradoEm) {
+  return function () {
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+
+    doc.setFillColor(...PDF_COR_PRIMARIA);
+    doc.rect(0, 0, pageWidth, 20, 'F');
+    pdfLogoCaminhao(doc, 14, 5.5, 9);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(255, 255, 255);
+    doc.text('LogTrack', 27, 13);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(210, 216, 230);
+    doc.text(tituloSecao, pageWidth - 14, 13, { align: 'right' });
+    doc.setFillColor(...PDF_COR_ACCENT);
+    doc.rect(0, 20, pageWidth, 0.8, 'F');
+
+    doc.setDrawColor(...PDF_COR_BORDA);
+    doc.setLineWidth(0.2);
+    doc.line(14, pageHeight - 16, pageWidth - 14, pageHeight - 16);
+    doc.setFontSize(8);
+    doc.setTextColor(...PDF_COR_TEXTO_CLARO);
+    doc.text(`LogTrack · Gerado em ${geradoEm}`, 14, pageHeight - 10);
+  };
+}
+
+/* Título de seção com barrinha de destaque dourada, tipo os títulos de cards na tela. */
+function pdfTituloSecao(doc, x, y, texto, tamanho = 13) {
+  doc.setFillColor(...PDF_COR_ACCENT);
+  doc.rect(x, y - (tamanho >= 13 ? 5.5 : 4.5), 3, tamanho >= 13 ? 7 : 5.5, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(tamanho);
+  doc.setTextColor(...PDF_COR_PRIMARIA);
+  doc.text(texto, x + 6, y);
+  doc.setFont('helvetica', 'normal');
+}
+
+/* "Pílula" com fundo cinza claro, usada pra mostrar período/filtros no topo do relatório. */
+function pdfPilula(doc, x, y, texto) {
+  doc.setFontSize(9);
+  const largura = doc.getTextWidth(texto) + 10;
+  doc.setFillColor(...PDF_COR_FUNDO);
+  doc.roundedRect(x, y, largura, 8, 4, 4, 'F');
+  doc.setTextColor(...PDF_COR_PRIMARIA);
+  doc.text(texto, x + 5, y + 5.5);
+  return largura;
+}
+
+/* Linha de cards de indicadores (tipo os "cards-grid" da tela), divididos em partes
+   iguais na largura disponível. Retorna a altura ocupada pra continuar o layout. */
+function pdfCardsKPI(doc, x, y, largura, kpis) {
+  const gap = 6;
+  const larguraCard = (largura - gap * (kpis.length - 1)) / kpis.length;
+  const altura = 22;
+  kpis.forEach((k, i) => {
+    const cx = x + i * (larguraCard + gap);
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(...PDF_COR_BORDA);
+    doc.roundedRect(cx, y, larguraCard, altura, 3, 3, 'FD');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(15);
+    doc.setTextColor(...PDF_COR_PRIMARIA);
+    doc.text(k.valor, cx + larguraCard / 2, y + 11, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...PDF_COR_TEXTO_CLARO);
+    doc.text(k.label, cx + larguraCard / 2, y + 17, { align: 'center' });
+  });
+  return altura;
+}
+
+/* Converte uma cor hex ("#1D8348") em array [r,g,b] pro setFillColor/setDrawColor do jsPDF. */
+function pdfHexParaRgb(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+/* Barra horizontal empilhada mostrando a proporção de cada status (mesmas cores dos
+   badges da tela, via CORES_STATUS/corPorStatus), com legenda embaixo. Retorna a
+   altura ocupada (barra + legenda) pra continuar o layout. */
+function pdfBarraStatus(doc, x, y, largura, itens) {
+  const total = itens.reduce((s, it) => s + it.valor, 0) || 1;
+  const altura = 6;
+  doc.setFillColor(...PDF_COR_FUNDO);
+  doc.roundedRect(x, y, largura, altura, altura / 2, altura / 2, 'F');
+  let cursorX = x;
+  itens.forEach(it => {
+    if (!it.valor) return;
+    const w = (largura * it.valor) / total;
+    doc.setFillColor(...pdfHexParaRgb(it.cor));
+    doc.rect(cursorX, y, w, altura, 'F');
+    cursorX += w;
+  });
+
+  let lx = x, ly = y + altura + 7;
+  doc.setFontSize(8);
+  itens.forEach(it => {
+    if (!it.valor) return;
+    doc.setFillColor(...pdfHexParaRgb(it.cor));
+    doc.circle(lx + 1.3, ly - 1.3, 1.3, 'F');
+    doc.setTextColor(...PDF_COR_PRIMARIA);
+    const texto = `${it.label} (${it.valor})`;
+    doc.text(texto, lx + 4.5, ly);
+    lx += doc.getTextWidth(texto) + 10;
+    if (lx > x + largura - 20) { lx = x; ly += 6; }
+  });
+  return (ly - y) + 4;
+}
+
+/* Pra usar em autoTable({ didParseCell, didDrawCell }) numa coluna de status: troca o
+   texto simples por um selo colorido, igual aos badges da tela. `obterStatus`/`obterLabel`
+   recebem o índice da linha (data.row.index) e devolvem a chave de CORES_STATUS / o rótulo. */
+function pdfColunaBadgeStatus(colunaIndex, obterStatus, obterLabel) {
+  return {
+    didParseCell(data) {
+      if (data.section === 'body' && data.column.index === colunaIndex) {
+        data.cell.text = [''];
+      }
+    },
+    didDrawCell(data) {
+      if (data.section !== 'body' || data.column.index !== colunaIndex) return;
+      const status = obterStatus(data.row.index);
+      const label = obterLabel(data.row.index);
+      const cor = pdfHexParaRgb(corPorStatus(status));
+      const cellDoc = data.doc;
+      cellDoc.setFont('helvetica', 'normal');
+      cellDoc.setFontSize(7.5);
+      const padX = 2.2, altura = 5.2;
+      const largura = cellDoc.getTextWidth(label) + padX * 2;
+      const cy = data.cell.y + (data.cell.height - altura) / 2;
+      const cx = data.cell.x + 2;
+      cellDoc.setFillColor(...cor);
+      cellDoc.roundedRect(cx, cy, largura, altura, altura / 2, altura / 2, 'F');
+      cellDoc.setTextColor(255, 255, 255);
+      cellDoc.text(label, cx + largura / 2, cy + altura / 2 + 1.5, { align: 'center' });
+    }
+  };
+}
+
+/* Estilo padrão de autoTable com as cores do sistema — usar via spread: {...PDF_ESTILO_TABELA} */
+const PDF_ESTILO_TABELA = {
+  headStyles: { fillColor: PDF_COR_PRIMARIA, textColor: 255, fontSize: 9 },
+  bodyStyles: { fontSize: 8, textColor: PDF_COR_PRIMARIA },
+  alternateRowStyles: { fillColor: PDF_COR_FUNDO },
+  styles: { lineColor: PDF_COR_BORDA, lineWidth: 0.1, cellPadding: 3 },
+  margin: { left: 14, right: 14, top: 26, bottom: 22 },
+};
+
+/* Escreve "Página X de N" em todas as páginas — só dá pra saber o total depois
+   que o documento inteiro foi montado, por isso roda por último, antes do doc.save(). */
+function pdfFinalizarPaginas(doc) {
+  const total = doc.internal.getNumberOfPages();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  for (let i = 1; i <= total; i++) {
+    doc.setPage(i);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...PDF_COR_TEXTO_CLARO);
+    doc.text(`Página ${i} de ${total}`, pageWidth - 14, pageHeight - 10, { align: 'right' });
+  }
 }
 
 /* ===================== MENU MOBILE ===================== */

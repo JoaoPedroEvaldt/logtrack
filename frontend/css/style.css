@@ -491,6 +491,15 @@ a.card { display: block; text-decoration: none; color: inherit; cursor: pointer;
 .card-valor { font-size: 28px; font-weight: 700; color: var(--text); letter-spacing: -0.02em; }
 .card-label { font-size: 13px; color: var(--text-light); margin-top: 4px; }
 
+/* Selo de variação (▲/▼ vs período anterior) nos cards de faturamento do dashboard. */
+.card-variacao { font-size: 12px; font-weight: 600; margin-top: 8px; }
+.card-variacao:empty { display: none; }
+.card-variacao .variacao-positiva { color: #1D8348; }
+.card-variacao .variacao-negativa { color: #A13E1F; }
+.card-variacao .variacao-neutra { color: var(--text-light); font-weight: 500; }
+body.dark .card-variacao .variacao-positiva { color: #4FD07E; }
+body.dark .card-variacao .variacao-negativa { color: #E5776A; }
+
 body.dark .card-icon,
 body.dark .card.azul .card-icon,
 body.dark .card.verde .card-icon,

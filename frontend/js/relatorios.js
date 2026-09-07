@@ -87,14 +87,6 @@ function manutencoesNoPeriodo({ inicio, fim, conjunto }) {
   });
 }
 
-function formatarDuracaoMedia(msMedio) {
-  if (!msMedio || isNaN(msMedio)) return '—';
-  const totalMin = Math.round(msMedio / 60000);
-  const h = Math.floor(totalMin / 60);
-  const min = totalMin % 60;
-  return `${h}h ${String(min).padStart(2, '0')}min`;
-}
-
 function mesesDoPeriodo(inicio, fim) {
   const meses = [];
   const cursor = new Date(inicio.getFullYear(), inicio.getMonth(), 1);
@@ -136,12 +128,6 @@ function atualizarRelatorio() {
   const entregues = entregasFiltradas.filter(e => e.status === 'entregue');
   document.getElementById('stat-entregues').textContent = entregues.length;
 
-  const duracoes = entregues
-    .filter(e => e.iniciado_em && e.concluido_em)
-    .map(e => new Date(e.concluido_em) - new Date(e.iniciado_em));
-  const mediaDuracao = duracoes.length ? duracoes.reduce((a, b) => a + b, 0) / duracoes.length : null;
-  document.getElementById('stat-tempo-medio').textContent = formatarDuracaoMedia(mediaDuracao);
-
   document.getElementById('tile-ocorrencias').style.display = incluirOcorrencias ? '' : 'none';
   if (incluirOcorrencias) {
     document.getElementById('stat-ocorrencias').textContent = ocorrenciasNoPeriodo(periodo).length;
@@ -182,53 +168,97 @@ async function carregarDados() {
 async function exportarPDF() {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const geradoEm = new Date().toLocaleString('pt-BR');
+
   const periodo = periodoSelecionado();
   const entregasFiltradas = entregasNoPeriodo(periodo);
+  const incluirOcorrencias = document.getElementById('modulo-ocorrencias').checked;
+  const incluirManutencoes = document.getElementById('modulo-manutencoes').checked;
+  const incluirDesempenho = document.getElementById('modulo-motoristas-veiculos').checked;
 
-  doc.setFontSize(18);
-  doc.setTextColor(30, 42, 68);
-  doc.text('LogTrack — Relatório de Desempenho Operacional', 14, 20);
-  doc.setFontSize(10);
-  doc.setTextColor(100);
-  doc.text(`Período: ${periodo.inicioStr || '—'} a ${periodo.fimStr || '—'} · Conjunto: ${periodo.conjunto ? periodo.conjunto.nome : 'Todos'}`, 14, 27);
-  doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 14, 33);
+  const entregues = entregasFiltradas.filter(e => e.status === 'entregue');
+
+  /* ---- Capa: pílulas de filtro + título + cards de indicadores ---- */
+  let y = 30;
+  let x = 14;
+  x += pdfPilula(doc, x, y, `Período: ${periodo.inicioStr || '—'} a ${periodo.fimStr || '—'}`) + 4;
+  pdfPilula(doc, x, y, `Conjunto: ${periodo.conjunto ? periodo.conjunto.nome : 'Todos'}`);
+  y += 16;
+
+  pdfTituloSecao(doc, 14, y, 'Relatório de Desempenho Operacional');
+  y += 10;
+
+  const kpis = [
+    { valor: String(entregues.length), label: 'Entregas concluídas' },
+  ];
+  if (incluirOcorrencias) kpis.push({ valor: String(ocorrenciasNoPeriodo(periodo).length), label: 'Ocorrências' });
+  if (incluirManutencoes) {
+    const custoTotal = manutencoesNoPeriodo(periodo).reduce((s, m) => s + (parseFloat(m.custo) || 0), 0);
+    kpis.push({ valor: 'R$ ' + custoTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 }), label: 'Custo com manutenção' });
+  }
+  y += pdfCardsKPI(doc, 14, y, pageWidth - 28, kpis) + 12;
+
+  const contagemPorStatus = {};
+  entregasFiltradas.forEach(e => { contagemPorStatus[e.status] = (contagemPorStatus[e.status] || 0) + 1; });
+  const itensBarraStatus = Object.keys(LABEL_STATUS)
+    .map(s => ({ status: s, label: LABEL_STATUS[s], valor: contagemPorStatus[s] || 0, cor: corPorStatus(s) }));
+  if (entregasFiltradas.length) {
+    y += pdfBarraStatus(doc, 14, y, pageWidth - 28, itensBarraStatus) + 6;
+  }
+
+  pdfTituloSecao(doc, 14, y, 'Entregas do período', 12);
+  y += 6;
+
+  const badgeStatusEntregas = pdfColunaBadgeStatus(
+    3,
+    (i) => entregasFiltradas[i].status,
+    (i) => LABEL_STATUS[entregasFiltradas[i].status] || entregasFiltradas[i].status
+  );
 
   doc.autoTable({
-    startY: 40,
-    head: [['Código', 'Cliente', 'Origem', 'Destino', 'Status', 'Previsão', 'Concluído em']],
+    startY: y,
+    head: [['Cliente', 'Origem', 'Destino', 'Status', 'Previsão', 'Concluído em']],
     body: entregasFiltradas.map(e => [
-      `#E-${e.id}`, e.cliente, e.origem, e.destino,
+      e.cliente, e.origem, e.destino,
       LABEL_STATUS[e.status] || e.status,
       formatarDataHora(e.previsao), formatarDataHora(e.concluido_em)
     ]),
-    headStyles: { fillColor: [30, 42, 68], textColor: 255, fontSize: 9 },
-    bodyStyles: { fontSize: 8 },
-    alternateRowStyles: { fillColor: [245, 246, 250] },
-    margin: { left: 14, right: 14 }
+    ...PDF_ESTILO_TABELA,
+    columnStyles: { 3: { cellWidth: 27 } },
+    didDrawPage: pdfCabecalhoRodape(doc, 'Entregas do período', geradoEm),
+    didParseCell: badgeStatusEntregas.didParseCell,
+    didDrawCell: badgeStatusEntregas.didDrawCell,
   });
 
-  if (document.getElementById('modulo-ocorrencias').checked) {
+  if (incluirOcorrencias) {
     const lista = ocorrenciasNoPeriodo(periodo);
     doc.addPage();
-    doc.setFontSize(16); doc.setTextColor(30, 42, 68);
-    doc.text('Ocorrências do período', 14, 20);
+    pdfTituloSecao(doc, 14, 32, 'Ocorrências do período');
     doc.autoTable({
-      startY: 28,
-      head: [['Entrega', 'Tipo', 'Descrição', 'Data']],
-      body: lista.map(o => [`#E-${o.entrega_id}`, LABEL_TIPO_OCORRENCIA[o.tipo] || o.tipo, o.descricao, formatarDataHora(o.criado_em)]),
-      headStyles: { fillColor: [30, 42, 68], textColor: 255, fontSize: 9 },
-      bodyStyles: { fontSize: 8 },
-      margin: { left: 14, right: 14 }
+      startY: 40,
+      head: [['Veículo', 'Tipo', 'Descrição', 'Data']],
+      body: lista.map(o => {
+        const entrega = todasEntregas.find(e => e.id === o.entrega_id);
+        const veiculo = entrega ? todosVeiculos.find(v => v.id === entrega.veiculo_id) : null;
+        return [
+          veiculo ? veiculo.placa : '—',
+          LABEL_TIPO_OCORRENCIA[o.tipo] || o.tipo,
+          o.descricao,
+          formatarDataHora(o.criado_em)
+        ];
+      }),
+      ...PDF_ESTILO_TABELA,
+      didDrawPage: pdfCabecalhoRodape(doc, 'Ocorrências do período', geradoEm),
     });
   }
 
-  if (document.getElementById('modulo-manutencoes').checked) {
+  if (incluirManutencoes) {
     const lista = manutencoesNoPeriodo(periodo);
     doc.addPage();
-    doc.setFontSize(16); doc.setTextColor(30, 42, 68);
-    doc.text('Manutenções do período', 14, 20);
+    pdfTituloSecao(doc, 14, 32, 'Manutenções do período');
     doc.autoTable({
-      startY: 28,
+      startY: 40,
       head: [['Veículo', 'Data', 'Tipo', 'Custo']],
       body: lista.map(m => {
         const v = todosVeiculos.find(v => v.id === m.veiculo_id);
@@ -239,13 +269,12 @@ async function exportarPDF() {
           m.custo != null ? 'R$ ' + parseFloat(m.custo).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'
         ];
       }),
-      headStyles: { fillColor: [30, 42, 68], textColor: 255, fontSize: 9 },
-      bodyStyles: { fontSize: 8 },
-      margin: { left: 14, right: 14 }
+      ...PDF_ESTILO_TABELA,
+      didDrawPage: pdfCabecalhoRodape(doc, 'Manutenções do período', geradoEm),
     });
   }
 
-  if (document.getElementById('modulo-motoristas-veiculos').checked) {
+  if (incluirDesempenho) {
     const desempenho = todosVeiculos.map(v => {
       const viagens = entregasFiltradas.filter(e => e.veiculo_id === v.id && e.status === 'entregue');
       const faturamento = viagens.reduce((s, e) => s + (parseFloat(e.valor_frete) || 0), 0);
@@ -253,20 +282,19 @@ async function exportarPDF() {
     }).filter(d => d.viagens > 0).sort((a, b) => b.faturamento - a.faturamento);
 
     doc.addPage();
-    doc.setFontSize(16); doc.setTextColor(30, 42, 68);
-    doc.text('Desempenho por veículo', 14, 20);
+    pdfTituloSecao(doc, 14, 32, 'Desempenho por veículo');
     doc.autoTable({
-      startY: 28,
+      startY: 40,
       head: [['Veículo', 'Viagens concluídas', 'Faturamento']],
       body: desempenho.map(({ v, viagens, faturamento }) => [
         `${v.placa} — ${v.modelo}`, viagens, 'R$ ' + faturamento.toLocaleString('pt-BR', { minimumFractionDigits: 2 })
       ]),
-      headStyles: { fillColor: [30, 42, 68], textColor: 255, fontSize: 9 },
-      bodyStyles: { fontSize: 8 },
-      margin: { left: 14, right: 14 }
+      ...PDF_ESTILO_TABELA,
+      didDrawPage: pdfCabecalhoRodape(doc, 'Desempenho por veículo', geradoEm),
     });
   }
 
+  pdfFinalizarPaginas(doc);
   doc.save(`logtrack-relatorio-${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.pdf`);
 }
 

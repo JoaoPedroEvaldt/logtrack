@@ -172,15 +172,21 @@ async function salvarManutencao() {
 async function exportarPDF() {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const geradoEm = new Date().toLocaleString('pt-BR');
 
-  doc.setFontSize(18);
-  doc.setTextColor(30, 77, 120);
-  doc.text('LogTrack — Relatório de Manutenções', 14, 20);
+  const custoTotal = manutencoes.reduce((s, m) => s + (parseFloat(m.custo) || 0), 0);
+  const kpis = [
+    { valor: String(manutencoes.length), label: 'Manutenções registradas' },
+    { valor: 'R$ ' + custoTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 }), label: 'Custo total' },
+  ];
 
-  doc.setFontSize(10);
-  doc.setTextColor(100);
-  doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 14, 28);
+  let y = 30;
+  pdfTituloSecao(doc, 14, y, 'Relatório de Manutenções');
+  y += 10;
+  y += pdfCardsKPI(doc, 14, y, pageWidth - 28, kpis) + 12;
 
+  const statusLabelPDF = { concluida: 'Concluída', em_andamento: 'Em andamento', agendada: 'Agendada' };
   const linhas = manutencoes.map(m => [
     `#${m.id}`,
     m.veiculo ? `${m.veiculo.placa} — ${m.veiculo.modelo}` : '—',
@@ -189,19 +195,27 @@ async function exportarPDF() {
     m.mecanico || '—',
     m.quilometragem != null ? m.quilometragem.toLocaleString('pt-BR') + ' km' : '—',
     m.custo != null ? 'R$ ' + parseFloat(m.custo).toLocaleString('pt-BR', {minimumFractionDigits:2}) : '—',
-    m.status,
+    statusLabelPDF[m.status] || m.status,
   ]);
 
+  const badgeStatusManutencao = pdfColunaBadgeStatus(
+    7,
+    (i) => manutencoes[i].status,
+    (i) => statusLabelPDF[manutencoes[i].status] || manutencoes[i].status
+  );
+
   doc.autoTable({
-    startY: 35,
+    startY: y,
     head: [['#', 'Veículo', 'Data', 'Tipo', 'Mecânico', 'KM', 'Custo', 'Status']],
     body: linhas,
-    headStyles: { fillColor: [30, 77, 120], textColor: 255, fontSize: 9 },
-    bodyStyles: { fontSize: 8 },
-    alternateRowStyles: { fillColor: [240, 244, 250] },
-    margin: { left: 14, right: 14 }
+    ...PDF_ESTILO_TABELA,
+    columnStyles: { 7: { cellWidth: 27 } },
+    didDrawPage: pdfCabecalhoRodape(doc, 'Manutenções', geradoEm),
+    didParseCell: badgeStatusManutencao.didParseCell,
+    didDrawCell: badgeStatusManutencao.didDrawCell,
   });
 
+  pdfFinalizarPaginas(doc);
   doc.save(`logtrack-manutencoes-${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.pdf`);
 }
 

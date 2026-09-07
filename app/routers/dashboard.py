@@ -153,34 +153,51 @@ def desempenho_motoristas(db: Session = Depends(get_db), atual: Usuario = Depend
         for r in resultado
     ]
 
+def _totais_periodo(db: Session, inicio: date, fim: date):
+    """Receita e custos brutos do período, sem detalhamento — usado pra comparar
+    o mês atual com o anterior sem duplicar a query inteira de novo."""
+    entregas = db.query(Entrega).filter(
+        Entrega.status == "entregue",
+        Entrega.concluido_em >= inicio,
+        Entrega.concluido_em < fim
+    ).all()
+    manutencoes = db.query(Manutencao).filter(
+        Manutencao.data_manutencao >= inicio,
+        Manutencao.data_manutencao < fim
+    ).all()
+    abastecimentos = db.query(Abastecimento).filter(
+        Abastecimento.data_abastecimento >= inicio,
+        Abastecimento.data_abastecimento < fim
+    ).all()
+    receita_bruta = sum(float(e.valor_frete or 0) for e in entregas)
+    custo_manutencao = sum(float(m.custo or 0) for m in manutencoes)
+    custo_abastecimento = sum(float(a.valor_total or 0) for a in abastecimentos)
+    return entregas, manutencoes, abastecimentos, receita_bruta, custo_manutencao, custo_abastecimento
+
 @router.get("/faturamento")
 def faturamento(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     """Faturamento líquido do mês atual: receita das entregas concluídas menos
     custos de manutenção e abastecimento no período, com detalhamento por
-    conjunto (via veículos do conjunto) e por motorista (via entregas/abastecimentos)."""
+    conjunto (via veículos do conjunto) e por motorista (via entregas/abastecimentos).
+    Inclui também os totais do mês anterior, só pra comparação (sem detalhamento) —
+    usando o MESMO NÚMERO DE DIAS decorridos, não o mês anterior inteiro. Sem isso,
+    no dia 7 do mês a comparação seria "7 dias vs 31 dias", inflando/distorcendo a
+    variação por pura diferença de tempo decorrido, não de desempenho real."""
     hoje = date.today()
     inicio_mes = date(hoje.year, hoje.month, 1)
     fim_mes = date(hoje.year + 1, 1, 1) if hoje.month == 12 else date(hoje.year, hoje.month + 1, 1)
+    inicio_mes_anterior = date(hoje.year - 1, 12, 1) if hoje.month == 1 else date(hoje.year, hoje.month - 1, 1)
 
-    entregas = db.query(Entrega).filter(
-        Entrega.status == "entregue",
-        Entrega.concluido_em >= inicio_mes,
-        Entrega.concluido_em < fim_mes
-    ).all()
-    manutencoes = db.query(Manutencao).filter(
-        Manutencao.data_manutencao >= inicio_mes,
-        Manutencao.data_manutencao < fim_mes
-    ).all()
-    abastecimentos = db.query(Abastecimento).filter(
-        Abastecimento.data_abastecimento >= inicio_mes,
-        Abastecimento.data_abastecimento < fim_mes
-    ).all()
+    dias_decorridos = (hoje - inicio_mes).days + 1
+    fim_mes_anterior_comparavel = min(inicio_mes_anterior + timedelta(days=dias_decorridos), inicio_mes)
+
+    entregas, manutencoes, abastecimentos, receita_bruta, custo_manutencao, custo_abastecimento = \
+        _totais_periodo(db, inicio_mes, fim_mes)
+    _, _, _, receita_bruta_ant, custo_manutencao_ant, custo_abastecimento_ant = \
+        _totais_periodo(db, inicio_mes_anterior, fim_mes_anterior_comparavel)
+
     conjuntos = db.query(Conjunto).filter(Conjunto.status != "inativo").all()
     motoristas = {m.id: m.nome for m in db.query(Motorista).filter(Motorista.status != "inativo").all()}
-
-    receita_bruta = sum(float(e.valor_frete or 0) for e in entregas)
-    custo_manutencao = sum(float(m.custo or 0) for m in manutencoes)
-    custo_abastecimento = sum(float(a.valor_total or 0) for a in abastecimentos)
 
     def veiculos_do_conjunto(c):
         return {c.cavalo_id, c.semirreboque1_id, c.semirreboque2_id} - {None}
@@ -242,5 +259,61 @@ def faturamento(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_s
         "custo_abastecimento": custo_abastecimento,
         "faturamento_liquido": receita_bruta - custo_manutencao - custo_abastecimento,
         "por_conjunto": por_conjunto,
-        "por_motorista": por_motorista
+        "por_motorista": por_motorista,
+        "mes_anterior": {
+            "receita_bruta": receita_bruta_ant,
+            "custo_total": custo_manutencao_ant + custo_abastecimento_ant,
+            "faturamento_liquido": receita_bruta_ant - custo_manutencao_ant - custo_abastecimento_ant
+        }
     }
+
+@router.get("/custo-por-km")
+def custo_por_km(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
+    """Estima R$/km de cada veículo no mês atual: usa a menor e a maior leitura de
+    quilometragem registradas em abastecimentos/manutenções do período pra achar os
+    km rodados, e divide pelo custo total (abastecimento + manutenção) no mesmo período.
+    Só entra na lista o veículo com pelo menos 2 leituras e km rodado > 0 — sem isso o
+    cálculo não tem base (não são todos os registros que têm quilometragem preenchida)."""
+    hoje = date.today()
+    inicio_mes = date(hoje.year, hoje.month, 1)
+    fim_mes = date(hoje.year + 1, 1, 1) if hoje.month == 12 else date(hoje.year, hoje.month + 1, 1)
+
+    manutencoes = db.query(Manutencao).filter(
+        Manutencao.data_manutencao >= inicio_mes,
+        Manutencao.data_manutencao < fim_mes
+    ).all()
+    abastecimentos = db.query(Abastecimento).filter(
+        Abastecimento.data_abastecimento >= inicio_mes,
+        Abastecimento.data_abastecimento < fim_mes
+    ).all()
+    veiculos = {v.id: v.placa for v in db.query(Veiculo).all()}
+
+    leituras_por_veiculo = {}
+    custo_por_veiculo = {}
+    for m in manutencoes:
+        custo_por_veiculo[m.veiculo_id] = custo_por_veiculo.get(m.veiculo_id, 0) + float(m.custo or 0)
+        if m.quilometragem:
+            leituras_por_veiculo.setdefault(m.veiculo_id, []).append(m.quilometragem)
+    for a in abastecimentos:
+        custo_por_veiculo[a.veiculo_id] = custo_por_veiculo.get(a.veiculo_id, 0) + float(a.valor_total or 0)
+        if a.quilometragem:
+            leituras_por_veiculo.setdefault(a.veiculo_id, []).append(a.quilometragem)
+
+    resultado = []
+    for veiculo_id, leituras in leituras_por_veiculo.items():
+        if len(leituras) < 2:
+            continue
+        km_rodado = max(leituras) - min(leituras)
+        if km_rodado <= 0:
+            continue
+        custo_total = custo_por_veiculo.get(veiculo_id, 0)
+        resultado.append({
+            "veiculo_id": veiculo_id,
+            "placa": veiculos.get(veiculo_id, f"#{veiculo_id}"),
+            "km_rodado": km_rodado,
+            "custo_total": custo_total,
+            "custo_por_km": custo_total / km_rodado
+        })
+
+    resultado.sort(key=lambda x: x["custo_por_km"], reverse=True)
+    return resultado

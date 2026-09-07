@@ -93,7 +93,7 @@ function renderizarTabela(entregas, conjuntos) {
   const tbody = document.getElementById('tabela-entregas');
 
   if (entregas.length === 0) {
-    tbody.innerHTML = estadoVazio(4, 'Nenhuma entrega cadastrada', 'Cadastre a primeira entrega para ver o painel ganhar vida.', 'vazio');
+    tbody.innerHTML = estadoVazio(3, 'Nenhuma entrega cadastrada', 'Cadastre a primeira entrega para ver o painel ganhar vida.', 'vazio');
     return;
   }
 
@@ -102,7 +102,6 @@ function renderizarTabela(entregas, conjuntos) {
     const conjunto = conjuntoDaEntrega(e, conjuntos);
     return `
       <tr>
-        <td>#E-${e.id}</td>
         <td>${escapeHtml(e.origem)} → ${escapeHtml(e.destino)}</td>
         <td>${conjunto ? escapeHtml(conjunto.nome) : '—'}</td>
         <td>${badgeStatus(e.status)}</td>
@@ -113,23 +112,48 @@ function renderizarTabela(entregas, conjuntos) {
 
 const TIPO_LABEL_VENCIMENTO = { cnh: 'CNH', crlv: 'CRLV', seguro: 'Seguro' };
 
+/* Classifica cada alerta por urgência (dias até o vencimento) e devolve o selo
+   correspondente — vermelho já vencido, laranja vence em até 7 dias, azul o resto
+   dentro dos 30 dias que a API já filtrou. Reaproveita os badges de status que já
+   existem no sistema, então não precisou de cor nova. */
+function situacaoVencimento(item) {
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  const validade = new Date(item.validade + 'T00:00:00');
+  const dias = Math.round((validade - hoje) / 86400000);
+
+  if (item.vencido) return { badge: 'badge-ocorrencia', texto: `Vencido há ${Math.abs(dias)} dia${Math.abs(dias) === 1 ? '' : 's'}` };
+  if (dias <= 7) return { badge: 'badge-atrasado', texto: dias === 0 ? 'Vence hoje' : `Vence em ${dias} dia${dias === 1 ? '' : 's'}` };
+  return { badge: 'badge-em_rota', texto: `Vence em ${dias} dias` };
+}
+
 function renderizarVencimentos(lista) {
   const tbody = document.getElementById('tabela-vencimentos');
   if (!tbody) return;
+
+  const resumoEl = document.getElementById('alertas-resumo');
+  if (resumoEl) {
+    const vencidos = lista.filter(i => i.vencido).length;
+    resumoEl.textContent = vencidos
+      ? `${vencidos} vencido${vencidos === 1 ? '' : 's'} · ${lista.length - vencidos} vencendo nos próximos 30 dias`
+      : lista.length ? `${lista.length} vencendo nos próximos 30 dias` : 'Tudo em dia';
+  }
 
   if (lista.length === 0) {
     tbody.innerHTML = estadoVazio(4, 'Nenhum vencimento próximo', 'CNHs, CRLVs e seguros estão em dia nos próximos 30 dias.', 'check');
     return;
   }
 
-  tbody.innerHTML = lista.map(item => `
-    <tr>
-      <td>${TIPO_LABEL_VENCIMENTO[item.tipo] || item.tipo}</td>
-      <td>${escapeHtml(item.referencia)}</td>
-      <td>${formatarData(item.validade)}</td>
-      <td>${item.vencido ? '<span class="badge badge-ocorrencia">Vencido</span>' : '<span class="badge badge-atrasado">Vence em breve</span>'}</td>
-    </tr>
-  `).join('');
+  tbody.innerHTML = lista.map(item => {
+    const s = situacaoVencimento(item);
+    return `
+      <tr>
+        <td>${TIPO_LABEL_VENCIMENTO[item.tipo] || item.tipo}</td>
+        <td>${escapeHtml(item.referencia)}</td>
+        <td>${formatarData(item.validade)}</td>
+        <td><span class="badge ${s.badge}">${s.texto}</span></td>
+      </tr>
+    `;
+  }).join('');
 }
 
 const NOMES_MES_EXTENSO = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
@@ -138,13 +162,35 @@ function formatarMoeda(valor) {
   return 'R$ ' + (valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+/* Selo "▲12% vs mesmo período" nos cards de faturamento. O backend já compara os
+   mesmos N dias em ambos os meses (não o mês anterior inteiro) — senão, no dia 7
+   do mês essa conta seria "7 dias vs 31 dias" e a variação não diria nada real.
+   `aumentoEBom` diz se subir é notícia boa (receita/líquido) ou ruim (custos) —
+   decide a cor, não só a seta. Sem dado do mês anterior pra comparar, não mostra
+   nada em vez de inventar um "0%". */
+function badgeVariacao(atual, anterior, aumentoEBom) {
+  if (!anterior) return atual ? '<span class="variacao-neutra">Sem histórico do mesmo período</span>' : '';
+  const pct = ((atual - anterior) / Math.abs(anterior)) * 100;
+  const subiu = pct >= 0;
+  const bom = subiu === aumentoEBom;
+  const seta = subiu ? '▲' : '▼';
+  const classe = bom ? 'variacao-positiva' : 'variacao-negativa';
+  return `<span class="${classe}">${seta} ${Math.abs(pct).toFixed(0)}% vs mesmo período do mês passado</span>`;
+}
+
 function renderizarFaturamento(fat) {
   const [ano, mes] = fat.periodo.split('-').map(Number);
   document.getElementById('faturamento-periodo').textContent = `${NOMES_MES_EXTENSO[mes - 1]} de ${ano}`;
 
+  const custoTotal = fat.custo_manutencao + fat.custo_abastecimento;
   document.getElementById('fat-receita').textContent = formatarMoeda(fat.receita_bruta);
-  document.getElementById('fat-custos').textContent = formatarMoeda(fat.custo_manutencao + fat.custo_abastecimento);
+  document.getElementById('fat-custos').textContent = formatarMoeda(custoTotal);
   document.getElementById('fat-liquido').textContent = formatarMoeda(fat.faturamento_liquido);
+
+  const anterior = fat.mes_anterior || {};
+  document.getElementById('fat-receita-var').innerHTML = badgeVariacao(fat.receita_bruta, anterior.receita_bruta, true);
+  document.getElementById('fat-custos-var').innerHTML = badgeVariacao(custoTotal, anterior.custo_total, false);
+  document.getElementById('fat-liquido-var').innerHTML = badgeVariacao(fat.faturamento_liquido, anterior.faturamento_liquido, true);
 
   const tbodyConjunto = document.getElementById('tabela-faturamento-conjunto');
   if (fat.por_conjunto.length === 0) {
@@ -176,12 +222,78 @@ function renderizarFaturamento(fat) {
   }
 }
 
+/* Linha "#1, #2, #3..." com destaque pro topo do ranking — reforça a leitura de
+   "top 5" sem precisar de mais uma coluna na tabela. */
+function medalha(posicao) {
+  return posicao < 3 ? `<strong>${posicao + 1}º</strong>` : `${posicao + 1}º`;
+}
+
+function renderizarTopMotoristas(lista) {
+  const tbody = document.getElementById('tabela-top-motoristas');
+  if (!tbody) return;
+  const top5 = [...lista].sort((a, b) => b.faturamento - a.faturamento).slice(0, 5);
+  if (top5.length === 0) {
+    tbody.innerHTML = estadoVazio(3, 'Sem entregas no histórico', null, 'vazio');
+    return;
+  }
+  tbody.innerHTML = top5.map((m, i) => `
+    <tr>
+      <td>${medalha(i)} ${escapeHtml(m.motorista)}</td>
+      <td>${m.concluidas}</td>
+      <td><strong>${formatarMoeda(m.faturamento)}</strong></td>
+    </tr>
+  `).join('');
+}
+
+/* Não existe endpoint pronto de desempenho por veículo — calcula em cima das
+   entregas já carregadas, do mesmo jeito que relatorios.js faz pro PDF. */
+function calcularTopVeiculos(entregas, veiculos) {
+  return veiculos.map(v => {
+    const viagens = entregas.filter(e => e.veiculo_id === v.id && e.status === 'entregue');
+    const faturamento = viagens.reduce((s, e) => s + (parseFloat(e.valor_frete) || 0), 0);
+    return { placa: v.placa, modelo: v.modelo, concluidas: viagens.length, faturamento };
+  }).filter(v => v.concluidas > 0).sort((a, b) => b.faturamento - a.faturamento).slice(0, 5);
+}
+
+function renderizarTopVeiculos(top5) {
+  const tbody = document.getElementById('tabela-top-veiculos');
+  if (!tbody) return;
+  if (top5.length === 0) {
+    tbody.innerHTML = estadoVazio(3, 'Sem entregas no histórico', null, 'vazio');
+    return;
+  }
+  tbody.innerHTML = top5.map((v, i) => `
+    <tr>
+      <td>${medalha(i)} ${escapeHtml(v.placa)}</td>
+      <td>${v.concluidas}</td>
+      <td><strong>${formatarMoeda(v.faturamento)}</strong></td>
+    </tr>
+  `).join('');
+}
+
+function renderizarCustoPorKm(lista) {
+  const tbody = document.getElementById('tabela-custo-km');
+  if (!tbody) return;
+  if (lista.length === 0) {
+    tbody.innerHTML = estadoVazio(4, 'Sem dados suficientes', 'Precisa de ao menos 2 leituras de quilometragem no mês (em abastecimentos ou manutenções) pra estimar.', 'vazio');
+    return;
+  }
+  tbody.innerHTML = lista.slice(0, 5).map(v => `
+    <tr>
+      <td>${escapeHtml(v.placa)}</td>
+      <td>${v.km_rodado.toLocaleString('pt-BR')} km</td>
+      <td>${formatarMoeda(v.custo_total)}</td>
+      <td><strong>${formatarMoeda(v.custo_por_km)}</strong></td>
+    </tr>
+  `).join('');
+}
+
 async function carregarPainel() {
   /* Motorista só enxerga as próprias entregas — o resto (cadastros de colegas,
      faturamento, vencimentos) é bloqueado pela API pra esse perfil, então nem pedimos. */
   const ehMotorista = localStorage.getItem('perfil') === 'motorista';
 
-  const [entregas, motoristas, veiculos, ocorrencias, conjuntos, faturamento, vencimentos] = await Promise.all([
+  const [entregas, motoristas, veiculos, ocorrencias, conjuntos, faturamento, vencimentos, desempenhoMotoristas, custoPorKm] = await Promise.all([
     get('/entregas'),
     ehMotorista ? Promise.resolve(null) : get('/motoristas'),
     ehMotorista ? Promise.resolve(null) : get('/veiculos'),
@@ -189,6 +301,8 @@ async function carregarPainel() {
     ehMotorista ? Promise.resolve(null) : get('/conjuntos'),
     ehMotorista ? Promise.resolve(null) : get('/dashboard/faturamento'),
     ehMotorista ? Promise.resolve(null) : get('/dashboard/vencimentos'),
+    ehMotorista ? Promise.resolve(null) : get('/dashboard/desempenho-motoristas'),
+    ehMotorista ? Promise.resolve(null) : get('/dashboard/custo-por-km'),
   ]);
 
   const listaEntregas = entregas || [];
@@ -214,6 +328,9 @@ async function carregarPainel() {
     document.getElementById('card-ocorrencias').textContent = listaOcorrencias.length;
     renderizarVencimentos(vencimentos || []);
     if (faturamento && !faturamento.detail) renderizarFaturamento(faturamento);
+    renderizarTopMotoristas(desempenhoMotoristas || []);
+    renderizarTopVeiculos(calcularTopVeiculos(listaEntregas, listaVeiculos));
+    renderizarCustoPorKm(custoPorKm || []);
   }
 
   renderizarGraficoMensal(listaEntregas);
