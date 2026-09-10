@@ -172,3 +172,28 @@ A suite cobre:
 - **Entregas** — bloqueio de motorista/veículo já em rota ou em manutenção ao criar uma nova entrega.
 
 Os testes rodam contra um SQLite isolado em memória via override de `get_db`; nunca tocam no Postgres real.
+
+## Deploy
+
+O frontend é servido pelo próprio FastAPI (`StaticFiles` montado em `/` em [app/main.py](app/main.py), depois de todas as rotas da API) — um único serviço, uma única URL, sem CORS entre origens pra configurar. Em produção, [frontend/js/api.js](frontend/js/api.js) detecta isso automaticamente (`location.origin`); rodando localmente como arquivo (`file://`), continua caindo em `http://127.0.0.1:8000` como antes.
+
+Hospedagem recomendada: [Render](https://render.com), com o Blueprint em [render.yaml](render.yaml) (web service a partir do `Dockerfile` + Postgres gerenciado). Passo a passo:
+
+1. Criar conta no Render e conectar a conta do GitHub com acesso a este repositório.
+2. **New → Blueprint**, apontar para o repo — o Render lê o `render.yaml` e propõe o web service + o banco Postgres juntos.
+3. Confirmar o deploy. `SECRET_KEY` é gerado automaticamente; `DATABASE_URL` é preenchido a partir do banco criado junto.
+4. Levar os dados que já existem no banco local pro banco novo do Render (schema + tudo que já foi cadastrado — motoristas, veículos, entregas, conjuntos, seu próprio login):
+   ```bash
+   # 1) dump do banco local (usa o DATABASE_URL do seu .env)
+   pg_dump "$DATABASE_URL" --no-owner --no-privileges -F c -f logtrack_backup.dump
+
+   # 2) restore no banco do Render (pegue a "External Database URL" no painel do banco)
+   pg_restore --no-owner --no-privileges -d "<connection string externa do Render>" logtrack_backup.dump
+   ```
+   O arquivo `logtrack_backup.dump` contém dados reais (CPF, CNH, etc.) — nunca commitar, apagar depois de usar.
+
+`scripts/seed_demo.py` fica disponível como alternativa, caso um dia você queira um ambiente separado só pra demonstração/testes, sem usar os dados reais.
+
+Confira os limites atuais do plano gratuito ao criar a conta (mudam com frequência) — para uso real e contínuo pela transportadora, o caminho natural é o plano pago tanto do web service quanto do banco.
+
+**Limitação conhecida:** a pasta `uploads/` (fotos de veículos, conjuntos e ocorrências) é gravada no disco do container, que é efêmero em hospedagem sem disco persistente — os arquivos somem a cada redeploy. Resolver isso (disco persistente pago, ou storage externo tipo S3) fica como próximo passo, fora do escopo deste deploy inicial.

@@ -1,0 +1,22 @@
+databases:
+  - name: logtrack-db
+    plan: free
+    postgresMajorVersion: "16"
+
+services:
+  - type: web
+    name: logtrack
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: logtrack-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_HOURS
+        value: "8"

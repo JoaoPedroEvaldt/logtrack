@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from app.routers import auth, usuarios, motoristas, veiculos, entregas, ocorrencias, dashboard, uploads
 from app.routers import conjunto as conjuntos_router
 from app.routers import manutencao as manutencoes
@@ -33,10 +34,8 @@ app.include_router(manutencoes.router)
 app.include_router(abastecimentos.router)
 app.include_router(log_acesso.router)
 
-@app.get("/")
-def root():
-    return {"message": "LogTrack API funcionando!", "version": "1.0.0"}
-
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")

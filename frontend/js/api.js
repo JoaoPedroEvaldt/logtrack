@@ -1,4 +1,4 @@
-const API = 'http://127.0.0.1:8000';
+const API = location.protocol === 'file:' ? 'http://127.0.0.1:8000' : location.origin;
 
 function getToken() {
   return localStorage.getItem('token');
