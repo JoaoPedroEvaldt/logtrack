@@ -87,7 +87,7 @@ def criar_motoristas(client: httpx.Client) -> list:
             "cnh_validade": str(date.today() + timedelta(days=365)),
             "telefone": f"(51) 9{9000 + i:04d}-{1000 + i:04d}",
         }
-        resp = client.post("/motoristas/", json=payload)
+        resp = client.post("/motoristas", json=payload)
         resp.raise_for_status()
         motoristas.append(resp.json())
     print(f"{len(motoristas)} motoristas criados.")
@@ -111,7 +111,7 @@ def criar_veiculos(client: httpx.Client) -> list:
             "tipo": tipo,
             "capacidade_kg": capacidade,
         }
-        resp = client.post("/veiculos/", json=payload)
+        resp = client.post("/veiculos", json=payload)
         resp.raise_for_status()
         veiculos.append(resp.json())
     print(f"{len(veiculos)} veiculos criados.")
@@ -127,7 +127,7 @@ def criar_conjuntos(client: httpx.Client, motoristas: list, cavalos: list, semis
             "cavalo_id": cavalos[i]["id"],
             "semirreboque1_id": semis[i]["id"],
         }
-        resp = client.post("/conjuntos/", json=payload)
+        resp = client.post("/conjuntos", json=payload)
         resp.raise_for_status()
         conjuntos.append(resp.json())
     print(f"{len(conjuntos)} conjuntos criados.")
@@ -163,7 +163,7 @@ def criar_entregas(client: httpx.Client, motoristas: list, cavalos: list) -> Non
             "veiculo_id": veiculo_id,
             "previsao": str(datetime.now() + timedelta(days=2)),
         }
-        resp = client.post("/entregas/", json=payload)
+        resp = client.post("/entregas", json=payload)
         resp.raise_for_status()
         entregas.append((resp.json()["id"], status_alvo))
 
@@ -175,7 +175,7 @@ def criar_entregas(client: httpx.Client, motoristas: list, cavalos: list) -> Non
             client.put(f"/entregas/{entrega_id}/status", params={"status": "em_rota"}).raise_for_status()
             client.put(f"/entregas/{entrega_id}/status", params={"status": "entregue"}).raise_for_status()
         elif status_alvo == "ocorrencia":
-            client.post("/ocorrencias/", json={
+            client.post("/ocorrencias", json={
                 "entrega_id": entrega_id,
                 "tipo": "problema_mecanico",
                 "descricao": "Pane eletrica na estrada (dado de demonstracao)",
@@ -187,7 +187,7 @@ def criar_entregas(client: httpx.Client, motoristas: list, cavalos: list) -> Non
 
 def criar_abastecimentos(client: httpx.Client, cavalos: list) -> None:
     for v in cavalos:
-        client.post("/abastecimentos/", json={
+        client.post("/abastecimentos", json={
             "veiculo_id": v["id"],
             "data_abastecimento": str(date.today()),
             "litros": 250,

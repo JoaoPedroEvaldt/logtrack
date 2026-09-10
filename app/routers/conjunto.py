@@ -91,7 +91,8 @@ def _buscar_conjunto_completo(id: int, db: Session) -> Conjunto:
         raise HTTPException(status_code=404, detail="Conjunto não encontrado")
     return _enriquecer_conjuntos([conjunto], db)[0]
 
-@router.post("/", response_model=ConjuntoResponse)
+@router.post("/", response_model=ConjuntoResponse, include_in_schema=False)
+@router.post("", response_model=ConjuntoResponse)
 def criar_conjunto(dados: ConjuntoCreate, db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     _validar_tipos_veiculo(dados.cavalo_id, dados.semirreboque1_id, dados.semirreboque2_id, db)
     _validar_veiculos_disponiveis(dados.cavalo_id, dados.semirreboque1_id, dados.semirreboque2_id, db)
@@ -101,7 +102,8 @@ def criar_conjunto(dados: ConjuntoCreate, db: Session = Depends(get_db), atual: 
     db.refresh(conjunto)
     return _buscar_conjunto_completo(conjunto.id, db)
 
-@router.get("/", response_model=List[ConjuntoResponse])
+@router.get("/", response_model=List[ConjuntoResponse], include_in_schema=False)
+@router.get("", response_model=List[ConjuntoResponse])
 def listar_conjuntos(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     conjuntos = _query_conjuntos_completos(db).filter(Conjunto.status == "ativo").all()
     return _enriquecer_conjuntos(conjuntos, db)

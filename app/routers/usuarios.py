@@ -9,7 +9,8 @@ from typing import List
 
 router = APIRouter(prefix="/usuarios", tags=["Usuários"])
 
-@router.post("/", response_model=UsuarioResponse)
+@router.post("/", response_model=UsuarioResponse, include_in_schema=False)
+@router.post("", response_model=UsuarioResponse)
 def criar_usuario(dados: UsuarioCreate, db: Session = Depends(get_db), atual: Usuario = Depends(exigir_admin)):
     if db.query(Usuario).filter(Usuario.email == dados.email).first():
         raise HTTPException(status_code=400, detail="E-mail já cadastrado")
@@ -24,7 +25,8 @@ def criar_usuario(dados: UsuarioCreate, db: Session = Depends(get_db), atual: Us
     db.refresh(usuario)
     return usuario
 
-@router.get("/", response_model=List[UsuarioResponse])
+@router.get("/", response_model=List[UsuarioResponse], include_in_schema=False)
+@router.get("", response_model=List[UsuarioResponse])
 def listar_usuarios(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_admin)):
     return db.query(Usuario).all()
 

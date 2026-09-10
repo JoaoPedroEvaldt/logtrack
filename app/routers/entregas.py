@@ -45,7 +45,8 @@ def _validar_veiculo_sem_manutencao(veiculo_id, db: Session):
             detail=f'Veículo está em manutenção (#{manutencao.id} — {manutencao.tipo}). Finalize a manutenção antes de usá-lo em uma entrega.'
         )
 
-@router.post("/", response_model=EntregaResponse)
+@router.post("/", response_model=EntregaResponse, include_in_schema=False)
+@router.post("", response_model=EntregaResponse)
 def criar_entrega(dados: EntregaCreate, db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     _validar_motorista_veiculo_livres(dados.motorista_id, dados.veiculo_id, db)
     _validar_veiculo_sem_manutencao(dados.veiculo_id, db)
@@ -55,7 +56,8 @@ def criar_entrega(dados: EntregaCreate, db: Session = Depends(get_db), atual: Us
     db.refresh(entrega)
     return entrega
 
-@router.get("/", response_model=List[EntregaResponse])
+@router.get("/", response_model=List[EntregaResponse], include_in_schema=False)
+@router.get("", response_model=List[EntregaResponse])
 def listar_entregas(db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
     if atual.perfil == "motorista":
         from app.models.motorista import Motorista

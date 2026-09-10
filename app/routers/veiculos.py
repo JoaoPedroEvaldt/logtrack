@@ -10,7 +10,8 @@ from typing import List
 
 router = APIRouter(prefix="/veiculos", tags=["Veículos"])
 
-@router.post("/", response_model=VeiculoResponse)
+@router.post("/", response_model=VeiculoResponse, include_in_schema=False)
+@router.post("", response_model=VeiculoResponse)
 def criar_veiculo(dados: VeiculoCreate, db: Session = Depends(get_db), atual: Usuario = Depends(exigir_admin)):
     if db.query(Veiculo).filter(Veiculo.placa == dados.placa).first():
         raise HTTPException(status_code=400, detail="Placa já cadastrada")
@@ -20,7 +21,8 @@ def criar_veiculo(dados: VeiculoCreate, db: Session = Depends(get_db), atual: Us
     db.refresh(veiculo)
     return veiculo
 
-@router.get("/", response_model=List[VeiculoResponse])
+@router.get("/", response_model=List[VeiculoResponse], include_in_schema=False)
+@router.get("", response_model=List[VeiculoResponse])
 def listar_veiculos(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     return db.query(Veiculo).filter(Veiculo.status != "inativo").all()
 

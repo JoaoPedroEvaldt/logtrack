@@ -10,7 +10,8 @@ from typing import List
 
 router = APIRouter(prefix="/manutencoes", tags=["Manutenções"])
 
-@router.post("/", response_model=ManutencaoResponse)
+@router.post("/", response_model=ManutencaoResponse, include_in_schema=False)
+@router.post("", response_model=ManutencaoResponse)
 def criar_manutencao(dados: ManutencaoCreate, db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     veiculo = db.query(Veiculo).filter(Veiculo.id == dados.veiculo_id).first()
     if not veiculo:
@@ -21,7 +22,8 @@ def criar_manutencao(dados: ManutencaoCreate, db: Session = Depends(get_db), atu
     db.refresh(manutencao)
     return db.query(Manutencao).options(joinedload(Manutencao.veiculo)).filter(Manutencao.id == manutencao.id).first()
 
-@router.get("/", response_model=List[ManutencaoResponse])
+@router.get("/", response_model=List[ManutencaoResponse], include_in_schema=False)
+@router.get("", response_model=List[ManutencaoResponse])
 def listar_manutencoes(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     return db.query(Manutencao).options(joinedload(Manutencao.veiculo)).order_by(Manutencao.data_manutencao.desc()).all()
 

@@ -10,7 +10,8 @@ from app.routers.auth import exigir_admin
 
 router = APIRouter(prefix="/log-acesso", tags=["Log de Acesso"])
 
-@router.get("/", response_model=List[LogAcessoResponse])
+@router.get("/", response_model=List[LogAcessoResponse], include_in_schema=False)
+@router.get("", response_model=List[LogAcessoResponse])
 def listar_log_acesso(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_admin)):
     return db.query(LogAcesso)\
         .options(joinedload(LogAcesso.usuario))\

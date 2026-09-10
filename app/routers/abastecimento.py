@@ -14,7 +14,8 @@ router = APIRouter(prefix="/abastecimentos", tags=["Abastecimentos"])
 def _com_relacoes(query):
     return query.options(joinedload(Abastecimento.veiculo), joinedload(Abastecimento.motorista))
 
-@router.post("/", response_model=AbastecimentoResponse)
+@router.post("/", response_model=AbastecimentoResponse, include_in_schema=False)
+@router.post("", response_model=AbastecimentoResponse)
 def criar_abastecimento(dados: AbastecimentoCreate, db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     if not db.query(Veiculo).filter(Veiculo.id == dados.veiculo_id).first():
         raise HTTPException(status_code=404, detail="Veículo não encontrado")
@@ -27,7 +28,8 @@ def criar_abastecimento(dados: AbastecimentoCreate, db: Session = Depends(get_db
     db.refresh(abastecimento)
     return _com_relacoes(db.query(Abastecimento)).filter(Abastecimento.id == abastecimento.id).first()
 
-@router.get("/", response_model=List[AbastecimentoResponse])
+@router.get("/", response_model=List[AbastecimentoResponse], include_in_schema=False)
+@router.get("", response_model=List[AbastecimentoResponse])
 def listar_abastecimentos(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     return _com_relacoes(db.query(Abastecimento)).order_by(Abastecimento.data_abastecimento.desc()).all()
 

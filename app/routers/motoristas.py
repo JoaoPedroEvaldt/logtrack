@@ -10,7 +10,8 @@ from typing import List
 
 router = APIRouter(prefix="/motoristas", tags=["Motoristas"])
 
-@router.post("/", response_model=MotoristaResponse)
+@router.post("/", response_model=MotoristaResponse, include_in_schema=False)
+@router.post("", response_model=MotoristaResponse)
 def criar_motorista(dados: MotoristaCreate, db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     if bool(dados.email) != bool(dados.senha):
         raise HTTPException(status_code=400, detail="Para criar acesso ao sistema, informe e-mail e senha juntos")
@@ -68,7 +69,8 @@ def criar_motorista(dados: MotoristaCreate, db: Session = Depends(get_db), atual
     db.refresh(motorista)
     return _serializar_motorista(motorista, db)
 
-@router.get("/", response_model=List[MotoristaResponse])
+@router.get("/", response_model=List[MotoristaResponse], include_in_schema=False)
+@router.get("", response_model=List[MotoristaResponse])
 def listar_motoristas(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     motoristas = db.query(Motorista).filter(Motorista.status != "inativo").all()
     return [_serializar_motorista(m, db) for m in motoristas]

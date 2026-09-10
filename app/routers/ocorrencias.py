@@ -11,7 +11,8 @@ from typing import List
 
 router = APIRouter(prefix="/ocorrencias", tags=["Ocorrências"])
 
-@router.post("/", response_model=OcorrenciaResponse)
+@router.post("/", response_model=OcorrenciaResponse, include_in_schema=False)
+@router.post("", response_model=OcorrenciaResponse)
 def criar_ocorrencia(dados: OcorrenciaCreate, db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
     entrega = db.query(Entrega).filter(Entrega.id == dados.entrega_id).first()
     if not entrega:
@@ -37,7 +38,8 @@ def listar_ocorrencias_entrega(entrega_id: int, db: Session = Depends(get_db), a
     _garantir_acesso_entrega(entrega, atual, db)
     return db.query(Ocorrencia).filter(Ocorrencia.entrega_id == entrega_id).all()
 
-@router.get("/", response_model=List[OcorrenciaResponse])
+@router.get("/", response_model=List[OcorrenciaResponse], include_in_schema=False)
+@router.get("", response_model=List[OcorrenciaResponse])
 def listar_ocorrencias(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     return db.query(Ocorrencia).all()
 
