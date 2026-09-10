@@ -1,4 +1,8 @@
-const API = location.protocol === 'file:' ? 'http://127.0.0.1:8000' : location.origin;
+// Em produção (servido pelo próprio FastAPI), API e frontend têm a mesma origem.
+// Em desenvolvimento local (arquivo aberto direto, ou Live Server numa porta
+// qualquer tipo 5500), o backend sempre roda separado na 8000.
+const _ehLocal = location.hostname === '' || location.hostname === '127.0.0.1' || location.hostname === 'localhost';
+const API = (_ehLocal && location.port !== '8000') ? 'http://127.0.0.1:8000' : location.origin;
 
 function getToken() {
   return localStorage.getItem('token');
