@@ -15,21 +15,6 @@ from app.routers.auth import exigir_staff
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
-@router.get("/publico/resumo")
-def resumo_publico(db: Session = Depends(get_db)):
-    """Contagens agregadas sem autenticação, usadas só como vitrine na tela de login."""
-    entregas_ativas = db.query(Entrega).filter(
-        Entrega.status.in_(["aguardando", "em_rota", "atrasado", "ocorrencia"])
-    ).count()
-    motoristas = db.query(Motorista).filter(Motorista.status != "inativo").count()
-    veiculos = db.query(Veiculo).filter(Veiculo.status != "inativo").count()
-
-    return {
-        "entregas_ativas": entregas_ativas,
-        "motoristas": motoristas,
-        "veiculos": veiculos
-    }
-
 @router.get("/resumo")
 def resumo(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     hoje = date.today()
