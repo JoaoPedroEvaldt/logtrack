@@ -89,21 +89,31 @@ function renderizarGraficoStatus(entregas) {
   });
 }
 
+function placasDoConjunto(conjunto) {
+  if (!conjunto) return '';
+  return [conjunto.cavalo, conjunto.semirreboque1, conjunto.semirreboque2]
+    .filter(Boolean)
+    .map(v => v.placa)
+    .join(' / ');
+}
+
 function renderizarTabela(entregas, conjuntos) {
   const tbody = document.getElementById('tabela-entregas');
 
   if (entregas.length === 0) {
-    tbody.innerHTML = estadoVazio(3, 'Nenhuma entrega cadastrada', 'Cadastre a primeira entrega para ver o painel ganhar vida.', 'vazio');
+    tbody.innerHTML = estadoVazio(4, 'Nenhuma entrega cadastrada', 'Cadastre a primeira entrega para ver o painel ganhar vida.', 'vazio');
     return;
   }
 
   const recentes = entregas.slice(-8).reverse();
   tbody.innerHTML = recentes.map(e => {
     const conjunto = conjuntoDaEntrega(e, conjuntos);
+    const placas = placasDoConjunto(conjunto);
     return `
       <tr>
         <td>${escapeHtml(e.origem)} → ${escapeHtml(e.destino)}</td>
         <td>${conjunto ? escapeHtml(conjunto.nome) : '—'}</td>
+        <td>${placas ? escapeHtml(placas) : '—'}</td>
         <td>${badgeStatus(e.status)}</td>
       </tr>
     `;

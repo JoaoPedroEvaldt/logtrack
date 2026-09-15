@@ -177,28 +177,6 @@ Os testes rodam contra um SQLite isolado em memória via override de `get_db`; n
 
 O frontend é servido pelo próprio FastAPI (`StaticFiles` montado em `/` em [app/main.py](app/main.py), depois de todas as rotas da API) — um único serviço, uma única URL, sem CORS entre origens pra configurar. Em produção, [frontend/js/api.js](frontend/js/api.js) detecta isso automaticamente (`location.origin`); rodando localmente como arquivo (`file://`), continua caindo em `http://127.0.0.1:8000` como antes.
 
-Hospedagem recomendada: [Render](https://render.com), com o Blueprint em [render.yaml](render.yaml) (web service a partir do `Dockerfile` + Postgres gerenciado). Passo a passo:
+Hospedagem: [Render](https://render.com), com o Blueprint em [render.yaml](render.yaml) (web service a partir do `Dockerfile` + Postgres gerenciado) — `New → Blueprint` apontando pro repo cria os dois juntos. `scripts/seed_demo.py` fica disponível como alternativa, caso um dia você queira um ambiente separado só pra demonstração/testes, sem usar os dados reais.
 
-1. Criar conta no Render e conectar a conta do GitHub com acesso a este repositório.
-2. **New → Blueprint**, apontar para o repo — o Render lê o `render.yaml` e propõe o web service + o banco Postgres juntos.
-3. Confirmar o deploy. `SECRET_KEY` é gerado automaticamente; `DATABASE_URL` é preenchido a partir do banco criado junto.
-4. Levar os dados que já existem no banco local pro banco novo do Render (schema + tudo que já foi cadastrado — motoristas, veículos, entregas, conjuntos, seu próprio login):
-   ```bash
-   # 1) dump do banco local (usa o DATABASE_URL do seu .env)
-   pg_dump "$DATABASE_URL" --no-owner --no-privileges -F c -f logtrack_backup.dump
-
-   # 2) restore no banco do Render (pegue a "External Database URL" no painel do banco)
-   pg_restore --no-owner --no-privileges -d "<connection string externa do Render>" logtrack_backup.dump
-   ```
-   O arquivo `logtrack_backup.dump` contém dados reais (CPF, CNH, etc.) — nunca commitar, apagar depois de usar.
-
-`scripts/seed_demo.py` fica disponível como alternativa, caso um dia você queira um ambiente separado só pra demonstração/testes, sem usar os dados reais.
-
-Confira os limites atuais do plano gratuito ao criar a conta (mudam com frequência) — para uso real e contínuo pela transportadora, o caminho natural é o plano pago tanto do web service quanto do banco.
-
-**Fotos (veículos/conjuntos):** por padrão ficam salvas em `uploads/` no disco do container — funciona bem local, mas some a cada redeploy num host sem disco persistente (caso do Render free tier). Pra resolver isso definitivamente, dá pra ligar o Cloudflare R2 (opcional — sem credenciais configuradas o app cai automaticamente pro disco local, ver `app/services/upload_foto.py`):
-
-1. Criar uma conta no [Cloudflare](https://dash.cloudflare.com) (tem tier gratuito: 10GB de storage/mês; exige cartão cadastrado, mas só cobra se passar do limite) e, no painel, ir em **Storage & databases → R2 Object Storage → Create bucket** (privado, sem acesso público).
-2. Em **Manage API Tokens → Create API Token**, gerar um token com permissão de leitura/escrita só nesse bucket. Guarda o Access Key ID e o Secret Access Key mostrados na hora — não aparecem de novo depois.
-3. Preencher `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` e `R2_BUCKET_NAME` no `.env` local (ver `.env.example`) e nas variáveis de ambiente do serviço no Render (o `render.yaml` já reserva essas chaves, preencher manualmente no painel do Render — não vão pro blueprint por serem segredo).
-4. Se já existem fotos em `uploads/` local, rodar `python scripts/migrar_fotos_para_r2.py` uma vez pra subir elas pro bucket.
+**Fotos (veículos/conjuntos):** por padrão ficam salvas em `uploads/` no disco do container — funciona bem local, mas some a cada redeploy num host sem disco persistente (caso do Render free tier). Opcionalmente dá pra ligar armazenamento externo compatível com S3 (ex. Cloudflare R2) via as variáveis `R2_*` em `.env.example`; sem elas configuradas, o app cai automaticamente pro disco local (ver `app/services/upload_foto.py`).
