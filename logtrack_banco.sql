@@ -88,6 +88,8 @@ CREATE TABLE IF NOT EXISTS ocorrencias (
     tipo VARCHAR(30) NOT NULL CHECK (tipo IN ('atraso', 'acidente', 'cliente_ausente', 'problema_mecanico', 'extravio', 'outro')),
     descricao TEXT NOT NULL,
     foto_path VARCHAR(255),
+    status VARCHAR(20) NOT NULL DEFAULT 'aberta' CHECK (status IN ('aberta', 'finalizada')),
+    finalizado_em TIMESTAMP,
     criado_em TIMESTAMP NOT NULL DEFAULT NOW()
 );
 

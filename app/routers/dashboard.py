@@ -47,9 +47,7 @@ def resumo(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)
 
     atrasadas = db.query(Entrega).filter(Entrega.status == "atrasado").count()
 
-    ocorrencias_abertas = db.query(Ocorrencia).filter(
-        func.date(Ocorrencia.criado_em) == hoje
-    ).count()
+    ocorrencias_abertas = db.query(Ocorrencia).filter(Ocorrencia.status == "aberta").count()
 
     motoristas_em_rota = [m for (m,) in db.query(Entrega.motorista_id).filter(
         Entrega.status == "em_rota", Entrega.motorista_id.isnot(None)
@@ -177,8 +175,9 @@ def _totais_periodo(db: Session, inicio: date, fim: date):
 @router.get("/faturamento")
 def faturamento(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     """Faturamento líquido do mês atual: receita das entregas concluídas menos
-    custos de manutenção e abastecimento no período, com detalhamento por
-    conjunto (via veículos do conjunto) e por motorista (via entregas/abastecimentos).
+    custos de manutenção, abastecimento e comissão do motorista (13% da receita)
+    no período, detalhado por conjunto (veículo + motorista fixo). Movimento que
+    não pertence a nenhum conjunto cadastrado entra como linha "Sem conjunto".
     Inclui também os totais do mês anterior, só pra comparação (sem detalhamento) —
     usando o MESMO NÚMERO DE DIAS decorridos, não o mês anterior inteiro. Sem isso,
     no dia 7 do mês a comparação seria "7 dias vs 31 dias", inflando/distorcendo a
@@ -198,6 +197,14 @@ def faturamento(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_s
 
     conjuntos = db.query(Conjunto).filter(Conjunto.status != "inativo").all()
     motoristas = {m.id: m.nome for m in db.query(Motorista).filter(Motorista.status != "inativo").all()}
+    placas_veiculos = {v.id: v.placa for v in db.query(Veiculo).all()}
+
+    def placas_do_conjunto(c):
+        return " / ".join(filter(None, (
+            placas_veiculos.get(c.cavalo_id),
+            placas_veiculos.get(c.semirreboque1_id),
+            placas_veiculos.get(c.semirreboque2_id),
+        )))
 
     def veiculos_do_conjunto(c):
         return {c.cavalo_id, c.semirreboque1_id, c.semirreboque2_id} - {None}
@@ -214,6 +221,10 @@ def faturamento(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_s
 
     conjunto_por_entrega = {e.id: conjunto_da_entrega(e, mapa_veiculos) for e in entregas}
 
+    # Uma linha por conjunto (veículo + motorista fixo): receita das entregas
+    # daquele conjunto, custo de abastecimento/manutenção dos veículos dele, e
+    # comissão do motorista sobre essa receita. É o "quanto esse caminhão deu
+    # de lucro pra transportadora", já considerando quem dirige ele.
     por_conjunto = []
     for c in conjuntos:
         veic_ids = mapa_veiculos[c.id]
@@ -221,36 +232,57 @@ def faturamento(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_s
             float(e.valor_frete or 0) for e in entregas
             if conjunto_por_entrega[e.id] and conjunto_por_entrega[e.id].id == c.id
         )
-        custo = sum(float(m.custo or 0) for m in manutencoes if m.veiculo_id in veic_ids) + \
-                sum(float(a.valor_total or 0) for a in abastecimentos if a.veiculo_id in veic_ids)
-        if receita or custo:
+        abastecimento = sum(float(a.valor_total or 0) for a in abastecimentos if a.veiculo_id in veic_ids)
+        manutencao = sum(float(m.custo or 0) for m in manutencoes if m.veiculo_id in veic_ids)
+        comissao = receita * 0.13
+        if receita or abastecimento or manutencao:
             por_conjunto.append({
                 "conjunto_id": c.id,
                 "conjunto": c.nome,
+                "placas": placas_do_conjunto(c),
+                "motorista_id": c.motorista_id,
+                "motorista": motoristas.get(c.motorista_id),
                 "receita": receita,
-                "custo": custo,
-                "liquido": receita - custo
+                "abastecimento": abastecimento,
+                "manutencao": manutencao,
+                "comissao": comissao,
+                "liquido": receita - abastecimento - manutencao - comissao
             })
-    por_conjunto.sort(key=lambda x: x["liquido"], reverse=True)
 
-    por_motorista = []
+    # Movimento que não pertence a nenhum conjunto: entrega feita por motorista/veículo
+    # fora de qualquer conjunto cadastrado, ou abastecimento de um veículo avulso.
+    # Sem isso esse faturamento e custo simplesmente desapareceriam do relatório.
+    todos_veic_ids = set().union(*mapa_veiculos.values()) if mapa_veiculos else set()
     motoristas_com_movimento = {e.motorista_id for e in entregas if e.motorista_id} | \
                                 {a.motorista_id for a in abastecimentos if a.motorista_id}
     for mid in motoristas_com_movimento:
         nome = motoristas.get(mid)
         if not nome:
             continue
-        receita = sum(float(e.valor_frete or 0) for e in entregas if e.motorista_id == mid)
-        custo = sum(float(a.valor_total or 0) for a in abastecimentos if a.motorista_id == mid)
-        por_motorista.append({
-            "motorista_id": mid,
-            "motorista": nome,
-            "receita": receita,
-            "custo": custo,
-            "comissao": receita * 0.13,
-            "liquido": receita - custo
-        })
-    por_motorista.sort(key=lambda x: x["liquido"], reverse=True)
+        receita = sum(
+            float(e.valor_frete or 0) for e in entregas
+            if e.motorista_id == mid and conjunto_por_entrega[e.id] is None
+        )
+        abastecimento = sum(
+            float(a.valor_total or 0) for a in abastecimentos
+            if a.motorista_id == mid and a.veiculo_id not in todos_veic_ids
+        )
+        if receita or abastecimento:
+            comissao = receita * 0.13
+            por_conjunto.append({
+                "conjunto_id": None,
+                "conjunto": "Sem conjunto",
+                "placas": "",
+                "motorista_id": mid,
+                "motorista": nome,
+                "receita": receita,
+                "abastecimento": abastecimento,
+                "manutencao": 0,
+                "comissao": comissao,
+                "liquido": receita - abastecimento - comissao
+            })
+
+    por_conjunto.sort(key=lambda x: x["liquido"], reverse=True)
 
     return {
         "periodo": f"{hoje.year}-{hoje.month:02d}",
@@ -259,7 +291,6 @@ def faturamento(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_s
         "custo_abastecimento": custo_abastecimento,
         "faturamento_liquido": receita_bruta - custo_manutencao - custo_abastecimento,
         "por_conjunto": por_conjunto,
-        "por_motorista": por_motorista,
         "mes_anterior": {
             "receita_bruta": receita_bruta_ant,
             "custo_total": custo_manutencao_ant + custo_abastecimento_ant,

@@ -6,7 +6,8 @@ from tests.conftest import JPEG_MINIMO, PNG_MINIMO, auth_headers
 
 @pytest.fixture(autouse=True)
 def _pasta_fotos_isolada(tmp_path, monkeypatch):
-    """Evita que os testes gravem arquivos de verdade dentro de uploads/ do projeto."""
+    """Evita que os testes gravem arquivos de verdade dentro de uploads/ do projeto.
+    Sem credenciais R2 configuradas (padrão nos testes), salvar_foto cai no disco local."""
     monkeypatch.setattr(upload_foto, "PASTA_UPLOADS", tmp_path)
 
 

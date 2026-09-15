@@ -18,6 +18,8 @@ class OcorrenciaResponse(BaseModel):
     tipo: str
     descricao: str
     foto_path: Optional[str]
+    status: str
+    finalizado_em: Optional[datetime]
     criado_em: datetime
 
     class Config:

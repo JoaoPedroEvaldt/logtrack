@@ -194,29 +194,18 @@ function renderizarFaturamento(fat) {
 
   const tbodyConjunto = document.getElementById('tabela-faturamento-conjunto');
   if (fat.por_conjunto.length === 0) {
-    tbodyConjunto.innerHTML = estadoVazio(4, 'Sem movimento no mês', null, 'vazio');
+    tbodyConjunto.innerHTML = estadoVazio(8, 'Sem movimento no mês', null, 'vazio');
   } else {
     tbodyConjunto.innerHTML = fat.por_conjunto.map(c => `
       <tr>
         <td>${escapeHtml(c.conjunto)}</td>
+        <td>${c.placas ? escapeHtml(c.placas) : '—'}</td>
+        <td>${c.motorista ? escapeHtml(c.motorista) : '—'}</td>
         <td>${formatarMoeda(c.receita)}</td>
-        <td>${formatarMoeda(c.custo)}</td>
+        <td>${formatarMoeda(c.abastecimento)}</td>
+        <td>${formatarMoeda(c.manutencao)}</td>
+        <td>${formatarMoeda(c.comissao)}</td>
         <td><strong>${formatarMoeda(c.liquido)}</strong></td>
-      </tr>
-    `).join('');
-  }
-
-  const tbodyMotorista = document.getElementById('tabela-faturamento-motorista');
-  if (fat.por_motorista.length === 0) {
-    tbodyMotorista.innerHTML = estadoVazio(5, 'Sem movimento no mês', null, 'vazio');
-  } else {
-    tbodyMotorista.innerHTML = fat.por_motorista.map(m => `
-      <tr>
-        <td>${escapeHtml(m.motorista)}</td>
-        <td>${formatarMoeda(m.receita)}</td>
-        <td>${formatarMoeda(m.custo)}</td>
-        <td>${formatarMoeda(m.comissao)}</td>
-        <td><strong>${formatarMoeda(m.liquido)}</strong></td>
       </tr>
     `).join('');
   }
@@ -307,7 +296,7 @@ async function carregarPainel() {
 
     document.getElementById('card-motoristas').textContent = `${motoristasDisp} / ${listaMotoristas.length}`;
     document.getElementById('card-veiculos').textContent = `${veiculosDisp} / ${listaVeiculos.length}`;
-    document.getElementById('card-ocorrencias').textContent = listaOcorrencias.length;
+    document.getElementById('card-ocorrencias').textContent = listaOcorrencias.filter(o => o.status === 'aberta').length;
     renderizarVencimentos(vencimentos || []);
     if (faturamento && !faturamento.detail) renderizarFaturamento(faturamento);
     renderizarTopMotoristas(desempenhoMotoristas || []);

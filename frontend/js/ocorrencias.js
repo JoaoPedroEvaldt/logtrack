@@ -44,8 +44,9 @@ async function carregarOcorrencias() {
 
   lista.innerHTML = data.slice().reverse().map(o => {
     const veiculo = veiculoDaEntrega(o.entrega_id);
+    const finalizada = o.status === 'finalizada';
     return `
-    <div class="ocorrencia-card">
+    <div class="ocorrencia-card${finalizada ? ' ocorrencia-finalizada' : ''}">
       <span class="ocorrencia-dot ocorrencia-dot-${DOT_POR_TIPO[o.tipo] || 'baixa'}"></span>
       <div class="ocorrencia-corpo">
         <div class="ocorrencia-topo">
@@ -54,10 +55,14 @@ async function carregarOcorrencias() {
         </div>
         <div class="ocorrencia-ref">Entrega #${o.entrega_id}${veiculo ? ' · Veículo ' + escapeHtml(veiculo.placa) : ''}</div>
         <div class="ocorrencia-desc">${escapeHtml(o.descricao)}</div>
-        <div class="ocorrencia-acoes">
-          <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="editarOcorrencia(${o.id})">${svgIcone('editar', 12)} Editar</button>
-          <button class="btn btn-danger" style="font-size:11px;padding:4px 10px;" onclick="excluirOcorrencia(${o.id})">${svgIcone('excluir', 12)} Excluir</button>
-        </div>
+        ${finalizada
+          ? `<div class="ocorrencia-badge-finalizada">${svgIcone('check', 12)} Finalizada em ${formatarDataHora(o.finalizado_em)}</div>`
+          : `<div class="ocorrencia-acoes">
+              <button class="btn btn-primary" style="font-size:11px;padding:4px 10px;" onclick="finalizarOcorrencia(${o.id})">${svgIcone('check', 12)} Finalizar</button>
+              <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="editarOcorrencia(${o.id})">${svgIcone('editar', 12)} Editar</button>
+              <button class="btn btn-danger" style="font-size:11px;padding:4px 10px;" onclick="excluirOcorrencia(${o.id})">${svgIcone('excluir', 12)} Excluir</button>
+            </div>`
+        }
       </div>
     </div>
   `;
@@ -139,6 +144,16 @@ function editarOcorrencia(id) {
 
 function fecharModal() {
   document.getElementById('modal').classList.remove('aberto');
+}
+
+async function finalizarOcorrencia(id) {
+  if (!(await confirmarAcao('Finalizar esta ocorrência? A entrega associada deixará de ficar marcada como "Ocorrência" caso não haja outra pendente.'))) return;
+  const res = await put(`/ocorrencias/${id}/finalizar`, {});
+  if (res && res.detail) {
+    toastErro('Erro: ' + res.detail);
+    return;
+  }
+  carregarOcorrencias();
 }
 
 async function excluirOcorrencia(id) {

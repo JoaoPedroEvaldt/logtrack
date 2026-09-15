@@ -31,6 +31,35 @@ CPF_VALIDO_2 = "52998224725"
 JPEG_MINIMO = b"\xff\xd8\xff\xe0\x00\x10JFIF"
 PNG_MINIMO = b"\x89PNG\r\n\x1a\n" + b"\x00" * 8
 
+
+class FakeCorpoR2:
+    def __init__(self, conteudo):
+        self._conteudo = conteudo
+
+    def read(self):
+        return self._conteudo
+
+
+class FakeClienteR2:
+    """Substitui o cliente boto3/R2 (app.services.upload_foto._cliente_r2) nos
+    testes — guarda os "objetos" em memória em vez de chamar o Cloudflare de verdade."""
+
+    def __init__(self):
+        self.armazenamento = {}
+
+    def put_object(self, Bucket, Key, Body, ContentType=None):
+        self.armazenamento[Key] = (Body, ContentType)
+
+    def get_object(self, Bucket, Key):
+        if Key not in self.armazenamento:
+            from botocore.exceptions import ClientError
+            raise ClientError({"Error": {"Code": "NoSuchKey", "Message": "Not Found"}}, "GetObject")
+        conteudo, content_type = self.armazenamento[Key]
+        return {"Body": FakeCorpoR2(conteudo), "ContentType": content_type}
+
+    def delete_object(self, Bucket, Key):
+        self.armazenamento.pop(Key, None)
+
 engine = create_engine(
     "sqlite:///:memory:",
     connect_args={"check_same_thread": False},
@@ -48,6 +77,16 @@ def db_session():
     finally:
         session.close()
         Base.metadata.drop_all(bind=engine)
+
+
+@pytest.fixture()
+def r2_fake(monkeypatch):
+    """Troca o storage R2 de fotos por um fake em memória, pra testes não
+    dependerem de credenciais/bucket real nem de disco local."""
+    from app.services import upload_foto
+    fake = FakeClienteR2()
+    monkeypatch.setattr(upload_foto, "_cliente_r2", lambda: fake)
+    return fake
 
 
 @pytest.fixture()

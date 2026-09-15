@@ -6,7 +6,8 @@ from tests.conftest import JPEG_MINIMO, auth_headers, criar_veiculo_orm
 
 @pytest.fixture(autouse=True)
 def _pasta_fotos_isolada(tmp_path, monkeypatch):
-    """Evita que os testes gravem arquivos de verdade dentro de uploads/ do projeto."""
+    """Evita que os testes gravem arquivos de verdade dentro de uploads/ do projeto.
+    Sem credenciais R2 configuradas (padrão nos testes), salvar_foto cai no disco local."""
     monkeypatch.setattr(upload_foto, "PASTA_UPLOADS", tmp_path)
 
 
@@ -82,6 +83,28 @@ def test_operador_nao_pode_desativar_veiculo(client, operador, db_session):
     assert resp.status_code == 403
 
 
+def test_desativar_veiculo_desvincula_do_conjunto(client, admin, db_session):
+    """Um veículo desativado some da listagem, mas antes continuava "preso" nos
+    conjuntos que o usavam — a posição (cavalo/semi) precisa ficar em branco."""
+    cavalo = criar_veiculo_orm(db_session, placa="CAV1A11", tipo="cavalo")
+    semi = criar_veiculo_orm(db_session, placa="SEM1I11", tipo="semirreboque")
+    headers = auth_headers(client, admin.email)
+    conjunto = client.post("/conjuntos/", headers=headers, json={
+        "nome": "Conjunto Teste",
+        "cavalo_id": cavalo.id,
+        "semirreboque1_id": semi.id,
+    }).json()
+    assert conjunto["cavalo_id"] == cavalo.id
+    assert conjunto["semirreboque1_id"] == semi.id
+
+    resp = client.delete(f"/veiculos/{semi.id}", headers=headers)
+    assert resp.status_code == 200, resp.text
+
+    resp_conjunto = client.get(f"/conjuntos/{conjunto['id']}", headers=headers)
+    assert resp_conjunto.json()["cavalo_id"] == cavalo.id
+    assert resp_conjunto.json()["semirreboque1_id"] is None
+
+
 def test_veiculo_inativo_nao_aparece_na_listagem(client, admin, db_session):
     criar_veiculo_orm(db_session, placa="AAA1A11", status="disponivel")
     criar_veiculo_orm(db_session, placa="BBB2B22", status="inativo")
@@ -155,6 +178,31 @@ def test_remover_foto_veiculo(client, admin, db_session):
     resp = client.delete(f"/veiculos/{veiculo.id}/foto", headers=headers)
     assert resp.status_code == 200, resp.text
     assert resp.json()["foto_path"] is None
+
+
+def test_upload_foto_veiculo_usa_r2_quando_configurado(client, admin, db_session, monkeypatch, r2_fake):
+    """Sem credenciais R2 (padrão), salvar_foto cai no disco (testado acima) — aqui
+    confere que o caminho R2 também funciona quando as 4 variáveis estão preenchidas."""
+    from app.config import settings
+    monkeypatch.setattr(settings, "R2_ACCOUNT_ID", "conta-teste")
+    monkeypatch.setattr(settings, "R2_ACCESS_KEY_ID", "chave-teste")
+    monkeypatch.setattr(settings, "R2_SECRET_ACCESS_KEY", "segredo-teste")
+    monkeypatch.setattr(settings, "R2_BUCKET_NAME", "bucket-teste")
+
+    veiculo = criar_veiculo_orm(db_session)
+    headers = auth_headers(client, admin.email)
+    upload = client.post(
+        f"/veiculos/{veiculo.id}/foto",
+        headers=headers,
+        files={"foto": ("foto.jpg", JPEG_MINIMO, "image/jpeg")},
+    )
+    assert upload.status_code == 200, upload.text
+    foto_path = upload.json()["foto_path"]
+    assert foto_path.removeprefix("/uploads/") in r2_fake.armazenamento
+
+    resp = client.get(foto_path, params={"token": headers["Authorization"].split(" ")[1]})
+    assert resp.status_code == 200
+    assert resp.content == JPEG_MINIMO
 
 
 def test_foto_do_veiculo_exige_autenticacao(client, admin, db_session):

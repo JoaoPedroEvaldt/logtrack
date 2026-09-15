@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy.sql import func
 from app.database import get_db
 from app.models.ocorrencia import Ocorrencia
 from app.models.entrega import Entrega
@@ -10,6 +11,18 @@ from app.routers.entregas import _garantir_acesso_entrega
 from typing import List
 
 router = APIRouter(prefix="/ocorrencias", tags=["Ocorrências"])
+
+def _revalidar_status_entrega(entrega_id: int, db: Session):
+    """Chamado depois de finalizar/excluir uma ocorrência: se não sobrar nenhuma
+    ocorrência aberta pra essa entrega, tira ela do status "ocorrência"."""
+    tem_aberta = db.query(Ocorrencia).filter(
+        Ocorrencia.entrega_id == entrega_id, Ocorrencia.status == "aberta"
+    ).first()
+    if tem_aberta:
+        return
+    entrega = db.query(Entrega).filter(Entrega.id == entrega_id).first()
+    if entrega and entrega.status == "ocorrencia":
+        entrega.status = "em_rota" if entrega.iniciado_em else "aguardando"
 
 @router.post("/", response_model=OcorrenciaResponse, include_in_schema=False)
 @router.post("", response_model=OcorrenciaResponse)
@@ -54,6 +67,22 @@ def atualizar_ocorrencia(id: int, dados: OcorrenciaUpdate, db: Session = Depends
     db.refresh(ocorrencia)
     return ocorrencia
 
+@router.put("/{id}/finalizar", response_model=OcorrenciaResponse)
+def finalizar_ocorrencia(id: int, db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
+    ocorrencia = db.query(Ocorrencia).filter(Ocorrencia.id == id).first()
+    if not ocorrencia:
+        raise HTTPException(status_code=404, detail="Ocorrência não encontrada")
+    if ocorrencia.status == "finalizada":
+        raise HTTPException(status_code=400, detail="Ocorrência já está finalizada")
+
+    ocorrencia.status = "finalizada"
+    ocorrencia.finalizado_em = func.now()
+    db.flush()
+    _revalidar_status_entrega(ocorrencia.entrega_id, db)
+    db.commit()
+    db.refresh(ocorrencia)
+    return ocorrencia
+
 @router.delete("/{id}")
 def deletar_ocorrencia(id: int, db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     ocorrencia = db.query(Ocorrencia).filter(Ocorrencia.id == id).first()
@@ -63,12 +92,7 @@ def deletar_ocorrencia(id: int, db: Session = Depends(get_db), atual: Usuario = 
     entrega_id = ocorrencia.entrega_id
     db.delete(ocorrencia)
     db.flush()
-
-    restantes = db.query(Ocorrencia).filter(Ocorrencia.entrega_id == entrega_id).count()
-    if restantes == 0:
-        entrega = db.query(Entrega).filter(Entrega.id == entrega_id).first()
-        if entrega and entrega.status == "ocorrencia":
-            entrega.status = "em_rota" if entrega.iniciado_em else "aguardando"
+    _revalidar_status_entrega(entrega_id, db)
 
     db.commit()
     return {"message": "Ocorrência excluída com sucesso"}

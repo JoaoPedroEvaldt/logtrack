@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.veiculo import Veiculo
 from app.models.usuario import Usuario
+from app.models.conjunto import Conjunto
 from app.schemas.veiculo import VeiculoCreate, VeiculoUpdate, VeiculoResponse
 from app.routers.auth import exigir_admin, exigir_staff
 from app.services.upload_foto import apagar_foto, salvar_foto
@@ -55,6 +56,20 @@ def deletar_veiculo(id: int, db: Session = Depends(get_db), atual: Usuario = Dep
     if not veiculo:
         raise HTTPException(status_code=404, detail="Veículo não encontrado")
     veiculo.status = "inativo"
+
+    # Um veículo desativado some da listagem (/veiculos filtra status != "inativo"),
+    # mas os conjuntos continuavam apontando pro id dele — a posição (cavalo/semi)
+    # ficava "presa" mostrando o veículo excluído em vez de aparecer em branco.
+    for conjunto in db.query(Conjunto).filter(
+        (Conjunto.cavalo_id == id) | (Conjunto.semirreboque1_id == id) | (Conjunto.semirreboque2_id == id)
+    ).all():
+        if conjunto.cavalo_id == id:
+            conjunto.cavalo_id = None
+        if conjunto.semirreboque1_id == id:
+            conjunto.semirreboque1_id = None
+        if conjunto.semirreboque2_id == id:
+            conjunto.semirreboque2_id = None
+
     db.commit()
     return {"message": "Veículo desativado com sucesso"}
 

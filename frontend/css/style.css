@@ -817,6 +817,15 @@ body.dark .badge-tipo-7 { background: rgba(137,135,129,0.22); color: #b3b1a9; }
 .ocorrencia-desc { font-size: 13px; color: var(--text); line-height: 1.5; }
 .ocorrencia-acoes { display: flex; gap: 6px; margin-top: 10px; }
 
+.ocorrencia-card.ocorrencia-finalizada { opacity: 0.7; }
+.ocorrencia-badge-finalizada {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-top: 10px; padding: 4px 10px; border-radius: 20px;
+  font-size: 11px; font-weight: 600;
+  background: #E3F5EA; color: #1D8348;
+}
+body.dark .ocorrencia-badge-finalizada { background: rgba(39,174,96,0.18); color: #4FD07E; }
+
 /* ===================== GRID DE VEÍCULOS ===================== */
 .veiculos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
 

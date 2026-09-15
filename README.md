@@ -196,4 +196,9 @@ Hospedagem recomendada: [Render](https://render.com), com o Blueprint em [render
 
 Confira os limites atuais do plano gratuito ao criar a conta (mudam com frequência) — para uso real e contínuo pela transportadora, o caminho natural é o plano pago tanto do web service quanto do banco.
 
-**Limitação conhecida:** a pasta `uploads/` (fotos de veículos, conjuntos e ocorrências) é gravada no disco do container, que é efêmero em hospedagem sem disco persistente — os arquivos somem a cada redeploy. Resolver isso (disco persistente pago, ou storage externo tipo S3) fica como próximo passo, fora do escopo deste deploy inicial.
+**Fotos (veículos/conjuntos):** por padrão ficam salvas em `uploads/` no disco do container — funciona bem local, mas some a cada redeploy num host sem disco persistente (caso do Render free tier). Pra resolver isso definitivamente, dá pra ligar o Cloudflare R2 (opcional — sem credenciais configuradas o app cai automaticamente pro disco local, ver `app/services/upload_foto.py`):
+
+1. Criar uma conta no [Cloudflare](https://dash.cloudflare.com) (tem tier gratuito: 10GB de storage/mês; exige cartão cadastrado, mas só cobra se passar do limite) e, no painel, ir em **Storage & databases → R2 Object Storage → Create bucket** (privado, sem acesso público).
+2. Em **Manage API Tokens → Create API Token**, gerar um token com permissão de leitura/escrita só nesse bucket. Guarda o Access Key ID e o Secret Access Key mostrados na hora — não aparecem de novo depois.
+3. Preencher `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` e `R2_BUCKET_NAME` no `.env` local (ver `.env.example`) e nas variáveis de ambiente do serviço no Render (o `render.yaml` já reserva essas chaves, preencher manualmente no painel do Render — não vão pro blueprint por serem segredo).
+4. Se já existem fotos em `uploads/` local, rodar `python scripts/migrar_fotos_para_r2.py` uma vez pra subir elas pro bucket.
