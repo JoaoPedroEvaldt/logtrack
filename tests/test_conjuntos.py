@@ -108,6 +108,28 @@ def test_operador_nao_pode_desativar_conjunto(client, admin, operador):
     assert resp.status_code == 403
 
 
+def test_criar_conjunto_com_motorista_inexistente_retorna_404(client, admin):
+    """Sem essa checagem, um id que não existe só estoura como erro de FK do
+    Postgres na hora do commit (500 feio) — o SQLite dos testes não pega isso
+    sozinho porque não faz enforcement de FK por padrão."""
+    headers = auth_headers(client, admin.email)
+    resp = client.post("/conjuntos/", headers=headers, json={"nome": "C1", "motorista_id": 999999})
+    assert resp.status_code == 404, resp.text
+
+
+def test_criar_conjunto_com_cavalo_inexistente_retorna_404(client, admin):
+    headers = auth_headers(client, admin.email)
+    resp = client.post("/conjuntos/", headers=headers, json={"nome": "C1", "cavalo_id": 999999})
+    assert resp.status_code == 404, resp.text
+
+
+def test_editar_conjunto_com_motorista_inexistente_retorna_404(client, admin):
+    headers = auth_headers(client, admin.email)
+    conjunto = _criar_conjunto(client, headers)
+    resp = client.put(f"/conjuntos/{conjunto['id']}", headers=headers, json={"motorista_id": 999999})
+    assert resp.status_code == 404, resp.text
+
+
 def test_editar_conjunto_com_cavalo_id_null_desvincula_veiculo(client, admin, db_session):
     """model_dump(exclude_unset=True): mandar cavalo_id=null (opção "Sem cavalo" no
     modal) precisa realmente limpar o vínculo, não ser descartado como antes."""

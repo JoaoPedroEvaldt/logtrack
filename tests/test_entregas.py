@@ -68,6 +68,28 @@ def test_veiculo_com_manutencao_concluida_nao_bloqueia(client, admin, db_session
     assert resp.status_code == 200, resp.text
 
 
+def test_criar_entrega_com_motorista_inexistente_retorna_404(client, admin):
+    """Sem essa checagem, um id que não existe só estoura como erro de FK do
+    Postgres na hora do commit (500 feio) — o SQLite dos testes não pega isso
+    sozinho porque não faz enforcement de FK por padrão."""
+    headers = auth_headers(client, admin.email)
+    resp = client.post("/entregas/", headers=headers, json=_payload(motorista_id=999999))
+    assert resp.status_code == 404, resp.text
+
+
+def test_criar_entrega_com_veiculo_inexistente_retorna_404(client, admin):
+    headers = auth_headers(client, admin.email)
+    resp = client.post("/entregas/", headers=headers, json=_payload(veiculo_id=999999))
+    assert resp.status_code == 404, resp.text
+
+
+def test_atualizar_entrega_com_veiculo_inexistente_retorna_404(client, admin, db_session):
+    entrega = criar_entrega_orm(db_session)
+    headers = auth_headers(client, admin.email)
+    resp = client.put(f"/entregas/{entrega.id}", headers=headers, json={"veiculo_id": 999999})
+    assert resp.status_code == 404, resp.text
+
+
 def test_cria_entrega_em_standby_sem_motorista_nem_veiculo(client, admin):
     """Frete cadastrado antes de saber qual conjunto vai atender — motorista_id
     e veiculo_id ficam em branco até serem definidos depois."""

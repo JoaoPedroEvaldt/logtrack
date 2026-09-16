@@ -4,12 +4,24 @@ from datetime import datetime
 from app.database import get_db
 from app.models.entrega import Entrega
 from app.models.manutencao import Manutencao
+from app.models.motorista import Motorista
+from app.models.veiculo import Veiculo
 from app.models.usuario import Usuario
 from app.schemas.entrega import EntregaCreate, EntregaUpdate, EntregaResponse
 from app.routers.auth import exigir_admin, exigir_staff, get_usuario_atual
 from typing import List
 
 router = APIRouter(prefix="/entregas", tags=["Entregas"])
+
+def _validar_motorista_e_veiculo_existem(motorista_id, veiculo_id, db: Session):
+    # Sem isso, mandar um id que não existe (ou de um cadastro nunca criado)
+    # só estoura na hora do commit como erro de FK do Postgres — um 500 feio
+    # em vez de um 404 claro. No SQLite dos testes esse erro nem aparece
+    # (FK não é enforced por padrão), então só se manifestava em produção.
+    if motorista_id and not db.query(Motorista).filter(Motorista.id == motorista_id).first():
+        raise HTTPException(status_code=404, detail="Motorista não encontrado")
+    if veiculo_id and not db.query(Veiculo).filter(Veiculo.id == veiculo_id).first():
+        raise HTTPException(status_code=404, detail="Veículo não encontrado")
 
 def _validar_motorista_veiculo_livres(motorista_id, veiculo_id, db: Session, excluir_id: int = None):
     if motorista_id:
@@ -48,6 +60,7 @@ def _validar_veiculo_sem_manutencao(veiculo_id, db: Session):
 @router.post("/", response_model=EntregaResponse, include_in_schema=False)
 @router.post("", response_model=EntregaResponse)
 def criar_entrega(dados: EntregaCreate, db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
+    _validar_motorista_e_veiculo_existem(dados.motorista_id, dados.veiculo_id, db)
     _validar_motorista_veiculo_livres(dados.motorista_id, dados.veiculo_id, db)
     _validar_veiculo_sem_manutencao(dados.veiculo_id, db)
     entrega = Entrega(**dados.model_dump())
@@ -119,6 +132,8 @@ def atualizar_entrega(id: int, dados: EntregaUpdate, db: Session = Depends(get_d
     motorista_id = atualizacoes.get("motorista_id", entrega.motorista_id)
     veiculo_id = atualizacoes.get("veiculo_id", entrega.veiculo_id)
     status_final = atualizacoes.get("status", entrega.status)
+    if "motorista_id" in atualizacoes or "veiculo_id" in atualizacoes:
+        _validar_motorista_e_veiculo_existem(motorista_id, veiculo_id, db)
     if status_final == "em_rota":
         _validar_motorista_veiculo_livres(motorista_id, veiculo_id, db, excluir_id=entrega.id)
         _validar_veiculo_sem_manutencao(veiculo_id, db)

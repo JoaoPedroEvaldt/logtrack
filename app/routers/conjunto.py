@@ -8,6 +8,7 @@ from app.models.conjunto import Conjunto
 from app.models.usuario import Usuario
 from app.models.entrega import Entrega
 from app.models.veiculo import Veiculo
+from app.models.motorista import Motorista
 from app.schemas.conjunto import ConjuntoCreate, ConjuntoUpdate, ConjuntoResponse
 from app.routers.auth import exigir_admin, exigir_staff
 from app.services.upload_foto import apagar_foto, salvar_foto
@@ -15,9 +16,15 @@ from app.services.upload_foto import apagar_foto, salvar_foto
 router = APIRouter(prefix="/conjuntos", tags=["Conjuntos"])
 
 def _validar_tipos_veiculo(cavalo_id, semi1_id, semi2_id, db: Session):
+    # A query aqui já cobre existência: sem o "not v: 404", um id que não existe
+    # passava batido (v vira None, o "if v and ..." nem entra) e só ia estourar
+    # como erro de FK do Postgres na hora do commit — um 500 feio em produção em
+    # vez de um 404 claro (SQLite dos testes não faz esse enforcement por padrão).
     if cavalo_id:
         v = db.query(Veiculo).filter(Veiculo.id == cavalo_id).first()
-        if v and v.tipo != "cavalo":
+        if not v:
+            raise HTTPException(status_code=404, detail="Veículo (cavalo mecânico) não encontrado")
+        if v.tipo != "cavalo":
             raise HTTPException(
                 status_code=400,
                 detail=f'Veículo {v.placa} é do tipo "{v.tipo}", não um cavalo mecânico.'
@@ -25,11 +32,17 @@ def _validar_tipos_veiculo(cavalo_id, semi1_id, semi2_id, db: Session):
     for semi_id in (semi1_id, semi2_id):
         if semi_id:
             v = db.query(Veiculo).filter(Veiculo.id == semi_id).first()
-            if v and v.tipo != "semirreboque":
+            if not v:
+                raise HTTPException(status_code=404, detail="Veículo (semirreboque) não encontrado")
+            if v.tipo != "semirreboque":
                 raise HTTPException(
                     status_code=400,
                     detail=f'Veículo {v.placa} é do tipo "{v.tipo}", não um semirreboque.'
                 )
+
+def _validar_motorista_existe(motorista_id, db: Session):
+    if motorista_id and not db.query(Motorista).filter(Motorista.id == motorista_id).first():
+        raise HTTPException(status_code=404, detail="Motorista não encontrado")
 
 def _validar_veiculos_disponiveis(cavalo_id, semi1_id, semi2_id, db: Session, excluir_id: int = None):
     ids_no_conjunto = [v for v in (cavalo_id, semi1_id, semi2_id) if v]
@@ -94,6 +107,7 @@ def _buscar_conjunto_completo(id: int, db: Session) -> Conjunto:
 @router.post("/", response_model=ConjuntoResponse, include_in_schema=False)
 @router.post("", response_model=ConjuntoResponse)
 def criar_conjunto(dados: ConjuntoCreate, db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
+    _validar_motorista_existe(dados.motorista_id, db)
     _validar_tipos_veiculo(dados.cavalo_id, dados.semirreboque1_id, dados.semirreboque2_id, db)
     _validar_veiculos_disponiveis(dados.cavalo_id, dados.semirreboque1_id, dados.semirreboque2_id, db)
     conjunto = Conjunto(**dados.model_dump())
@@ -117,6 +131,9 @@ def atualizar_conjunto(id: int, dados: ConjuntoUpdate, db: Session = Depends(get
     conjunto = db.query(Conjunto).filter(Conjunto.id == id).first()
     if not conjunto:
         raise HTTPException(status_code=404, detail="Conjunto não encontrado")
+
+    motorista_id = dados.motorista_id if dados.motorista_id is not None else conjunto.motorista_id
+    _validar_motorista_existe(motorista_id, db)
 
     cavalo_id = dados.cavalo_id if dados.cavalo_id is not None else conjunto.cavalo_id
     semi1_id = dados.semirreboque1_id if dados.semirreboque1_id is not None else conjunto.semirreboque1_id
