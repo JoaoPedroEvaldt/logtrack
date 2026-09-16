@@ -45,6 +45,23 @@ def test_motorista_nao_pode_atualizar_abastecimento(client, admin, motorista_usu
     assert resp.status_code == 403
 
 
+def test_atualizar_abastecimento_limpa_campo_enviado_como_null(client, admin, db_session):
+    """PUT precisa usar exclude_unset (não exclude_none) no model_dump: o
+    formulário manda posto=None explicitamente pra limpar o campo, e isso não
+    pode ser descartado silenciosamente."""
+    veiculo = criar_veiculo_orm(db_session)
+    headers = auth_headers(client, admin.email)
+    abastecimento = client.post("/abastecimentos/", headers=headers, json=_payload(veiculo.id)).json()
+
+    resp = client.put(f"/abastecimentos/{abastecimento['id']}", headers=headers, json={"posto": "Posto Ipiranga"})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["posto"] == "Posto Ipiranga"
+
+    resp = client.put(f"/abastecimentos/{abastecimento['id']}", headers=headers, json={"posto": None})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["posto"] is None
+
+
 def test_admin_exclui_abastecimento(client, admin, db_session):
     veiculo = criar_veiculo_orm(db_session)
     headers = auth_headers(client, admin.email)

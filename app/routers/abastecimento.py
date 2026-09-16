@@ -45,7 +45,11 @@ def atualizar_abastecimento(id: int, dados: AbastecimentoUpdate, db: Session = D
     abastecimento = db.query(Abastecimento).filter(Abastecimento.id == id).first()
     if not abastecimento:
         raise HTTPException(status_code=404, detail="Abastecimento não encontrado")
-    for campo, valor in dados.model_dump(exclude_none=True).items():
+    # exclude_unset (não exclude_none): o formulário manda motorista_id/
+    # quilometragem/posto/estado explicitamente como null ao limpar o campo —
+    # exclude_none descartaria esse null e deixaria o valor antigo preso, sem
+    # erro nenhum pro usuário.
+    for campo, valor in dados.model_dump(exclude_unset=True).items():
         setattr(abastecimento, campo, valor)
     db.commit()
     db.refresh(abastecimento)

@@ -43,7 +43,11 @@ def atualizar_manutencao(id: int, dados: ManutencaoUpdate, db: Session = Depends
     manutencao = db.query(Manutencao).filter(Manutencao.id == id).first()
     if not manutencao:
         raise HTTPException(status_code=404, detail="Manutenção não encontrada")
-    for campo, valor in dados.model_dump(exclude_none=True).items():
+    # exclude_unset (não exclude_none): o formulário manda data_fim/mecanico/
+    # quilometragem/proxima_revisao explicitamente como null ao limpar o campo —
+    # exclude_none descartaria esse null e deixaria o valor antigo preso, sem
+    # erro nenhum pro usuário.
+    for campo, valor in dados.model_dump(exclude_unset=True).items():
         setattr(manutencao, campo, valor)
     db.commit()
     db.refresh(manutencao)

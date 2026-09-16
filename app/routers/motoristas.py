@@ -95,7 +95,10 @@ def atualizar_motorista(id: int, dados: MotoristaUpdate, db: Session = Depends(g
         Motorista.cnh_numero == dados.cnh_numero, Motorista.status != "inativo", Motorista.id != id
     ).first():
         raise HTTPException(status_code=400, detail="CNH já cadastrada para outro motorista")
-    for campo, valor in dados.model_dump(exclude_none=True).items():
+    # exclude_unset (não exclude_none): o formulário manda telefone explicitamente
+    # como null ao limpar o campo — exclude_none descartaria esse null e deixaria
+    # o telefone antigo preso, sem erro nenhum pro usuário.
+    for campo, valor in dados.model_dump(exclude_unset=True).items():
         setattr(motorista, campo, valor)
     db.commit()
     db.refresh(motorista)

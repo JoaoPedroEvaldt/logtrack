@@ -44,6 +44,23 @@ def test_motorista_nao_pode_atualizar_manutencao(client, motorista_usuario, db_s
     assert resp.status_code == 403
 
 
+def test_atualizar_manutencao_limpa_campo_enviado_como_null(client, admin, db_session):
+    """PUT precisa usar exclude_unset (não exclude_none) no model_dump: o
+    formulário manda mecanico=None explicitamente pra limpar o campo, e isso
+    não pode ser descartado silenciosamente."""
+    veiculo = criar_veiculo_orm(db_session)
+    manutencao = criar_manutencao_orm(db_session, veiculo.id)
+    headers = auth_headers(client, admin.email)
+
+    resp = client.put(f"/manutencoes/{manutencao.id}", headers=headers, json={"mecanico": "Oficina do Zé"})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["mecanico"] == "Oficina do Zé"
+
+    resp = client.put(f"/manutencoes/{manutencao.id}", headers=headers, json={"mecanico": None})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["mecanico"] is None
+
+
 def test_admin_exclui_manutencao(client, admin, db_session):
     veiculo = criar_veiculo_orm(db_session)
     manutencao = criar_manutencao_orm(db_session, veiculo.id)

@@ -87,6 +87,22 @@ def test_motorista_nao_pode_atualizar_motorista(client, motorista_usuario, db_se
     assert resp.status_code == 403
 
 
+def test_atualizar_motorista_limpa_telefone_enviado_como_null(client, admin, db_session):
+    """PUT precisa usar exclude_unset (não exclude_none) no model_dump: o
+    formulário manda telefone=None explicitamente pra limpar o campo, e isso
+    não pode ser descartado silenciosamente."""
+    m = criar_motorista_orm(db_session)
+    headers = auth_headers(client, admin.email)
+
+    resp = client.put(f"/motoristas/{m.id}", headers=headers, json={"telefone": "51999999999"})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["telefone"] == "51999999999"
+
+    resp = client.put(f"/motoristas/{m.id}", headers=headers, json={"telefone": None})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["telefone"] is None
+
+
 def test_apenas_admin_pode_deletar_motorista(client, admin, operador, db_session):
     m = criar_motorista_orm(db_session)
     headers_operador = auth_headers(client, operador.email)
