@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import ConfigDict, BaseModel
 from datetime import datetime
 from typing import Optional
 
@@ -23,8 +23,7 @@ class VeiculoInfo(BaseModel):
     modelo: str
     marca: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class MotoristaInfo(BaseModel):
     id: int
@@ -32,8 +31,7 @@ class MotoristaInfo(BaseModel):
     cpf: str
     cnh_numero: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ViagemInfo(BaseModel):
     id: int
@@ -42,8 +40,7 @@ class ViagemInfo(BaseModel):
     status: str
     previsao: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ConjuntoResponse(BaseModel):
     id: int
@@ -61,5 +58,4 @@ class ConjuntoResponse(BaseModel):
     viagem_atual: Optional[ViagemInfo] = None
     criado_em: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

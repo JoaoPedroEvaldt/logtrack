@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     DATABASE_URL: str
@@ -14,8 +14,7 @@ class Settings(BaseSettings):
     R2_SECRET_ACCESS_KEY: str = ""
     R2_BUCKET_NAME: str = ""
 
-    class Config:
-        env_file = ".env"
-        extra = "ignore"  # .env também guarda POSTGRES_PASSWORD/DOCKER_DATABASE_URL, usadas só pelo docker-compose.yml
+    # extra="ignore": .env também guarda POSTGRES_PASSWORD/DOCKER_DATABASE_URL, usadas só pelo docker-compose.yml
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 settings = Settings()

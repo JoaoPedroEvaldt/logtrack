@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import ConfigDict, BaseModel
 from datetime import datetime
 from typing import Optional
 
@@ -22,5 +22,4 @@ class OcorrenciaResponse(BaseModel):
     finalizado_em: Optional[datetime]
     criado_em: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

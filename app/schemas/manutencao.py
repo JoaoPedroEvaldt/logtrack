@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from datetime import date, datetime
 from typing import Optional
 
@@ -31,8 +31,7 @@ class VeiculoInfo(BaseModel):
     modelo: str
     marca: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ManutencaoResponse(BaseModel):
     id: int
@@ -49,5 +48,4 @@ class ManutencaoResponse(BaseModel):
     proxima_revisao: Optional[date]
     criado_em: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

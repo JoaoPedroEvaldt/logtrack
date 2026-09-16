@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import ConfigDict, BaseModel, EmailStr, Field, field_validator
 from datetime import date, datetime
 from typing import Optional
 import re
@@ -81,5 +81,4 @@ class MotoristaResponse(BaseModel):
     email: Optional[str] = None
     criado_em: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
