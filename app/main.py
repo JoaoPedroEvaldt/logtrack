@@ -13,10 +13,15 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# allow_origins=["*"] existe pro dev local (frontend aberto via Live Server numa
+# porta qualquer, API sempre na 8000 — ver app.js) fazer requisição cross-origin
+# pra API. allow_credentials fica False (padrão) porque a autenticação é toda via
+# Bearer token no header, nunca cookie — não há necessidade real de credenciais
+# de CORS, e "*" + allow_credentials=True é uma combinação que o próprio
+# navegador rejeitaria se as origens fossem mesmo diferentes.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )

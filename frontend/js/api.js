@@ -58,6 +58,9 @@ async function get(endpoint) {
   const res = await fetch(`${API}${endpoint}`, {
     headers: { 'Authorization': `Bearer ${getToken()}` }
   });
+  // return (undefined), não {}: quem chama faz `await get(...) || []` — {} é
+  // truthy em JS e passaria batido no ||, quebrando o .filter()/.map() de quem
+  // esperava um array. undefined cai certinho no fallback.
   if (res.status === 401) { logout(); return; }
   // Sem isso, o corpo de erro ({detail: "Acesso negado"}) volta como se fosse
   // dado de verdade — quem chamou faz .filter()/.map() nele e quebra a página
@@ -76,6 +79,13 @@ async function post(endpoint, dados) {
     },
     body: JSON.stringify(dados)
   });
+  // Mesmo tratamento de token expirado/inválido que get() já faz — sem isso,
+  // salvar um formulário com o token vencido só mostrava um toast genérico
+  // ("Token inválido ou expirado") em vez de mandar a pessoa logar de novo.
+  // Retorna {} (não undefined, como em get()): quem chama post/put/del faz
+  // `if (res.detail)` sem checar `res &&` antes — undefined quebraria com
+  // TypeError bem na hora do redirect, {} só deixa o "if" cair em falso.
+  if (res.status === 401) { logout(); return {}; }
   return res.json();
 }
 
@@ -88,6 +98,7 @@ async function put(endpoint, dados) {
     },
     body: JSON.stringify(dados)
   });
+  if (res.status === 401) { logout(); return {}; }
   return res.json();
 }
 
@@ -97,6 +108,7 @@ async function enviarArquivo(endpoint, formData, metodo = 'POST') {
     headers: { 'Authorization': `Bearer ${getToken()}` },
     body: formData
   });
+  if (res.status === 401) { logout(); return {}; }
   return res.json();
 }
 
@@ -105,6 +117,7 @@ async function del(endpoint) {
     method: 'DELETE',
     headers: { 'Authorization': `Bearer ${getToken()}` }
   });
+  if (res.status === 401) { logout(); return {}; }
   return res.json();
 }
 
