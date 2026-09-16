@@ -14,13 +14,16 @@ router = APIRouter(prefix="/abastecimentos", tags=["Abastecimentos"])
 def _com_relacoes(query):
     return query.options(joinedload(Abastecimento.veiculo), joinedload(Abastecimento.motorista))
 
+def _validar_veiculo_e_motorista_existem(veiculo_id, motorista_id, db: Session):
+    if veiculo_id and not db.query(Veiculo).filter(Veiculo.id == veiculo_id).first():
+        raise HTTPException(status_code=404, detail="Veículo não encontrado")
+    if motorista_id and not db.query(Motorista).filter(Motorista.id == motorista_id).first():
+        raise HTTPException(status_code=404, detail="Motorista não encontrado")
+
 @router.post("/", response_model=AbastecimentoResponse, include_in_schema=False)
 @router.post("", response_model=AbastecimentoResponse)
 def criar_abastecimento(dados: AbastecimentoCreate, db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
-    if not db.query(Veiculo).filter(Veiculo.id == dados.veiculo_id).first():
-        raise HTTPException(status_code=404, detail="Veículo não encontrado")
-    if dados.motorista_id and not db.query(Motorista).filter(Motorista.id == dados.motorista_id).first():
-        raise HTTPException(status_code=404, detail="Motorista não encontrado")
+    _validar_veiculo_e_motorista_existem(dados.veiculo_id, dados.motorista_id, db)
 
     abastecimento = Abastecimento(**dados.model_dump())
     db.add(abastecimento)
@@ -45,11 +48,18 @@ def atualizar_abastecimento(id: int, dados: AbastecimentoUpdate, db: Session = D
     abastecimento = db.query(Abastecimento).filter(Abastecimento.id == id).first()
     if not abastecimento:
         raise HTTPException(status_code=404, detail="Abastecimento não encontrado")
+
+    atualizacoes = dados.model_dump(exclude_unset=True)
+    if "veiculo_id" in atualizacoes or "motorista_id" in atualizacoes:
+        veiculo_id = atualizacoes.get("veiculo_id", abastecimento.veiculo_id)
+        motorista_id = atualizacoes.get("motorista_id", abastecimento.motorista_id)
+        _validar_veiculo_e_motorista_existem(veiculo_id, motorista_id, db)
+
     # exclude_unset (não exclude_none): o formulário manda motorista_id/
     # quilometragem/posto/estado explicitamente como null ao limpar o campo —
     # exclude_none descartaria esse null e deixaria o valor antigo preso, sem
     # erro nenhum pro usuário.
-    for campo, valor in dados.model_dump(exclude_unset=True).items():
+    for campo, valor in atualizacoes.items():
         setattr(abastecimento, campo, valor)
     db.commit()
     db.refresh(abastecimento)
