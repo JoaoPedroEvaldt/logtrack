@@ -1,7 +1,7 @@
 checarAuth();
 document.getElementById('usuario-perfil').textContent = localStorage.getItem('perfil') || '';
 aplicarMascaraMoeda(document.getElementById('valor-frete'));
-document.querySelectorAll('#cards-resumo-entregas .card-icon').forEach(el => {
+document.querySelectorAll('#cards-resumo-entregas .card-icon, #rota-stats .card-icon').forEach(el => {
   el.innerHTML = svgIcone(el.dataset.icone, 21);
 });
 
@@ -219,6 +219,7 @@ function renderizarTabela(lista) {
       <td style="display:flex;gap:6px;">
         ${ehMotorista ? '' : `<button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="abrirModal(${e.id})">${svgIcone('editar', 12)} Editar</button>`}
         <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="abrirModalStatus(${e.id})">Status</button>
+        <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="abrirModalRota(${e.id})">${svgIcone('caminhao', 12)} Rota</button>
       </td>
     </tr>
   `).join('');
@@ -325,6 +326,338 @@ function abrirModalStatus(id) {
 function fecharModalStatus() {
   document.getElementById('modal-status').classList.remove('aberto');
   entregaIdSelecionada = null;
+}
+
+let mapaRota = null;
+let camadaRota = null; // L.layerGroup com os marcadores/linha da entrega aberta no momento
+/* abrirModalRota() é assíncrona (geocodificação + OSRM) — se o usuário fechar
+   o modal ou abrir outra entrega antes disso resolver, a chamada antiga não
+   pode continuar mexendo no mapa. Cada chamada guarda seu próprio número e
+   confere contra o "atual" depois de cada await. */
+let rotaRequestId = 0;
+
+/* Cria o mapa e o tile layer uma única vez (na primeira abertura) — reaberturas
+   só limpam e redesenham camadaRota, sem tocar no mapa em si. */
+function garantirMapaRota() {
+  if (mapaRota) return;
+  mapaRota = L.map('mapa-rota').setView([-14.235, -51.925], 4);
+  // CartoDB/Stadia exigem API key pra tiles escuros hoje em dia — em vez de
+  // depender de um serviço pago, o tema escuro escurece o tile padrão do OSM
+  // (gratuito, sem chave) via filtro CSS (.mapa-escuro no style.css).
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors',
+  }).addTo(mapaRota);
+  camadaRota = L.layerGroup().addTo(mapaRota);
+}
+
+/* Ícone de caminhão reaproveitando o mesmo path do ícone do menu — usado
+   como marcador no mapa da rota (na origem, ou na posição estimada quando
+   a entrega já está em rota). */
+function iconeCaminhaoMapa() {
+  return L.divIcon({
+    className: 'icone-caminhao-mapa',
+    html: `<svg viewBox="0 0 24 24" fill="#2E75B6" stroke="#1E4D78" stroke-width="1" width="28" height="28">${svgIcone('caminhao', 24).replace(/<svg[^>]*>|<\/svg>/g, '')}</svg>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+  });
+}
+
+/* Opções de toLocaleString pro formato "dd/mm hh:mm" usado nas datas de chegada/entrega da rota. */
+const FORMATO_DATA_HORA_CURTO = { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' };
+
+/* "5410" -> "1h 30min" / "45" -> "45min" — duração em segundos. */
+function formatarDuracao(segundos) {
+  const totalMin = Math.round(segundos / 60);
+  const h = Math.floor(totalMin / 60);
+  const min = totalMin % 60;
+  if (h === 0) return `${min}min`;
+  if (min === 0) return `${h}h`;
+  return `${h}h ${min}min`;
+}
+
+/* Distância em linha reta (km) entre dois pontos — usada só como aproximação
+   quando o OSRM não retorna uma rota rodoviária de verdade. */
+function distanciaHaversineKm(a, b) {
+  const R = 6371;
+  const toRad = g => g * Math.PI / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLon = toRad(b.lon - a.lon);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
+/* O tempo de direção "puro" que o OSRM devolve não é o tempo real de viagem —
+   a Lei do Motorista (Lei 13.103/2015, art. 235-C da CLT) obriga: parada de
+   30min a cada 5h30 de direção contínua, e descanso de 11h consecutivas a
+   cada 8h de direção acumulada no dia. Simula esses limites pra estimar
+   quanto tempo de relógio a viagem realmente leva. É só uma estimativa de
+   planejamento — não substitui o cronotacógrafo/registro real do motorista. */
+const LEI_MOTORISTA = {
+  direcaoContinuaMaxH: 5.5,
+  paradaCurtaH: 0.5,
+  jornadaDirecaoMaxH: 8,
+  descansoDiarioH: 11,
+};
+
+function simularViagemComParadasLegais(duracaoSegundos) {
+  const { direcaoContinuaMaxH, paradaCurtaH, jornadaDirecaoMaxH, descansoDiarioH } = LEI_MOTORISTA;
+  let restante = duracaoSegundos / 3600;
+  let decorridoH = 0;
+  let continuaH = 0;
+  let acumDiaH = 0;
+  let paradasCurtas = 0;
+  let descansosLongos = 0;
+
+  while (restante > 1e-9) {
+    const bloco = Math.min(restante, direcaoContinuaMaxH - continuaH, jornadaDirecaoMaxH - acumDiaH);
+    decorridoH += bloco;
+    restante -= bloco;
+    continuaH += bloco;
+    acumDiaH += bloco;
+
+    if (restante <= 1e-9) break;
+
+    if (acumDiaH >= jornadaDirecaoMaxH - 1e-9) {
+      decorridoH += descansoDiarioH;
+      descansosLongos++;
+      acumDiaH = 0;
+      continuaH = 0;
+    } else if (continuaH >= direcaoContinuaMaxH - 1e-9) {
+      decorridoH += paradaCurtaH;
+      paradasCurtas++;
+      continuaH = 0;
+    }
+  }
+
+  return { horasTotais: decorridoH, paradasCurtas, descansosLongos };
+}
+
+function preencherStatsRota({ distancia, tempo, chegada, chegadaLabel, paradas }) {
+  document.getElementById('rota-stat-distancia').textContent = distancia;
+  document.getElementById('rota-stat-tempo').textContent = tempo;
+  document.getElementById('rota-stat-chegada').textContent = chegada;
+  document.getElementById('rota-stat-paradas').textContent = paradas;
+  if (chegadaLabel) document.getElementById('rota-stat-chegada-label').textContent = chegadaLabel;
+}
+
+/* Rotas do OSRM ficam em cache (localStorage) igual à geocodificação — a
+   estrada entre duas cidades não muda de um dia pro outro, e isso poupa o
+   servidor público do OSRM em reaberturas do mesmo modal. Limitado a um
+   número de entradas pra não inchar o localStorage com a geometria (às vezes
+   milhares de pontos) de rotas muito longas. */
+const ROTA_CACHE_CHAVE = 'rotas_osrm_v1';
+const ROTA_CACHE_MAX_ENTRADAS = 30;
+
+// Mantida em memória (mesmo motivo do _geocodeCache em api.js): sem isso,
+// abrirModalRota() lê e reparseia o JSON inteiro do localStorage duas vezes
+// em toda rota nova (uma vez pra checar o cache, outra dentro de
+// salvarRotaCache) — e essas entradas carregam a geometria completa da rota
+// (pode ser milhares de pontos), então reparsear à toa não é de graça.
+let _rotaCache = null;
+
+function lerCacheRotas() {
+  if (_rotaCache) return _rotaCache;
+  try { _rotaCache = JSON.parse(localStorage.getItem(ROTA_CACHE_CHAVE)) || {}; }
+  catch (e) { _rotaCache = {}; }
+  return _rotaCache;
+}
+
+function salvarRotaCache(chave, dadosRota) {
+  const cache = lerCacheRotas();
+  cache[chave] = { ...dadosRota, _em: Date.now() };
+  const chaves = Object.keys(cache);
+  if (chaves.length > ROTA_CACHE_MAX_ENTRADAS) {
+    chaves.sort((a, b) => cache[a]._em - cache[b]._em);
+    delete cache[chaves[0]];
+  }
+  salvarCacheJSON(ROTA_CACHE_CHAVE, cache);
+}
+
+/* Interpola um ponto ao longo da polyline pela fração (0 a 1) da distância
+   percorrida — usado pra posicionar o caminhão no trajeto real (não em linha
+   reta) quando a entrega já está em rota. */
+function pontoNaLinha(coordenadas, frac) {
+  if (coordenadas.length < 2) return coordenadas[0];
+  const segmentos = [];
+  let total = 0;
+  for (let i = 0; i < coordenadas.length - 1; i++) {
+    const d = distanciaHaversineKm(
+      { lat: coordenadas[i][0], lon: coordenadas[i][1] },
+      { lat: coordenadas[i + 1][0], lon: coordenadas[i + 1][1] }
+    );
+    segmentos.push(d);
+    total += d;
+  }
+  let alvo = total * Math.max(0, Math.min(1, frac));
+  for (let i = 0; i < segmentos.length; i++) {
+    if (alvo <= segmentos[i] || i === segmentos.length - 1) {
+      const t = segmentos[i] > 0 ? Math.min(1, alvo / segmentos[i]) : 0;
+      const [lat1, lon1] = coordenadas[i];
+      const [lat2, lon2] = coordenadas[i + 1];
+      return [lat1 + (lat2 - lat1) * t, lon1 + (lon2 - lon1) * t];
+    }
+    alvo -= segmentos[i];
+  }
+  return coordenadas[coordenadas.length - 1];
+}
+
+/* iniciado_em/concluido_em são gravados no backend via datetime.utcnow() (UTC
+   "puro"), diferente de criado_em (hora local do servidor Postgres) — sem o
+   "Z", o Date() do navegador interpretaria a string como horário local e
+   erraria por horas. */
+function dataUtcDoBackend(iso) {
+  if (!iso) return null;
+  return new Date(iso.endsWith('Z') ? iso : iso + 'Z');
+}
+
+async function abrirModalRota(id) {
+  const meuRequestId = ++rotaRequestId;
+  const entrega = entregas.find(e => e.id === id);
+  if (!entrega) return;
+
+  document.getElementById('modal-rota-titulo').textContent = `Rota — ${entrega.origem} → ${entrega.destino}`;
+  const status = document.getElementById('rota-status');
+  status.textContent = 'Calculando rota...';
+  preencherStatsRota({ distancia: '—', tempo: '—', chegada: '—', chegadaLabel: 'Chegada (saindo agora)', paradas: '—' });
+  document.getElementById('modal-rota').classList.add('aberto');
+
+  // O mapa é criado uma vez só e reaproveitado (nunca destruído/recriado):
+  // remover e recriar o L.map a cada abertura disparava um erro do Leaflet
+  // quando a animação de zoom do fitBounds() anterior ainda não tinha
+  // terminado (o callback de "fim de transição CSS" rodava depois do mapa já
+  // ter sido removido, e quebrava tentando ler a posição de um pane que não
+  // existe mais). camadaRota junta tudo que é específico da entrega aberta
+  // (marcadores, linha) pra poder limpar só isso a cada abertura.
+  garantirMapaRota();
+  camadaRota.clearLayers();
+  const elMapa = document.getElementById('mapa-rota');
+  const escuro = document.body.classList.contains('dark');
+  elMapa.classList.toggle('mapa-escuro', escuro);
+  mapaRota.invalidateSize();
+
+  let origem, destino;
+  try {
+    [origem, destino] = await Promise.all([
+      geocodificarCidade(entrega.origem),
+      geocodificarCidade(entrega.destino),
+    ]);
+  } catch (e) {
+    if (meuRequestId !== rotaRequestId) return;
+    status.textContent = 'Não foi possível buscar as coordenadas de origem/destino (falha de rede).';
+    return;
+  }
+  if (meuRequestId !== rotaRequestId) return;
+
+  if (!origem || !destino) {
+    status.textContent = 'Não foi possível localizar origem e/ou destino no mapa.';
+    return;
+  }
+
+  const origemNorm = normalizarBusca(entrega.origem);
+  const destinoNorm = normalizarBusca(entrega.destino);
+  const mesmaCidade = origemNorm === destinoNorm;
+
+  L.marker([destino.lat, destino.lon]).addTo(camadaRota).bindPopup(`Destino: ${escapeHtml(entrega.destino)}`);
+
+  let coordenadas = [[origem.lat, origem.lon], [destino.lat, destino.lon]];
+  let rotaCalculada = null;
+
+  if (mesmaCidade) {
+    status.textContent = 'Origem e destino são a mesma cidade.';
+    preencherStatsRota({ distancia: '0 km', tempo: '0min', chegada: '—', chegadaLabel: 'Chegada', paradas: 'Nenhuma' });
+    L.marker([origem.lat, origem.lon], { icon: iconeCaminhaoMapa() }).addTo(camadaRota).bindPopup(`Origem/Destino: ${escapeHtml(entrega.origem)}`);
+    // fitBounds numa linha de comprimento zero (mesmo ponto duas vezes) faz o
+    // Leaflet calcular um zoom/pan inválido — não desenha linha nenhuma, só
+    // centraliza no ponto com um zoom fixo de "escala de bairro".
+    mapaRota.setView([origem.lat, origem.lon], 12);
+    return;
+  }
+
+  {
+    const chaveRota = `${origemNorm}>${destinoNorm}`;
+    rotaCalculada = lerCacheRotas()[chaveRota] || null;
+
+    if (!rotaCalculada) {
+      try {
+        const url = `https://router.project-osrm.org/route/v1/driving/${origem.lon},${origem.lat};${destino.lon},${destino.lat}?overview=full&geometries=geojson`;
+        const res = await fetch(url);
+        const dados = await res.json();
+        if (meuRequestId !== rotaRequestId) return;
+        const r = dados.routes && dados.routes[0];
+        if (r) {
+          rotaCalculada = { distance: r.distance, duration: r.duration, coordinates: r.geometry.coordinates };
+          salvarRotaCache(chaveRota, rotaCalculada);
+        }
+      } catch (e) {
+        if (meuRequestId !== rotaRequestId) return;
+        rotaCalculada = null;
+      }
+    }
+
+    if (rotaCalculada) {
+      coordenadas = rotaCalculada.coordinates.map(([lon, lat]) => [lat, lon]);
+      const km = rotaCalculada.distance / 1000;
+      const { horasTotais, paradasCurtas, descansosLongos } = simularViagemComParadasLegais(rotaCalculada.duration);
+
+      const partesParadas = [];
+      if (descansosLongos > 0) partesParadas.push(`${descansosLongos} descanso${descansosLongos > 1 ? 's' : ''} de 11h`);
+      if (paradasCurtas > 0) partesParadas.push(`${paradasCurtas} parada${paradasCurtas > 1 ? 's' : ''} de 30min`);
+
+      const iniciadoEm = entrega.status === 'em_rota' ? dataUtcDoBackend(entrega.iniciado_em) : null;
+      const ancoraPartida = iniciadoEm || new Date();
+      const chegada = new Date(ancoraPartida.getTime() + horasTotais * 3600 * 1000);
+
+      let chegadaLabel = 'Chegada (saindo agora)';
+      let chegadaTexto = chegada.toLocaleString('pt-BR', FORMATO_DATA_HORA_CURTO);
+      if (entrega.status === 'entregue' && entrega.concluido_em) {
+        chegadaLabel = 'Entregue em';
+        chegadaTexto = dataUtcDoBackend(entrega.concluido_em).toLocaleString('pt-BR', FORMATO_DATA_HORA_CURTO);
+      } else if (entrega.status === 'em_rota' && iniciadoEm) {
+        chegadaLabel = 'Chegada estimada';
+      }
+
+      preencherStatsRota({
+        distancia: `${km.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} km`,
+        tempo: formatarDuracao(rotaCalculada.duration),
+        chegada: chegadaTexto,
+        chegadaLabel,
+        paradas: partesParadas.length ? partesParadas.join(' + ') : 'Nenhuma',
+      });
+      status.textContent = 'Tempo de direção calculado via OpenStreetMap (OSRM). Chegada considera as paradas obrigatórias da Lei do Motorista (Lei 13.103/2015) — direção contínua máx. de 5h30 e descanso de 11h a cada 8h dirigidas. Estimativa de planejamento (não inclui pedágio nem trânsito), não substitui o cronotacógrafo.';
+
+      // Posição do caminhão: parado na origem (ainda não saiu), avançando pelo
+      // trajeto real (entrega em rota) ou parado no destino (já entregue).
+      let fracAtual = 0;
+      if (entrega.status === 'em_rota' && iniciadoEm) {
+        fracAtual = Math.max(0, Math.min(1, (Date.now() - iniciadoEm.getTime()) / (horasTotais * 3600 * 1000)));
+      } else if (entrega.status === 'entregue') {
+        fracAtual = 1;
+      }
+      const posicaoCaminhao = fracAtual === 0 ? [origem.lat, origem.lon] : pontoNaLinha(coordenadas, fracAtual);
+      const popupCaminhao = entrega.status === 'em_rota'
+        ? `Posição estimada — ${Math.round(fracAtual * 100)}% do trajeto`
+        : `Origem: ${escapeHtml(entrega.origem)}`;
+      L.marker(posicaoCaminhao, { icon: iconeCaminhaoMapa() }).addTo(camadaRota).bindPopup(popupCaminhao);
+      if (fracAtual > 0) {
+        L.circleMarker([origem.lat, origem.lon], { radius: 6, color: '#1E4D78', weight: 2, fillColor: '#2E75B6', fillOpacity: 1 })
+          .addTo(camadaRota).bindPopup(`Origem: ${escapeHtml(entrega.origem)}`);
+      }
+    } else {
+      const km = distanciaHaversineKm(origem, destino);
+      preencherStatsRota({ distancia: `~${km.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} km`, tempo: '—', chegada: '—', chegadaLabel: 'Chegada', paradas: '—' });
+      status.textContent = 'Não foi possível calcular o trajeto rodoviário — mostrando distância em linha reta.';
+      L.marker([origem.lat, origem.lon], { icon: iconeCaminhaoMapa() }).addTo(camadaRota).bindPopup(`Origem: ${escapeHtml(entrega.origem)}`);
+    }
+  }
+
+  const linha = L.polyline(coordenadas, { color: escuro ? '#7CB2E8' : '#2E75B6', weight: 4 }).addTo(camadaRota);
+  mapaRota.fitBounds(linha.getBounds(), { padding: [24, 24] });
+}
+
+function fecharModalRota() {
+  rotaRequestId++; // invalida qualquer geocodificação/rota ainda em voo dessa abertura
+  document.getElementById('modal-rota').classList.remove('aberto');
+  // O mapa em si não é destruído (ver garantirMapaRota) — só fecha o modal.
 }
 
 async function salvarEntrega() {

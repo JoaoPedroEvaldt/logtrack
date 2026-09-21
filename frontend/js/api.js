@@ -470,6 +470,13 @@ function ativarBuscaGlobal() {
   });
 }
 
+/* Grava no localStorage sem deixar uma falha (quota estourada, modo privado
+   bloqueando storage, etc.) virar exceção não tratada — usado por todo cache
+   client-side (IBGE, geocodificação, rotas do OSRM). */
+function salvarCacheJSON(chave, valor) {
+  try { localStorage.setItem(chave, JSON.stringify(valor)); } catch (e) { /* localStorage cheio/bloqueado — segue sem cache */ }
+}
+
 /* ===================== AUTOCOMPLETE DE CIDADE (IBGE) =====================
    Usado nos campos de Origem/Destino de Entregas. A lista de municípios do
    IBGE (~5.570 cidades, ~2,4MB) é pesada pra baixar toda vez — fica em cache
@@ -498,12 +505,45 @@ async function carregarCidadesIBGE() {
         // Esperança do Norte/MT) — `regiao-imediata` vem preenchido em 100%.
         .map(m => `${m.nome} - ${m['regiao-imediata']['regiao-intermediaria'].UF.sigla}`)
         .sort((a, b) => a.localeCompare(b, 'pt-BR'));
-      try { localStorage.setItem(IBGE_CACHE_CHAVE, JSON.stringify(cidades)); } catch (e) { /* localStorage cheio — segue sem cache */ }
+      salvarCacheJSON(IBGE_CACHE_CHAVE, cidades);
       return cidades;
     })
     .catch(() => []);
 
   return _cidadesIbgePromise;
+}
+
+/* Coordenadas de cidade nunca mudam, então o cache de geocodificação (Nominatim/
+   OpenStreetMap) fica no localStorage sem expiração — igual ao cache do IBGE. */
+const GEOCODE_CACHE_CHAVE = 'geocode_cidades_v1';
+
+/* Mantida em memória (não relida do localStorage a cada chamada) porque
+   abrirModalRota() geocodifica origem e destino em paralelo (Promise.all) —
+   se cada chamada lesse e regravasse sua própria cópia do objeto, a que
+   terminasse primeiro seria sobrescrita pela outra ao salvar por último. */
+let _geocodeCache = null;
+
+function lerCacheGeocode() {
+  if (_geocodeCache) return _geocodeCache;
+  try { _geocodeCache = JSON.parse(localStorage.getItem(GEOCODE_CACHE_CHAVE)) || {}; }
+  catch (e) { _geocodeCache = {}; }
+  return _geocodeCache;
+}
+
+async function geocodificarCidade(cidadeUf) {
+  const chave = normalizarBusca(cidadeUf);
+  const cache = lerCacheGeocode();
+  if (cache[chave]) return cache[chave];
+
+  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=br&q=${encodeURIComponent(cidadeUf + ', Brasil')}`;
+  const res = await fetch(url);
+  const dados = await res.json();
+  if (!dados || !dados[0]) return null;
+
+  const ponto = { lat: parseFloat(dados[0].lat), lon: parseFloat(dados[0].lon) };
+  cache[chave] = ponto;
+  salvarCacheJSON(GEOCODE_CACHE_CHAVE, cache);
+  return ponto;
 }
 
 /* Liga o autocomplete num <input> — dropdown de sugestões, navegação por

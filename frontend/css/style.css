@@ -905,6 +905,23 @@ body.dark .ocorrencia-badge-finalizada { background: rgba(39,174,96,0.18); color
 
 /* ===================== MODAL ===================== */
 .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 999; align-items: center; justify-content: center; padding: 16px; }
+.icone-caminhao-mapa { background: none; border: none; }
+
+/* Tiles escuros de verdade (CartoDB/Stadia) exigem API key hoje em dia — em
+   vez disso, inverte as cores do tile padrão do OSM (gratuito, sem chave) só
+   na camada de tiles, deixando marcadores/controles do Leaflet com as cores
+   normais por cima. */
+.mapa-escuro .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.85); }
+
+/* Cards de estatística do modal de rota (entregas) são mais numerosos e densos
+   que os cards de resumo padrão — número menor evita que "2 descansos de 11h +
+   2 paradas de 30min" estoure a largura do card. */
+.rota-stats.cards-grid { gap: 12px; }
+.rota-stats .card { padding: 14px 16px; }
+.rota-stats .card-icon { width: 32px; height: 32px; margin-bottom: 8px; }
+.rota-stats .card-icon svg { width: 16px; height: 16px; }
+.rota-stats .card-valor { font-size: 15px; line-height: 1.35; }
+.rota-stats .card-label { font-size: 11px; margin-top: 2px; }
 .modal-overlay.aberto { display: flex; }
 .modal { background: var(--bg-card); border-radius: 16px; padding: 32px; width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto; transition: background 0.3s; }
 .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
