@@ -7,6 +7,7 @@ from app.models.manutencao import Manutencao
 from app.models.motorista import Motorista
 from app.models.veiculo import Veiculo
 from app.models.usuario import Usuario
+from app.models.deslocamento_vazio import DeslocamentoVazio
 from app.schemas.entrega import EntregaCreate, EntregaUpdate, EntregaResponse
 from app.routers.auth import exigir_admin, exigir_staff, get_usuario_atual
 from typing import List
@@ -44,6 +45,18 @@ def _validar_motorista_veiculo_livres(motorista_id, veiculo_id, db: Session, exc
                 status_code=400,
                 detail=f'Veículo já está em rota na entrega #{conflito.id} ({conflito.cliente}). Finalize aquela entrega antes de iniciar outra.'
             )
+
+def _buscar_entrega_anterior(veiculo_id, excluir_id: int, db: Session):
+    # Última entrega concluída do mesmo veículo antes desta — é o ponto de partida
+    # do deslocamento vazio (destino dela até a origem da entrega que está iniciando).
+    if not veiculo_id:
+        return None
+    return (
+        db.query(Entrega)
+        .filter(Entrega.veiculo_id == veiculo_id, Entrega.status == "entregue", Entrega.id != excluir_id)
+        .order_by(Entrega.concluido_em.desc())
+        .first()
+    )
 
 def _validar_veiculo_sem_manutencao(veiculo_id, db: Session):
     if not veiculo_id:
@@ -111,13 +124,27 @@ def atualizar_status(id: int, status: str, db: Session = Depends(get_db), atual:
         _validar_motorista_veiculo_livres(entrega.motorista_id, entrega.veiculo_id, db, excluir_id=entrega.id)
         _validar_veiculo_sem_manutencao(entrega.veiculo_id, db)
     entrega.status = status
+    entrega_anterior_id = None
     if status == "em_rota":
         entrega.iniciado_em = datetime.utcnow()
+        # Deslocamento vazio vive numa tabela própria (ver DeslocamentoVazio) —
+        # nunca como coluna em Entrega, pra não ter risco de um cálculo de
+        # faturamento (que usa valor_frete/entregas) somar km_vazio por engano.
+        # Recalculado do zero a cada novo início de rota: o veículo pode ter
+        # feito outras entregas desde a última vez que essa aqui esteve em rota.
+        anterior = _buscar_entrega_anterior(entrega.veiculo_id, entrega.id, db)
+        entrega_anterior_id = anterior.id if anterior else None
+        dv = db.query(DeslocamentoVazio).filter(DeslocamentoVazio.entrega_id == entrega.id).first()
+        if not dv:
+            dv = DeslocamentoVazio(entrega_id=entrega.id)
+            db.add(dv)
+        dv.entrega_anterior_id = entrega_anterior_id
+        dv.km_vazio = None
     if status == "entregue":
         entrega.concluido_em = datetime.utcnow()
     db.commit()
     db.refresh(entrega)
-    return {"message": f"Status atualizado para {status}"}
+    return {"message": f"Status atualizado para {status}", "entrega_anterior_id": entrega_anterior_id}
 
 @router.put("/{id}", response_model=EntregaResponse)
 def atualizar_entrega(id: int, dados: EntregaUpdate, db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):

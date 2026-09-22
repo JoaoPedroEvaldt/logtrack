@@ -546,6 +546,85 @@ async function geocodificarCidade(cidadeUf) {
   return ponto;
 }
 
+/* Rotas do OSRM ficam em cache (localStorage) igual à geocodificação — a
+   estrada entre duas cidades não muda de um dia pro outro, e isso poupa o
+   servidor público do OSRM em reaberturas do mesmo trajeto. Limitado a um
+   número de entradas pra não inchar o localStorage com a geometria (às vezes
+   milhares de pontos) de rotas muito longas. Compartilhado entre o modal de
+   Rota (entregas.js) e o mapa de deslocamento vazio (relatorios.js) — mesma
+   chave "cidadeA>cidadeB", mesmo formato de valor. */
+const ROTA_CACHE_CHAVE = 'rotas_osrm_v1';
+const ROTA_CACHE_MAX_ENTRADAS = 30;
+
+// Mesmo motivo do _geocodeCache acima: evita reparsear o JSON inteiro (com a
+// geometria completa das rotas) do localStorage a cada chamada.
+let _rotaCache = null;
+
+function lerCacheRotas() {
+  if (_rotaCache) return _rotaCache;
+  try { _rotaCache = JSON.parse(localStorage.getItem(ROTA_CACHE_CHAVE)) || {}; }
+  catch (e) { _rotaCache = {}; }
+  return _rotaCache;
+}
+
+function salvarRotaCache(chave, dadosRota) {
+  const cache = lerCacheRotas();
+  cache[chave] = { ...dadosRota, _em: Date.now() };
+  const chaves = Object.keys(cache);
+  if (chaves.length > ROTA_CACHE_MAX_ENTRADAS) {
+    chaves.sort((a, b) => cache[a]._em - cache[b]._em);
+    delete cache[chaves[0]];
+  }
+  salvarCacheJSON(ROTA_CACHE_CHAVE, cache);
+}
+
+/* Ícone de caminhão reaproveitando o mesmo path do ícone do menu (icons.js) —
+   usado como marcador no mapa da rota de uma entrega e no mapa de
+   deslocamento vazio (um por trecho, cada um na cor daquele trecho). */
+function iconeCaminhaoMapa(corPreenchimento = '#2E75B6', corBorda = '#1E4D78') {
+  return L.divIcon({
+    className: 'icone-caminhao-mapa',
+    html: `<svg viewBox="0 0 24 24" fill="${corPreenchimento}" stroke="${corBorda}" stroke-width="1" width="28" height="28">${svgIcone('caminhao', 24).replace(/<svg[^>]*>|<\/svg>/g, '')}</svg>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+  });
+}
+
+/* Geocodifica as duas cidades e busca (ou reaproveita do cache) o trajeto
+   rodoviário real entre elas via OSRM — usado tanto pro modal de Rota quanto
+   pro mapa de deslocamento vazio, sempre com a geometria completa
+   (overview=full) porque os dois consumidores dependem dela pra desenhar a
+   linha no mapa. Retorna null se não conseguir geocodificar ou calcular a
+   rota; { distanceKm: 0, durationSec: 0, coordinates: [] } se origem e
+   destino forem a mesma cidade. */
+async function obterRotaRodoviaria(cidadeA, cidadeB) {
+  const normA = normalizarBusca(cidadeA);
+  const normB = normalizarBusca(cidadeB);
+  if (normA === normB) return { distanceKm: 0, durationSec: 0, coordinates: [] };
+
+  const [a, b] = await Promise.all([geocodificarCidade(cidadeA), geocodificarCidade(cidadeB)]);
+  if (!a || !b) return null;
+
+  const chave = `${normA}>${normB}`;
+  const cache = lerCacheRotas();
+  if (cache[chave]) {
+    const r = cache[chave];
+    return { distanceKm: r.distance / 1000, durationSec: r.duration, coordinates: r.coordinates };
+  }
+
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${a.lon},${a.lat};${b.lon},${b.lat}?overview=full&geometries=geojson`;
+    const res = await fetch(url);
+    const dados = await res.json();
+    const r = dados.routes && dados.routes[0];
+    if (!r) return null;
+    salvarRotaCache(chave, { distance: r.distance, duration: r.duration, coordinates: r.geometry.coordinates });
+    return { distanceKm: r.distance / 1000, durationSec: r.duration, coordinates: r.geometry.coordinates };
+  } catch (e) {
+    return null;
+  }
+}
+
 /* Liga o autocomplete num <input> — dropdown de sugestões, navegação por
    seta/Enter/Esc, filtra a lista do IBGE já em cache (sem tecla nenhuma
    pesquisa de novo na API, só filtra em memória). */

@@ -195,3 +195,103 @@ def test_editar_entrega_com_motorista_id_null_desvincula_motorista(client, admin
     resp = client.put(f"/entregas/{entrega.id}", headers=headers, json={"motorista_id": None})
     assert resp.status_code == 200, resp.text
     assert resp.json()["motorista_id"] is None
+
+
+def _deslocamento_vazio_de(db_session, entrega_id):
+    from app.models.deslocamento_vazio import DeslocamentoVazio
+    return db_session.query(DeslocamentoVazio).filter(DeslocamentoVazio.entrega_id == entrega_id).first()
+
+
+def test_iniciar_rota_vincula_entrega_anterior_do_mesmo_veiculo(client, admin, db_session):
+    """O deslocamento vazio (tabela própria, separada de entregas) deve apontar
+    pra última entrega concluída do mesmo veículo — é o ponto de partida do
+    trecho vazio até a origem desta."""
+    from datetime import datetime
+    veiculo = criar_veiculo_orm(db_session)
+    anterior = criar_entrega_orm(db_session, veiculo_id=veiculo.id, status="entregue")
+    anterior.concluido_em = datetime(2026, 1, 1)
+    db_session.commit()
+    nova = criar_entrega_orm(db_session, veiculo_id=veiculo.id, status="aguardando")
+
+    headers = auth_headers(client, admin.email)
+    resp = client.put(f"/entregas/{nova.id}/status", headers=headers, params={"status": "em_rota"})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["entrega_anterior_id"] == anterior.id
+
+    dv = _deslocamento_vazio_de(db_session, nova.id)
+    assert dv.entrega_anterior_id == anterior.id
+    assert dv.km_vazio is None
+
+
+def test_iniciar_rota_sem_entrega_anterior_nao_vincula(client, admin, db_session):
+    """Primeira entrega de um veículo novo não tem deslocamento vazio pra medir."""
+    veiculo = criar_veiculo_orm(db_session)
+    nova = criar_entrega_orm(db_session, veiculo_id=veiculo.id, status="aguardando")
+
+    headers = auth_headers(client, admin.email)
+    resp = client.put(f"/entregas/{nova.id}/status", headers=headers, params={"status": "em_rota"})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["entrega_anterior_id"] is None
+
+    dv = _deslocamento_vazio_de(db_session, nova.id)
+    assert dv.entrega_anterior_id is None
+
+
+def test_salvar_km_vazio_com_entrega_anterior(client, admin, db_session):
+    veiculo = criar_veiculo_orm(db_session)
+    criar_entrega_orm(db_session, veiculo_id=veiculo.id, status="entregue")
+    nova = criar_entrega_orm(db_session, veiculo_id=veiculo.id, status="aguardando")
+    headers = auth_headers(client, admin.email)
+    client.put(f"/entregas/{nova.id}/status", headers=headers, params={"status": "em_rota"})
+
+    resp = client.put(f"/deslocamentos-vazios/{nova.id}", headers=headers, json={"km_vazio": 187.5})
+    assert resp.status_code == 200, resp.text
+
+    dv = _deslocamento_vazio_de(db_session, nova.id)
+    assert float(dv.km_vazio) == 187.5
+
+
+def test_salvar_km_vazio_sem_entrega_anterior_retorna_400(client, admin, db_session):
+    """Sem entrega_anterior_id não há trecho vazio pra associar a distância."""
+    entrega = criar_entrega_orm(db_session, status="em_rota")
+    headers = auth_headers(client, admin.email)
+    resp = client.put(f"/deslocamentos-vazios/{entrega.id}", headers=headers, json={"km_vazio": 50})
+    assert resp.status_code == 400
+
+
+def test_entrega_anterior_e_por_veiculo_nao_por_motorista(client, admin, db_session):
+    """O km vazio é do CAMINHÃO, não do motorista: se o mesmo motorista troca de
+    veículo entre uma entrega e outra, a entrega nova não pode "herdar" o destino
+    de uma viagem que outro veículo fez. Cada veículo tem sua própria sequência."""
+    motorista = criar_motorista_orm(db_session)
+    veiculo_a = criar_veiculo_orm(db_session, placa="AAA0001")
+    veiculo_b = criar_veiculo_orm(db_session, placa="BBB0002")
+
+    # Motorista entrega com o veículo A (ex.: chega em Natal) — não tem nenhuma relação
+    # com o que o veículo B vai fazer a seguir, mesmo sendo o mesmo motorista.
+    criar_entrega_orm(db_session, motorista_id=motorista.id, veiculo_id=veiculo_a.id, status="entregue")
+
+    # Mesmo motorista, mas agora no veículo B, numa entrega nova sem nenhuma
+    # entrega anterior registrada para esse veículo específico.
+    nova = criar_entrega_orm(db_session, motorista_id=motorista.id, veiculo_id=veiculo_b.id, status="aguardando")
+
+    headers = auth_headers(client, admin.email)
+    resp = client.put(f"/entregas/{nova.id}/status", headers=headers, params={"status": "em_rota"})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["entrega_anterior_id"] is None
+
+    dv = _deslocamento_vazio_de(db_session, nova.id)
+    assert dv.entrega_anterior_id is None
+
+
+def test_motorista_pode_salvar_km_vazio_da_propria_entrega(client, db_session, motorista_usuario):
+    from app.models.motorista import Motorista
+    meu_motorista = db_session.query(Motorista).filter(Motorista.usuario_id == motorista_usuario.id).first()
+    veiculo = criar_veiculo_orm(db_session)
+    criar_entrega_orm(db_session, veiculo_id=veiculo.id, status="entregue")
+    minha_entrega = criar_entrega_orm(db_session, motorista_id=meu_motorista.id, veiculo_id=veiculo.id, status="aguardando")
+
+    headers = auth_headers(client, motorista_usuario.email)
+    client.put(f"/entregas/{minha_entrega.id}/status", headers=headers, params={"status": "em_rota"})
+    resp = client.put(f"/deslocamentos-vazios/{minha_entrega.id}", headers=headers, json={"km_vazio": 42})
+    assert resp.status_code == 200, resp.text

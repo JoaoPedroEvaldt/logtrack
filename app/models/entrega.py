@@ -23,3 +23,8 @@ class Entrega(Base):
     atualizado_em   = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     ocorrencias     = relationship("Ocorrencia", backref="entrega")
+
+    # Deslocamento vazio (km rodado sem carga antes desta entrega) vive numa
+    # tabela própria (deslocamento_vazio.py) — nunca como coluna aqui, pra não
+    # ter risco de um cálculo de faturamento (que usa valor_frete/entregas)
+    # somar km_vazio sem querer. Ver DeslocamentoVazio.

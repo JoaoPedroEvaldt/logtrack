@@ -350,18 +350,6 @@ function garantirMapaRota() {
   camadaRota = L.layerGroup().addTo(mapaRota);
 }
 
-/* Ícone de caminhão reaproveitando o mesmo path do ícone do menu — usado
-   como marcador no mapa da rota (na origem, ou na posição estimada quando
-   a entrega já está em rota). */
-function iconeCaminhaoMapa() {
-  return L.divIcon({
-    className: 'icone-caminhao-mapa',
-    html: `<svg viewBox="0 0 24 24" fill="#2E75B6" stroke="#1E4D78" stroke-width="1" width="28" height="28">${svgIcone('caminhao', 24).replace(/<svg[^>]*>|<\/svg>/g, '')}</svg>`,
-    iconSize: [28, 28],
-    iconAnchor: [14, 14],
-  });
-}
-
 /* Opções de toLocaleString pro formato "dd/mm hh:mm" usado nas datas de chegada/entrega da rota. */
 const FORMATO_DATA_HORA_CURTO = { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' };
 
@@ -440,37 +428,26 @@ function preencherStatsRota({ distancia, tempo, chegada, chegadaLabel, paradas }
   if (chegadaLabel) document.getElementById('rota-stat-chegada-label').textContent = chegadaLabel;
 }
 
-/* Rotas do OSRM ficam em cache (localStorage) igual à geocodificação — a
-   estrada entre duas cidades não muda de um dia pro outro, e isso poupa o
-   servidor público do OSRM em reaberturas do mesmo modal. Limitado a um
-   número de entradas pra não inchar o localStorage com a geometria (às vezes
-   milhares de pontos) de rotas muito longas. */
-const ROTA_CACHE_CHAVE = 'rotas_osrm_v1';
-const ROTA_CACHE_MAX_ENTRADAS = 30;
+/* Calcula e salva o km rodado vazio (destino da última entrega concluída
+   desse veículo até a origem desta) assim que a entrega entra em rota —
+   entregaAnteriorId vem na resposta do PUT /status (atualizar_status já
+   descobriu e gravou o vínculo na tabela deslocamentos_vazios, separada de
+   entregas). Só funciona se a entrega anterior estiver visível pro usuário
+   atual: um motorista não enxerga entregas de outro motorista (ver
+   _garantir_acesso_entrega no backend), então nesse caso o km vazio fica
+   pendente até um admin/operador abrir a tela — não é crítico, é só uma
+   métrica de relatório. */
+async function calcularESalvarKmVazio(entregaId, entregaAnteriorId) {
+  if (!entregaAnteriorId) return;
+  const entrega = entregas.find(e => e.id === entregaId);
+  const anterior = entregas.find(e => e.id === entregaAnteriorId);
+  if (!entrega || !anterior) return;
 
-// Mantida em memória (mesmo motivo do _geocodeCache em api.js): sem isso,
-// abrirModalRota() lê e reparseia o JSON inteiro do localStorage duas vezes
-// em toda rota nova (uma vez pra checar o cache, outra dentro de
-// salvarRotaCache) — e essas entradas carregam a geometria completa da rota
-// (pode ser milhares de pontos), então reparsear à toa não é de graça.
-let _rotaCache = null;
-
-function lerCacheRotas() {
-  if (_rotaCache) return _rotaCache;
-  try { _rotaCache = JSON.parse(localStorage.getItem(ROTA_CACHE_CHAVE)) || {}; }
-  catch (e) { _rotaCache = {}; }
-  return _rotaCache;
-}
-
-function salvarRotaCache(chave, dadosRota) {
-  const cache = lerCacheRotas();
-  cache[chave] = { ...dadosRota, _em: Date.now() };
-  const chaves = Object.keys(cache);
-  if (chaves.length > ROTA_CACHE_MAX_ENTRADAS) {
-    chaves.sort((a, b) => cache[a]._em - cache[b]._em);
-    delete cache[chaves[0]];
-  }
-  salvarCacheJSON(ROTA_CACHE_CHAVE, cache);
+  const rota = await obterRotaRodoviaria(anterior.destino, entrega.origem);
+  if (rota == null) return;
+  try {
+    await put(`/deslocamentos-vazios/${entregaId}`, { km_vazio: Math.round(rota.distanceKm * 10) / 10 });
+  } catch (e) { /* métrica secundária — falha de rede aqui não deve incomodar o usuário */ }
 }
 
 /* Interpola um ponto ao longo da polyline pela fração (0 a 1) da distância
@@ -560,7 +537,6 @@ async function abrirModalRota(id) {
   L.marker([destino.lat, destino.lon]).addTo(camadaRota).bindPopup(`Destino: ${escapeHtml(entrega.destino)}`);
 
   let coordenadas = [[origem.lat, origem.lon], [destino.lat, destino.lon]];
-  let rotaCalculada = null;
 
   if (mesmaCidade) {
     status.textContent = 'Origem e destino são a mesma cidade.';
@@ -574,30 +550,13 @@ async function abrirModalRota(id) {
   }
 
   {
-    const chaveRota = `${origemNorm}>${destinoNorm}`;
-    rotaCalculada = lerCacheRotas()[chaveRota] || null;
-
-    if (!rotaCalculada) {
-      try {
-        const url = `https://router.project-osrm.org/route/v1/driving/${origem.lon},${origem.lat};${destino.lon},${destino.lat}?overview=full&geometries=geojson`;
-        const res = await fetch(url);
-        const dados = await res.json();
-        if (meuRequestId !== rotaRequestId) return;
-        const r = dados.routes && dados.routes[0];
-        if (r) {
-          rotaCalculada = { distance: r.distance, duration: r.duration, coordinates: r.geometry.coordinates };
-          salvarRotaCache(chaveRota, rotaCalculada);
-        }
-      } catch (e) {
-        if (meuRequestId !== rotaRequestId) return;
-        rotaCalculada = null;
-      }
-    }
+    const rotaCalculada = await obterRotaRodoviaria(entrega.origem, entrega.destino);
+    if (meuRequestId !== rotaRequestId) return;
 
     if (rotaCalculada) {
       coordenadas = rotaCalculada.coordinates.map(([lon, lat]) => [lat, lon]);
-      const km = rotaCalculada.distance / 1000;
-      const { horasTotais, paradasCurtas, descansosLongos } = simularViagemComParadasLegais(rotaCalculada.duration);
+      const km = rotaCalculada.distanceKm;
+      const { horasTotais, paradasCurtas, descansosLongos } = simularViagemComParadasLegais(rotaCalculada.durationSec);
 
       const partesParadas = [];
       if (descansosLongos > 0) partesParadas.push(`${descansosLongos} descanso${descansosLongos > 1 ? 's' : ''} de 11h`);
@@ -618,7 +577,7 @@ async function abrirModalRota(id) {
 
       preencherStatsRota({
         distancia: `${km.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} km`,
-        tempo: formatarDuracao(rotaCalculada.duration),
+        tempo: formatarDuracao(rotaCalculada.durationSec),
         chegada: chegadaTexto,
         chegadaLabel,
         paradas: partesParadas.length ? partesParadas.join(' + ') : 'Nenhuma',
@@ -693,7 +652,8 @@ async function salvarEntrega() {
 
 async function confirmarStatus() {
   const status = document.getElementById('novo-status').value;
-  const res = await fetch(`${API}/entregas/${entregaIdSelecionada}/status?status=${status}`, {
+  const idAlvo = entregaIdSelecionada;
+  const res = await fetch(`${API}/entregas/${idAlvo}/status?status=${status}`, {
     method: 'PUT',
     headers: { 'Authorization': `Bearer ${getToken()}` }
   });
@@ -703,7 +663,8 @@ async function confirmarStatus() {
     return;
   }
   fecharModalStatus();
-  carregarEntregas();
+  await carregarEntregas();
+  if (status === 'em_rota') calcularESalvarKmVazio(idAlvo, corpo.entrega_anterior_id);
 }
 
 async function iniciar() {

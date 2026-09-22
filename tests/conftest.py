@@ -19,6 +19,7 @@ from app.models.veiculo import Veiculo
 from app.models.entrega import Entrega
 from app.models.manutencao import Manutencao
 from app.models import abastecimento as _abastecimento  # noqa: F401 - registra a tabela em Base.metadata
+from app.models import deslocamento_vazio as _deslocamento_vazio  # noqa: F401 - registra a tabela em Base.metadata
 
 # CPFs matematicamente válidos (dígitos verificadores corretos), usados como
 # dado de teste — não pertencem a pessoas reais.

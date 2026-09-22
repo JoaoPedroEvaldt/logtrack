@@ -6,6 +6,7 @@ from app.routers import conjunto as conjuntos_router
 from app.routers import manutencao as manutencoes
 from app.routers import abastecimento as abastecimentos
 from app.routers import log_acesso
+from app.routers import deslocamento_vazio
 
 app = FastAPI(
     title="LogTrack API",
@@ -38,6 +39,7 @@ app.include_router(conjuntos_router.router)
 app.include_router(manutencoes.router)
 app.include_router(abastecimentos.router)
 app.include_router(log_acesso.router)
+app.include_router(deslocamento_vazio.router)
 
 @app.get("/health")
 def health():

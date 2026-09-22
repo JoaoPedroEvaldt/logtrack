@@ -18,6 +18,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
 </head>
 <body class="dashboard-page">
 
@@ -112,6 +113,10 @@
         <label class="checkbox-linha"><input type="checkbox" id="modulo-ocorrencias" checked onchange="atualizarRelatorio()" /> Ocorrências</label>
         <label class="checkbox-linha"><input type="checkbox" id="modulo-manutencoes" onchange="atualizarRelatorio()" /> Manutenções</label>
         <label class="checkbox-linha"><input type="checkbox" id="modulo-motoristas-veiculos" onchange="atualizarRelatorio()" /> Motoristas e veículos</label>
+        <label class="checkbox-linha"><input type="checkbox" id="modulo-vazio" onchange="atualizarRelatorio()" /> Deslocamento vazio</label>
+        <select id="filtro-veiculo-vazio" onchange="atualizarRelatorio()" style="margin:8px 0 0 26px;width:calc(100% - 26px);">
+          <option value="">Todos os veículos</option>
+        </select>
 
         <button class="btn btn-primary" style="width:100%;margin-top:24px;" onclick="exportarPDF()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;vertical-align:-2px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -144,6 +149,16 @@
             <div class="card-valor" id="stat-custo-manutencao" style="font-size:20px;">—</div>
             <div class="card-label">Custo com manutenção</div>
           </div>
+          <div class="card" id="tile-vazio-km">
+            <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></div>
+            <div class="card-valor" id="stat-vazio-km">—</div>
+            <div class="card-label">Km rodados vazios</div>
+          </div>
+          <div class="card" id="tile-vazio-viagens">
+            <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="20" x2="6" y2="14"/><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/></svg></div>
+            <div class="card-valor" id="stat-vazio-viagens">—</div>
+            <div class="card-label">Deslocamentos vazios</div>
+          </div>
         </div>
 
         <div class="chart-card">
@@ -151,11 +166,18 @@
           <canvas id="grafico-mensal"></canvas>
         </div>
 
+        <div class="chart-card" id="card-mapa-vazio" style="display:none;">
+          <h3>Trechos rodados vazios no período</h3>
+          <div id="mapa-vazio" class="mapa-vazio-container"></div>
+          <div class="legenda-vazio" id="legenda-vazio"></div>
+        </div>
+
         <p class="relatorio-preview-nota" id="preview-nota"></p>
       </div>
     </div>
   </main>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <script src="../js/api.js"></script>
   <script src="../js/toasts.js"></script>
   <script src="../js/icons.js"></script>

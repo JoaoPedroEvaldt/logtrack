@@ -922,6 +922,13 @@ body.dark .ocorrencia-badge-finalizada { background: rgba(39,174,96,0.18); color
 .rota-stats .card-icon svg { width: 16px; height: 16px; }
 .rota-stats .card-valor { font-size: 15px; line-height: 1.35; }
 .rota-stats .card-label { font-size: 11px; margin-top: 2px; }
+
+/* Mapa de deslocamento vazio (Relatórios) — bem maior que o mapa de uma única
+   entrega porque mostra vários trajetos ao mesmo tempo (até ~15 num mês). */
+.mapa-vazio-container { height: 520px; border-radius: 12px; }
+.legenda-vazio { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 14px; }
+.legenda-vazio-item { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--text-light); }
+.legenda-vazio-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 .modal-overlay.aberto { display: flex; }
 .modal { background: var(--bg-card); border-radius: 16px; padding: 32px; width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto; transition: background 0.3s; }
 .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }

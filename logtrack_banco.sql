@@ -175,3 +175,27 @@ VALUES (
     '$2b$12$b7KVO4FgURsxljgDR0Swjeh7u0.7gVMD50Rdg90Iv2MItvHiKngba',
     'operador'
 ) ON CONFLICT (email) DO NOTHING;
+
+-- Deslocamento vazio (km rodado sem carga antes de uma entrega): tentativa
+-- inicial guardava isso em colunas na própria tabela entregas. Corrigido logo
+-- em seguida para uma tabela própria (abaixo) -- risco de um cálculo de
+-- faturamento (que usa valor_frete/entregas) somar km_vazio por engano era
+-- alto demais mantendo os dois conceitos na mesma tabela. Mantido aqui só
+-- para bancos que já rodaram esta versão antes da correção; o bloco seguinte
+-- migra os dados e remove essas colunas.
+ALTER TABLE entregas ADD COLUMN IF NOT EXISTS entrega_anterior_id INTEGER REFERENCES entregas(id) ON DELETE SET NULL;
+ALTER TABLE entregas ADD COLUMN IF NOT EXISTS km_vazio DECIMAL(10,2) CHECK (km_vazio >= 0);
+
+CREATE TABLE IF NOT EXISTS deslocamentos_vazios (
+    id SERIAL PRIMARY KEY,
+    entrega_id INTEGER NOT NULL UNIQUE REFERENCES entregas(id) ON DELETE CASCADE,
+    entrega_anterior_id INTEGER REFERENCES entregas(id) ON DELETE SET NULL,
+    km_vazio DECIMAL(10,2) CHECK (km_vazio >= 0),
+    criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+);
+INSERT INTO deslocamentos_vazios (entrega_id, entrega_anterior_id, km_vazio)
+SELECT id, entrega_anterior_id, km_vazio FROM entregas
+WHERE entrega_anterior_id IS NOT NULL OR km_vazio IS NOT NULL
+ON CONFLICT (entrega_id) DO NOTHING;
+ALTER TABLE entregas DROP COLUMN IF EXISTS entrega_anterior_id;
+ALTER TABLE entregas DROP COLUMN IF EXISTS km_vazio;
