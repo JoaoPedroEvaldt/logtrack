@@ -80,6 +80,21 @@ def db_session():
         Base.metadata.drop_all(bind=engine)
 
 
+@pytest.fixture(autouse=True)
+def _sem_r2_real(monkeypatch):
+    """settings lê o .env de verdade (inclusive fora dos testes) — e desde que o
+    storage de fotos foi migrado pro R2 em produção, esse .env tem credenciais
+    reais preenchidas. Sem isso, testes de upload que não pedem `r2_fake`
+    explicitamente cairiam no bucket real em vez do disco local isolado por
+    tmp_path. Testes que querem testar o caminho R2 (com `r2_fake`) sobrescrevem
+    essas variáveis de volta via monkeypatch.setattr no próprio teste."""
+    from app.config import settings
+    monkeypatch.setattr(settings, "R2_ACCOUNT_ID", "")
+    monkeypatch.setattr(settings, "R2_ACCESS_KEY_ID", "")
+    monkeypatch.setattr(settings, "R2_SECRET_ACCESS_KEY", "")
+    monkeypatch.setattr(settings, "R2_BUCKET_NAME", "")
+
+
 @pytest.fixture()
 def r2_fake(monkeypatch):
     """Troca o storage R2 de fotos por um fake em memória, pra testes não

@@ -1,6 +1,20 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 from datetime import date, datetime
 from typing import Optional
+
+def _nao_negativo(v):
+    if v is not None and v < 0:
+        raise ValueError("não pode ser negativo")
+    return v
+
+def _validar_datas_coerentes(modelo):
+    # Só compara os campos que vieram nesta requisição — num PUT parcial que só
+    # manda um dos dois, a comparação contra o valor já salvo é feita pelo router.
+    if modelo.data_fim is not None and modelo.data_manutencao is not None and modelo.data_fim < modelo.data_manutencao:
+        raise ValueError("data_fim não pode ser anterior a data_manutencao")
+    if modelo.proxima_revisao is not None and modelo.data_manutencao is not None and modelo.proxima_revisao < modelo.data_manutencao:
+        raise ValueError("proxima_revisao não pode ser anterior a data_manutencao")
+    return modelo
 
 class ManutencaoCreate(BaseModel):
     veiculo_id: int
@@ -14,6 +28,10 @@ class ManutencaoCreate(BaseModel):
     status: Optional[str] = "concluida"
     proxima_revisao: Optional[date] = None
 
+    _validar_custo = field_validator("custo")(_nao_negativo)
+    _validar_quilometragem = field_validator("quilometragem")(_nao_negativo)
+    _validar_datas = model_validator(mode="after")(_validar_datas_coerentes)
+
 class ManutencaoUpdate(BaseModel):
     data_manutencao: Optional[date] = None
     data_fim: Optional[date] = None
@@ -24,6 +42,10 @@ class ManutencaoUpdate(BaseModel):
     quilometragem: Optional[int] = None
     status: Optional[str] = None
     proxima_revisao: Optional[date] = None
+
+    _validar_custo = field_validator("custo")(_nao_negativo)
+    _validar_quilometragem = field_validator("quilometragem")(_nao_negativo)
+    _validar_datas = model_validator(mode="after")(_validar_datas_coerentes)
 
 class VeiculoInfo(BaseModel):
     id: int

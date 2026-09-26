@@ -1,6 +1,16 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 from datetime import date, datetime
 from typing import Optional
+
+def _litros_positivo(v: Optional[float]) -> Optional[float]:
+    if v is not None and v <= 0:
+        raise ValueError("litros deve ser maior que zero")
+    return v
+
+def _nao_negativo(v):
+    if v is not None and v < 0:
+        raise ValueError("não pode ser negativo")
+    return v
 
 class AbastecimentoCreate(BaseModel):
     veiculo_id: int
@@ -12,6 +22,10 @@ class AbastecimentoCreate(BaseModel):
     posto: Optional[str] = None
     estado: Optional[str] = None
 
+    _validar_litros = field_validator("litros")(_litros_positivo)
+    _validar_valor_total = field_validator("valor_total")(_nao_negativo)
+    _validar_quilometragem = field_validator("quilometragem")(_nao_negativo)
+
 class AbastecimentoUpdate(BaseModel):
     veiculo_id: Optional[int] = None
     motorista_id: Optional[int] = None
@@ -21,6 +35,10 @@ class AbastecimentoUpdate(BaseModel):
     quilometragem: Optional[int] = None
     posto: Optional[str] = None
     estado: Optional[str] = None
+
+    _validar_litros = field_validator("litros")(_litros_positivo)
+    _validar_valor_total = field_validator("valor_total")(_nao_negativo)
+    _validar_quilometragem = field_validator("quilometragem")(_nao_negativo)
 
 class VeiculoInfo(BaseModel):
     id: int

@@ -1,6 +1,11 @@
-from pydantic import ConfigDict, BaseModel
+from pydantic import ConfigDict, BaseModel, field_validator
 from datetime import datetime
 from typing import Optional
+
+def _nao_negativo(v: Optional[float]) -> Optional[float]:
+    if v is not None and v < 0:
+        raise ValueError("não pode ser negativo")
+    return v
 
 class EntregaCreate(BaseModel):
     cliente: str
@@ -13,6 +18,9 @@ class EntregaCreate(BaseModel):
     veiculo_id: Optional[int] = None
     previsao: datetime
 
+    _validar_peso_kg = field_validator("peso_kg")(_nao_negativo)
+    _validar_valor_frete = field_validator("valor_frete")(_nao_negativo)
+
 class EntregaUpdate(BaseModel):
     cliente: Optional[str] = None
     origem: Optional[str] = None
@@ -24,6 +32,9 @@ class EntregaUpdate(BaseModel):
     veiculo_id: Optional[int] = None
     status: Optional[str] = None
     previsao: Optional[datetime] = None
+
+    _validar_peso_kg = field_validator("peso_kg")(_nao_negativo)
+    _validar_valor_frete = field_validator("valor_frete")(_nao_negativo)
 
 class EntregaResponse(BaseModel):
     id: int
