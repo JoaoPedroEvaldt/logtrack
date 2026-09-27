@@ -1,5 +1,7 @@
 # LogTrack
 
+[![Testes](https://github.com/JoaoPedroEvaldt/logtrack/actions/workflows/testes.yml/badge.svg)](https://github.com/JoaoPedroEvaldt/logtrack/actions/workflows/testes.yml)
+
 Sistema de gestão operacional para transportadoras de pequeno e médio porte: entregas, motoristas, veículos, manutenções, abastecimento, ocorrências e faturamento centralizados em um único lugar, com controle de acesso por perfil.
 
 > Projeto acadêmico desenvolvido a partir de uma necessidade real de uma transportadora, hoje em uso operacional.

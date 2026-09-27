@@ -1,0 +1,25 @@
+name: Testes
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    # Os testes usam SQLite em memória e um cliente R2 falso (tests/conftest.py) —
+    # estes valores só existem pra app.config.Settings conseguir carregar; nada
+    # aqui aponta pra banco ou bucket de verdade.
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+      SECRET_KEY: chave-somente-para-ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+      - run: pytest -q
