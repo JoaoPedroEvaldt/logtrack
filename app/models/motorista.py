@@ -8,10 +8,11 @@ class Motorista(Base):
     __table_args__ = (
         Index("motoristas_cpf_ativo_idx", "cpf", unique=True, postgresql_where="status <> 'inativo'"),
         Index("motoristas_cnh_numero_ativo_idx", "cnh_numero", unique=True, postgresql_where="status <> 'inativo'"),
+        Index("idx_motoristas_status", "status"),
     )
 
-    id              = Column(Integer, primary_key=True, index=True)
-    usuario_id      = Column(Integer, ForeignKey("usuarios.id"), nullable=True, unique=True)
+    id              = Column(Integer, primary_key=True)
+    usuario_id      = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=True, unique=True)
     nome            = Column(String(100), nullable=False)
     cpf             = Column(String(14), nullable=False)
     cnh_numero      = Column(String(20), nullable=False)
@@ -19,8 +20,8 @@ class Motorista(Base):
     cnh_validade    = Column(Date, nullable=False)
     telefone        = Column(String(20))
     status          = Column(String(20), nullable=False, default="disponivel")
-    criado_em       = Column(DateTime, server_default=func.now())
-    atualizado_em   = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    criado_em       = Column(DateTime, nullable=False, server_default=func.now())
+    atualizado_em   = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
 
     usuario         = relationship("Usuario", backref="motorista")
     entregas        = relationship("Entrega", backref="motorista")

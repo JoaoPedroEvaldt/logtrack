@@ -6,8 +6,8 @@ from app.database import Base
 class Manutencao(Base):
     __tablename__ = "manutencoes"
 
-    id              = Column(Integer, primary_key=True, index=True)
-    veiculo_id      = Column(Integer, ForeignKey("veiculos.id"), nullable=False)
+    id              = Column(Integer, primary_key=True)
+    veiculo_id      = Column(Integer, ForeignKey("veiculos.id", ondelete="CASCADE"), nullable=False)
     data_manutencao = Column(Date, nullable=False)
     data_fim        = Column(Date)
     tipo            = Column(String(50), nullable=False)
@@ -17,6 +17,6 @@ class Manutencao(Base):
     quilometragem   = Column(Integer)
     status          = Column(String(20), nullable=False, default="concluida")
     proxima_revisao = Column(Date)
-    criado_em       = Column(DateTime, server_default=func.now())
+    criado_em       = Column(DateTime, nullable=False, server_default=func.now())
 
     veiculo         = relationship("Veiculo", back_populates="manutencoes")

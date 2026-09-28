@@ -121,7 +121,7 @@ erDiagram
     }
 ```
 
-Schema completo em [logtrack_banco.sql](logtrack_banco.sql).
+O schema é versionado com **Alembic** em [migrations/versions/](migrations/versions/): cada mudança de banco vira uma migração numerada, aplicada igual em todos os ambientes com `alembic upgrade head`.
 
 ## Como rodar
 
@@ -145,8 +145,9 @@ pip install -r requirements.txt
 cp .env.example .env
 # edite o .env: defina DATABASE_URL e SECRET_KEY
 
-# crie o banco "logtrack" no Postgres e rode o schema:
-psql -U postgres -d logtrack -f logtrack_banco.sql
+# crie o banco "logtrack" no Postgres e aplique as migrações:
+alembic upgrade head
+python scripts/criar_admin.py   # primeiro usuário administrador
 
 uvicorn app.main:app --reload
 ```

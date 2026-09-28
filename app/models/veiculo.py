@@ -1,12 +1,15 @@
-from sqlalchemy import Column, Integer, String, Date, DateTime, Numeric
+from sqlalchemy import Column, Integer, String, Date, DateTime, Numeric, Index
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.database import Base
 
 class Veiculo(Base):
     __tablename__ = "veiculos"
+    __table_args__ = (
+        Index("idx_veiculos_status", "status"),
+    )
 
-    id              = Column(Integer, primary_key=True, index=True)
+    id              = Column(Integer, primary_key=True)
     placa           = Column(String(10), nullable=False, unique=True)
     modelo          = Column(String(80), nullable=False)
     marca           = Column(String(60), nullable=False)
@@ -21,8 +24,8 @@ class Veiculo(Base):
     status          = Column(String(20), nullable=False, default="disponivel")
     crlv_validade   = Column(Date)
     seguro_validade = Column(Date)
-    criado_em       = Column(DateTime, server_default=func.now())
-    atualizado_em   = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    criado_em       = Column(DateTime, nullable=False, server_default=func.now())
+    atualizado_em   = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
 
     manutencoes     = relationship("Manutencao", back_populates="veiculo")
     entregas        = relationship("Entrega", backref="veiculo")

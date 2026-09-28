@@ -1,21 +1,25 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Index
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.database import Base
 
 class Conjunto(Base):
     __tablename__ = "conjuntos"
+    __table_args__ = (
+        Index("idx_conjuntos_cavalo", "cavalo_id"),
+        Index("idx_conjuntos_motorista", "motorista_id"),
+    )
 
-    id                = Column(Integer, primary_key=True, index=True)
+    id                = Column(Integer, primary_key=True)
     nome              = Column(String(100), nullable=False)
-    motorista_id      = Column(Integer, ForeignKey("motoristas.id"), nullable=True)
-    cavalo_id         = Column(Integer, ForeignKey("veiculos.id"), nullable=True)
-    semirreboque1_id  = Column(Integer, ForeignKey("veiculos.id"), nullable=True)
-    semirreboque2_id  = Column(Integer, ForeignKey("veiculos.id"), nullable=True)
+    motorista_id      = Column(Integer, ForeignKey("motoristas.id", ondelete="SET NULL"), nullable=True)
+    cavalo_id         = Column(Integer, ForeignKey("veiculos.id", ondelete="SET NULL"), nullable=True)
+    semirreboque1_id  = Column(Integer, ForeignKey("veiculos.id", ondelete="SET NULL"), nullable=True)
+    semirreboque2_id  = Column(Integer, ForeignKey("veiculos.id", ondelete="SET NULL"), nullable=True)
     foto_path         = Column(String(255), nullable=True)
     status            = Column(String(20), nullable=False, default="ativo")
-    criado_em         = Column(DateTime, server_default=func.now())
-    atualizado_em     = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    criado_em         = Column(DateTime, nullable=False, server_default=func.now())
+    atualizado_em     = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
 
     motorista         = relationship("Motorista", backref="conjuntos", foreign_keys=[motorista_id])
     cavalo            = relationship("Veiculo", foreign_keys=[cavalo_id])

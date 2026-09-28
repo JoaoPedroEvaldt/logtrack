@@ -12,6 +12,10 @@ services:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d logtrack"]
+      interval: 2s
+      retries: 15
 
   backend:
     build: .
@@ -23,8 +27,11 @@ services:
       SECRET_KEY: ${SECRET_KEY:?defina SECRET_KEY no .env}
       ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_HOURS: 8
+    # Aplica as migrações pendentes (Alembic) antes de subir a API.
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
 volumes:
   postgres_data:

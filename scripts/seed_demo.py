@@ -1,4 +1,4 @@
-"""Popula um banco LogTrack vazio (schema aplicado via logtrack_banco.sql) com
+"""Popula um banco LogTrack vazio (schema aplicado via `alembic upgrade head`) com
 dados ficticios, para demonstracao/apresentacao academica.
 
 NUNCA rode isto contra o banco de producao real da transportadora -- e so
@@ -7,7 +7,7 @@ script pede confirmacao explicita, mostrando o DATABASE_URL atual, antes de
 escrever qualquer coisa.
 
 O usuario administrador de demonstracao e criado direto no banco (mesma
-logica do INSERT em logtrack_banco.sql -- nao ha rota publica de cadastro,
+logica de scripts/criar_admin.py -- nao ha rota publica de cadastro,
 o primeiro admin sempre precisa ser inserido diretamente). O resto dos dados
 (motoristas, veiculos, conjuntos, entregas, abastecimentos, ocorrencia) e
 criado pelos endpoints reais da API, exercitando a mesma validacao que o
