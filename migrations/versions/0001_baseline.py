@@ -1,12 +1,13 @@
-"""baseline: schema do banco real em 2026-09-28
+"""baseline: schema do banco antes do deslocamento vazio
 
 Espelha exatamente o schema do Postgres em uso (extraído com pg_dump
 --schema-only do banco real), não o antigo logtrack_banco.sql — que já tinha
 divergido dele (faltavam índices, CHECKs e as views).
 
 Bancos que já existiam antes do Alembic NÃO rodam esta migração: são só
-marcados com `alembic stamp 0001`. Ela serve pra criar um banco novo do zero
-(`alembic upgrade head`).
+marcados com `alembic stamp` na revisão que corresponde ao que já têm (o de
+produção estava em 0001 — a tabela da 0002 nunca tinha sido criada lá). Ela
+serve pra criar um banco novo do zero (`alembic upgrade head`).
 
 Revision ID: 0001
 Revises:
@@ -213,20 +214,6 @@ def upgrade() -> None:
         sa.CheckConstraint("valor_total >= 0", name="abastecimentos_valor_total_check"),
     )
 
-    # Deslocamento vazio (km rodado sem carga antes de uma entrega) fica numa
-    # tabela própria, fora de entregas, pra nenhum cálculo de faturamento
-    # (que soma valor_frete de entregas) misturar km_vazio por engano.
-    op.create_table(
-        "deslocamentos_vazios",
-        sa.Column("id", sa.Integer, primary_key=True),
-        sa.Column("entrega_id", sa.Integer, sa.ForeignKey("entregas.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("entrega_anterior_id", sa.Integer, sa.ForeignKey("entregas.id", ondelete="SET NULL")),
-        sa.Column("km_vazio", sa.Numeric(10, 2)),
-        sa.Column("criado_em", sa.DateTime, nullable=False, server_default=_agora()),
-        sa.UniqueConstraint("entrega_id", name="deslocamentos_vazios_entrega_id_key"),
-        sa.CheckConstraint("km_vazio >= 0", name="deslocamentos_vazios_km_vazio_check"),
-    )
-
     # Views que existem no banco real (criadas na primeira versão do projeto,
     # hoje não usadas pelo app) — mantidas aqui só pro baseline refletir o
     # banco fielmente.
@@ -272,6 +259,6 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.execute("DROP VIEW IF EXISTS vw_resumo_dia")
     op.execute("DROP VIEW IF EXISTS vw_alertas_vencimento")
-    for tabela in ["deslocamentos_vazios", "abastecimentos", "conjuntos", "log_acesso",
+    for tabela in ["abastecimentos", "conjuntos", "log_acesso",
                    "ocorrencias", "entregas", "manutencoes", "veiculos", "motoristas", "usuarios"]:
         op.drop_table(tabela)
