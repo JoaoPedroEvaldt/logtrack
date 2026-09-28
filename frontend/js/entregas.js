@@ -364,16 +364,6 @@ function garantirMapaRota() {
 /* Opções de toLocaleString pro formato "dd/mm hh:mm" usado nas datas de chegada/entrega da rota. */
 const FORMATO_DATA_HORA_CURTO = { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' };
 
-/* "5410" -> "1h 30min" / "45" -> "45min" — duração em segundos. */
-function formatarDuracao(segundos) {
-  const totalMin = Math.round(segundos / 60);
-  const h = Math.floor(totalMin / 60);
-  const min = totalMin % 60;
-  if (h === 0) return `${min}min`;
-  if (min === 0) return `${h}h`;
-  return `${h}h ${min}min`;
-}
-
 /* Distância em linha reta (km) entre dois pontos — usada só como aproximação
    quando o OSRM não retorna uma rota rodoviária de verdade. */
 function distanciaHaversineKm(a, b) {
@@ -383,104 +373,6 @@ function distanciaHaversineKm(a, b) {
   const dLon = toRad(b.lon - a.lon);
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLon / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
-}
-
-/* O tempo de direção "puro" que o OSRM devolve não é o tempo real de viagem —
-   a Lei do Motorista (Lei 13.103/2015, art. 235-C da CLT) obriga: parada de
-   30min a cada 5h30 de direção contínua, e descanso de 11h consecutivas a
-   cada 8h de direção acumulada no dia. Simula esses limites pra estimar
-   quanto tempo de relógio a viagem realmente leva. É só uma estimativa de
-   planejamento — não substitui o cronotacógrafo/registro real do motorista. */
-const LEI_MOTORISTA = {
-  direcaoContinuaMaxH: 5.5,
-  paradaCurtaH: 0.5,
-  jornadaDirecaoMaxH: 8,
-  descansoDiarioH: 11,
-};
-
-function simularViagemComParadasLegais(duracaoSegundos) {
-  const { direcaoContinuaMaxH, paradaCurtaH, jornadaDirecaoMaxH, descansoDiarioH } = LEI_MOTORISTA;
-  let restante = duracaoSegundos / 3600;
-  let decorridoH = 0;
-  let continuaH = 0;
-  let acumDiaH = 0;
-  let paradasCurtas = 0;
-  let descansosLongos = 0;
-
-  while (restante > 1e-9) {
-    const bloco = Math.min(restante, direcaoContinuaMaxH - continuaH, jornadaDirecaoMaxH - acumDiaH);
-    decorridoH += bloco;
-    restante -= bloco;
-    continuaH += bloco;
-    acumDiaH += bloco;
-
-    if (restante <= 1e-9) break;
-
-    if (acumDiaH >= jornadaDirecaoMaxH - 1e-9) {
-      decorridoH += descansoDiarioH;
-      descansosLongos++;
-      acumDiaH = 0;
-      continuaH = 0;
-    } else if (continuaH >= direcaoContinuaMaxH - 1e-9) {
-      decorridoH += paradaCurtaH;
-      paradasCurtas++;
-      continuaH = 0;
-    }
-  }
-
-  return { horasTotais: decorridoH, paradasCurtas, descansosLongos };
-}
-
-/* O OSRM público calcula tempo de CARRO. Pra caminhão carregado:
-   - velocidade limitada a 90 km/h (limite do CTB pra veículo de carga em
-     rodovia), e mesmo abaixo disso um caminhão pesado roda ~15% mais devagar
-     que um carro no mesmo trecho (subida, retomada, ultrapassagem);
-   - abastecimento a cada ~700 km — quando cai perto de um descanso de 11h,
-     o motorista abastece durante ele, então só conta o que sobra;
-   - parada em posto fiscal a cada divisa estadual cruzada (contada pela
-     malha de estados do IBGE, ver ufsAoLongoDaRota em api.js).
-   Validado contra o trecho a trecho do OSRM (Sapucaia do Sul/RS → João
-   Pessoa/PB): 62,2h pela fórmula abaixo x 62,3h somando cada trecho.
-   Valores ajustáveis aqui se a prática da empresa for diferente. */
-const PARAMETROS_CAMINHAO = {
-  velocidadeMaxKmH: 90,
-  fatorCarregado: 0.85,
-  autonomiaKm: 700,
-  abastecimentoMin: 45,
-  postoFiscalMin: 30,
-};
-
-function estimarViagemCaminhao(rota, ufs) {
-  const { velocidadeMaxKmH, fatorCarregado, autonomiaKm, abastecimentoMin, postoFiscalMin } = PARAMETROS_CAMINHAO;
-  const km = rota.distanceKm;
-  const direcaoH = Math.max(
-    rota.durationSec / 3600 / fatorCarregado,
-    km / (velocidadeMaxKmH * fatorCarregado)
-  );
-  const { horasTotais, paradasCurtas, descansosLongos } = simularViagemComParadasLegais(direcaoH * 3600);
-  const abastecimentos = Math.max(0, Math.floor(km / autonomiaKm) - descansosLongos);
-  const divisas = ufs && ufs.length > 1 ? ufs.length - 1 : 0;
-  const totalH = horasTotais + abastecimentos * abastecimentoMin / 60 + divisas * postoFiscalMin / 60;
-  return { km, direcaoH, totalH, paradasCurtas, descansosLongos, abastecimentos, divisas, ufs: ufs || [] };
-}
-
-/* "131.5" (horas) -> "5d 11h 30min"; abaixo de 1 dia cai no formatarDuracao. */
-function formatarHorasLongas(horas) {
-  if (horas < 24) return formatarDuracao(horas * 3600);
-  const totalMin = Math.round(horas * 60);
-  const d = Math.floor(totalMin / 1440);
-  const h = Math.floor((totalMin % 1440) / 60);
-  const min = totalMin % 60;
-  return [`${d}d`, h ? `${h}h` : '', min ? `${min}min` : ''].filter(Boolean).join(' ');
-}
-
-function descreverParadas(est) {
-  const partes = [];
-  if (est.descansosLongos) partes.push(`${est.descansosLongos} descanso${est.descansosLongos > 1 ? 's' : ''} de 11h`);
-  if (est.paradasCurtas) partes.push(`${est.paradasCurtas} parada${est.paradasCurtas > 1 ? 's' : ''} de 30min`);
-  if (est.abastecimentos) partes.push(`${est.abastecimentos} abastecimento${est.abastecimentos > 1 ? 's' : ''}`);
-  if (est.divisas) partes.push(`${est.divisas} posto${est.divisas > 1 ? 's' : ''} fisca${est.divisas > 1 ? 'is' : 'l'}`);
-  return partes;
 }
 
 /* <input type="datetime-local"> trabalha com "AAAA-MM-DDTHH:MM" em hora local. */

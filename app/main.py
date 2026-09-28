@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.routers import auth, usuarios, motoristas, veiculos, entregas, ocorrencias, dashboard, uploads
 from app.routers import conjunto as conjuntos_router
@@ -26,6 +27,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Comprime respostas maiores (JSON das listas, JS/CSS do frontend e a base de
+# municípios em frontend/data) — no plano gratuito do Render isso pesa.
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 app.include_router(auth.router)
 app.include_router(uploads.router)

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>LogTrack — Relatórios</title>
+  <title>LogTrack — Deslocamento Vazio</title>
   <script>
     (function () {
       try {
@@ -16,9 +16,7 @@
   <link rel="stylesheet" href="../css/style.css" />
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 56 66'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%232E75B6'/%3E%3Cstop offset='100%25' stop-color='%231E4D78'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M28 2C14.7 2 4 12.5 4 25.5 4 42 28 62 28 62S52 42 52 25.5C52 12.5 41.3 2 28 2Z' fill='url(%23g)'/%3E%3Cg fill='%23FFFFFF'%3E%3Crect x='10' y='18' width='6' height='9'/%3E%3Crect x='17' y='15' width='23' height='12' rx='1'/%3E%3Ccircle cx='14' cy='29' r='2.3'/%3E%3Ccircle cx='31' cy='29' r='2.3'/%3E%3Ccircle cx='38' cy='29' r='2.3'/%3E%3C/g%3E%3Ccircle cx='45' cy='9' r='7' fill='%2327AE60' opacity='0.25'/%3E%3Ccircle cx='45' cy='9' r='4' fill='%2327AE60'/%3E%3C/svg%3E" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
 </head>
 <body class="dashboard-page">
 
@@ -38,8 +36,8 @@
       <a class="menu-item" href="motoristas.html" data-staff-only><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span> Motoristas</a>
       <a class="menu-item" href="veiculos.html" data-staff-only><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></span> Veículos</a>
       <a class="menu-item" href="ocorrencias.html" data-staff-only><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span> Ocorrências</a>
-      <a class="menu-item active" href="relatorios.html" data-staff-only><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="20" x2="6" y2="14"/><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/></svg></span> Relatórios</a>
-      <a class="menu-item" href="deslocamento-vazio.html" data-staff-only><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15" stroke-dasharray="3 3"/><circle cx="18" cy="5" r="3"/></svg></span> Deslocamento Vazio</a>
+      <a class="menu-item" href="relatorios.html" data-staff-only><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="20" x2="6" y2="14"/><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/></svg></span> Relatórios</a>
+      <a class="menu-item active" href="deslocamento-vazio.html" data-staff-only><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15" stroke-dasharray="3 3"/><circle cx="18" cy="5" r="3"/></svg></span> Deslocamento Vazio</a>
       <a class="menu-item" href="conjuntos.html" data-staff-only><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span> Conjuntos</a>
       <a class="menu-item" href="manutencoes.html" data-staff-only><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span> Manutenções</a>
       <a class="menu-item" href="abastecimentos.html" data-staff-only><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 22h12"/><path d="M4 9h9v11H4z"/><path d="M4 9V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v5"/><path d="M13 7h2l3 3v7a1 1 0 0 1-1 1h-1"/><circle cx="16.5" cy="17.5" r="1.5"/></svg></span> Abastecimento</a>
@@ -58,7 +56,7 @@
     <div class="topbar">
       <div class="topbar-titulo">
         <span class="topbar-categoria">Indicadores</span>
-        <h1>Relatórios</h1>
+        <h1>Deslocamento Vazio</h1>
       </div>
       <div class="topbar-acoes">
         <div class="topbar-busca">
@@ -78,110 +76,142 @@
       </div>
     </div>
 
-    <div class="toolbar" style="justify-content:flex-end;">
-      <button class="btn btn-primary" onclick="exportarPDF()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;vertical-align:-2px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Exportar PDF</button>
-    </div>
-
-    <div class="relatorio-layout">
-      <div class="relatorio-form">
-        <h2 class="relatorio-form-titulo">Gerar relatório</h2>
-
-        <div class="form-group" style="margin-bottom:16px;">
-          <label>Tipo de relatório</label>
-          <select id="tipo-relatorio">
-            <option value="desempenho">Desempenho operacional</option>
-          </select>
+    <!-- O que é: explicação em linguagem simples + ilustração do conceito -->
+    <section class="vazio-intro">
+      <div class="vazio-intro-texto">
+        <span class="vazio-intro-tag">Entenda o indicador</span>
+        <h2>O que é deslocamento vazio?</h2>
+        <p>É o trecho que o caminhão roda <strong>sem carga</strong>. Depois de fazer uma entrega, ele quase nunca carrega de novo na mesma cidade: precisa viajar até onde está a próxima carga.</p>
+        <p>Esses quilômetros gastam <strong>diesel, pneus e horas do motorista</strong>, mas não geram nenhum frete. Quanto menos a frota roda vazia, mais a transportadora lucra.</p>
+        <p class="vazio-intro-nota">O LogTrack calcula esse trecho sozinho sempre que uma entrega é iniciada: ele pega onde o caminhão terminou a entrega anterior e mede a estrada até a origem da nova carga.</p>
+      </div>
+      <div class="vazio-intro-figura" aria-hidden="true">
+        <svg viewBox="0 0 460 190" class="vazio-ilustracao">
+          <path d="M40 140 C 90 140, 100 60, 150 60" class="il-carregado" />
+          <path d="M150 60 C 230 60, 230 140, 310 140" class="il-vazio" />
+          <path d="M310 140 C 360 140, 370 60, 420 60" class="il-carregado" />
+          <circle cx="40" cy="140" r="7" class="il-ponto" />
+          <circle cx="150" cy="60" r="9" class="il-ponto-fim" />
+          <circle cx="310" cy="140" r="9" class="il-ponto-ini" />
+          <circle cx="420" cy="60" r="7" class="il-ponto" />
+          <g transform="translate(214 88)" class="il-caminhao">
+            <rect x="0" y="0" width="26" height="15" rx="2" />
+            <path d="M26 5h7l5 5v5H26z" />
+            <circle cx="7" cy="18" r="3.2" class="il-roda" /><circle cx="31" cy="18" r="3.2" class="il-roda" />
+          </g>
+          <text x="150" y="36" text-anchor="middle" class="il-rotulo">Entrega anterior</text>
+          <text x="150" y="20" text-anchor="middle" class="il-rotulo-sub">terminou aqui</text>
+          <text x="310" y="170" text-anchor="middle" class="il-rotulo">Próxima carga</text>
+          <text x="310" y="184" text-anchor="middle" class="il-rotulo-sub">carregou aqui</text>
+          <text x="196" y="128" text-anchor="middle" class="il-rotulo-vazio">rodando vazio</text>
+        </svg>
+        <div class="vazio-legenda-linhas">
+          <span><i class="linha-carregado"></i> com carga (gera frete)</span>
+          <span><i class="linha-vazio"></i> sem carga (só custo)</span>
         </div>
+      </div>
+    </section>
 
-        <div class="form-group" style="margin-bottom:16px;">
-          <label>Período</label>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <input type="date" id="data-inicio" onchange="atualizarRelatorio()" />
-            <span style="color:var(--text-light);">–</span>
-            <input type="date" id="data-fim" onchange="atualizarRelatorio()" />
-          </div>
-        </div>
-
-        <div class="form-group" style="margin-bottom:20px;">
-          <label>Conjunto</label>
-          <select id="filtro-conjunto" onchange="atualizarRelatorio()">
-            <option value="">Todos</option>
-          </select>
-        </div>
-
-        <label>Incluir módulos</label>
-        <label class="checkbox-linha"><input type="checkbox" checked disabled /> Entregas</label>
-        <label class="checkbox-linha"><input type="checkbox" id="modulo-ocorrencias" checked onchange="atualizarRelatorio()" /> Ocorrências</label>
-        <label class="checkbox-linha"><input type="checkbox" id="modulo-manutencoes" onchange="atualizarRelatorio()" /> Manutenções</label>
-        <label class="checkbox-linha"><input type="checkbox" id="modulo-motoristas-veiculos" onchange="atualizarRelatorio()" /> Motoristas e veículos</label>
-        <label class="checkbox-linha"><input type="checkbox" id="modulo-vazio" onchange="atualizarRelatorio()" /> Deslocamento vazio</label>
-        <select id="filtro-veiculo-vazio" onchange="atualizarRelatorio()" style="margin:8px 0 0 26px;width:calc(100% - 26px);">
+    <!-- Filtros -->
+    <div class="vazio-filtros">
+      <div class="form-group">
+        <label>Período</label>
+        <select id="filtro-periodo" onchange="atualizarTela()">
+          <option value="30">Últimos 30 dias</option>
+          <option value="90" selected>Últimos 3 meses</option>
+          <option value="365">Último ano</option>
+          <option value="tudo">Todo o histórico</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Veículo</label>
+        <select id="filtro-veiculo" onchange="atualizarTela()">
           <option value="">Todos os veículos</option>
         </select>
-
-        <button class="btn btn-primary" style="width:100%;margin-top:24px;" onclick="exportarPDF()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;vertical-align:-2px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Exportar em PDF
-        </button>
       </div>
-
-      <div class="relatorio-preview">
-        <div class="relatorio-preview-header">
-          <div>
-            <h2>Relatório de desempenho operacional</h2>
-            <p id="preview-sub"></p>
-          </div>
-          <span class="info-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
-        </div>
-
-        <div class="cards-grid" id="cards-resumo">
-          <div class="card">
-            <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 9.4 7.5 4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></div>
-            <div class="card-valor" id="stat-entregues">—</div>
-            <div class="card-label">Entregas concluídas</div>
-          </div>
-          <div class="card" id="tile-ocorrencias">
-            <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
-            <div class="card-valor" id="stat-ocorrencias">—</div>
-            <div class="card-label">Ocorrências</div>
-          </div>
-          <div class="card" id="tile-manutencao">
-            <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
-            <div class="card-valor" id="stat-custo-manutencao" style="font-size:20px;">—</div>
-            <div class="card-label">Custo com manutenção</div>
-          </div>
-          <div class="card" id="tile-vazio-km">
-            <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></div>
-            <div class="card-valor" id="stat-vazio-km">—</div>
-            <div class="card-label">Km rodados vazios</div>
-          </div>
-          <div class="card" id="tile-vazio-viagens">
-            <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="20" x2="6" y2="14"/><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/></svg></div>
-            <div class="card-valor" id="stat-vazio-viagens">—</div>
-            <div class="card-label">Deslocamentos vazios</div>
-          </div>
-        </div>
-
-        <div class="chart-card">
-          <h3>Entregas concluídas por mês</h3>
-          <canvas id="grafico-mensal"></canvas>
-        </div>
-
-        <div class="chart-card" id="card-mapa-vazio" style="display:none;">
-          <h3 style="display:flex;justify-content:space-between;align-items:center;gap:12px;">Trechos rodados vazios no período <a href="deslocamento-vazio.html" style="font-size:12px;font-weight:600;color:var(--primary-light);text-decoration:none;">Ver análise completa →</a></h3>
-          <div id="mapa-vazio" class="mapa-vazio-container"></div>
-          <div class="legenda-vazio" id="legenda-vazio"></div>
-        </div>
-
-        <p class="relatorio-preview-nota" id="preview-nota"></p>
+      <div class="form-group">
+        <label>Consumo médio do caminhão <span class="ajuda" title="Quantos quilômetros o caminhão faz com 1 litro de diesel. Usado só para estimar o custo do trecho vazio.">?</span></label>
+        <div class="input-sufixo"><input type="number" id="consumo-km-l" min="0.5" max="10" step="0.1" onchange="salvarConsumo(); atualizarTela()" /><span>km/L</span></div>
       </div>
     </div>
-  </main>
+
+    <!-- Indicadores -->
+    <div class="cards-grid vazio-kpis">
+      <div class="card">
+        <div class="card-icon" data-icone="caminhao"></div>
+        <div class="card-valor" id="kpi-km">—</div>
+        <div class="card-label">Km rodados sem carga</div>
+        <div class="kpi-explica">Soma de todos os trechos vazios do período.</div>
+      </div>
+      <div class="card">
+        <div class="card-icon" data-icone="local"></div>
+        <div class="card-valor" id="kpi-trechos">—</div>
+        <div class="card-label">Trechos vazios</div>
+        <div class="kpi-explica" id="kpi-trechos-explica">Vezes em que um caminhão saiu sem carga para buscar a próxima.</div>
+      </div>
+      <div class="card">
+        <div class="card-icon" data-icone="dinheiro"></div>
+        <div class="card-valor" id="kpi-custo">—</div>
+        <div class="card-label">Custo estimado em diesel</div>
+        <div class="kpi-explica" id="kpi-custo-explica">—</div>
+      </div>
+      <div class="card">
+        <div class="card-icon" data-icone="alerta"></div>
+        <div class="card-valor" id="kpi-percentual">—</div>
+        <div class="card-label">Da rodagem foi sem carga</div>
+        <div class="barra-proporcao"><span class="barra-carregado" id="barra-carregado"></span><span class="barra-vazio" id="barra-vazio"></span></div>
+        <div class="kpi-explica" id="kpi-percentual-explica">Calculando os km rodados com carga...</div>
+      </div>
+    </div>
+
+    <!-- Trecho a trecho + mapa -->
+    <div class="vazio-grade">
+      <section class="chart-card vazio-trechos-card">
+        <div class="vazio-secao-cabecalho">
+          <h3>Trecho a trecho</h3>
+          <div class="vazio-niveis" title="Nível = quanto da viagem foi feita sem carga (trecho vazio ÷ trecho vazio + trecho com carga da entrega seguinte)">
+            <span class="nivel nivel-baixo">Baixo &lt; 20%</span>
+            <span class="nivel nivel-moderado">Moderado 20–40%</span>
+            <span class="nivel nivel-alto">Alto &gt; 40%</span>
+          </div>
+        </div>
+        <p class="vazio-secao-ajuda">Cada cartão conta a história de um trecho vazio: onde o caminhão terminou a entrega, quanto rodou sem carga e onde pegou a carga seguinte. Clique em <strong>Ver no mapa</strong> para destacar o trajeto.</p>
+        <div id="lista-trechos" class="vazio-trechos"></div>
+      </section>
+
+      <section class="chart-card vazio-mapa-card">
+        <div class="vazio-secao-cabecalho">
+          <h3>Mapa das viagens</h3>
+          <button type="button" class="btn btn-outline btn-mini" id="btn-mapa-todos" onclick="mostrarTodosNoMapa()" hidden>Mostrar todos</button>
+        </div>
+        <div id="mapa-vazio-pagina" class="vazio-mapa"></div>
+        <div class="vazio-legenda-linhas">
+          <span><i class="linha-carregado"></i> com carga</span>
+          <span><i class="linha-vazio"></i> vazio</span>
+          <span><i class="ponto-fim"></i> terminou a entrega</span>
+          <span><i class="ponto-ini"></i> pegou a próxima carga</span>
+        </div>
+      </section>
+    </div>
+
+    <!-- Por veículo + como reduzir -->
+    <div class="vazio-grade vazio-grade-baixo">
+      <section class="chart-card">
+        <h3>Km vazios por veículo</h3>
+        <p class="vazio-secao-ajuda">Quais caminhões mais rodaram sem carga no período.</p>
+        <div class="vazio-grafico-wrap"><canvas id="grafico-veiculos"></canvas></div>
+      </section>
+      <section class="chart-card vazio-dicas">
+        <h3>Como reduzir o deslocamento vazio</h3>
+        <ul id="lista-dicas" class="vazio-dicas-lista"></ul>
+      </section>
+    </div>
+</main>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <script src="../js/api.js"></script>
   <script src="../js/toasts.js"></script>
   <script src="../js/icons.js"></script>
-  <script src="../js/relatorios.js"></script>
+  <script src="../js/deslocamento-vazio.js"></script>
 </body>
 </html>
