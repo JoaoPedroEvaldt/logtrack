@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Numeric, ForeignKey, Text, Index
+from sqlalchemy import Column, Integer, String, DateTime, Numeric, ForeignKey, Text, Index, JSON
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -25,6 +25,15 @@ class Entrega(Base):
     previsao        = Column(DateTime, nullable=False)
     iniciado_em     = Column(DateTime)
     concluido_em    = Column(DateTime)
+    # Planejamento da viagem, calculado no navegador ao cadastrar a entrega
+    # (rota do OSRM + estimativa de caminhão com as paradas obrigatórias — ver
+    # estimarViagemCaminhao em entregas.js). rota_via guarda os pontos de
+    # passagem escolhidos pelo usuário ([{nome, lat, lon}, ...]) pra rota ser
+    # redesenhada igual depois; vazio = rota mais rápida direta.
+    saida_prevista   = Column(DateTime)
+    rota_via         = Column(JSON)
+    distancia_km     = Column(Numeric(10, 1))
+    tempo_estimado_h = Column(Numeric(7, 1))
     criado_em       = Column(DateTime, nullable=False, server_default=func.now())
     atualizado_em   = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
 

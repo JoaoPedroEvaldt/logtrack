@@ -596,16 +596,20 @@ function iconeCaminhaoMapa(corPreenchimento = '#2E75B6', corBorda = '#1E4D78') {
    (overview=full) porque os dois consumidores dependem dela pra desenhar a
    linha no mapa. Retorna null se não conseguir geocodificar ou calcular a
    rota; { distanceKm: 0, durationSec: 0, coordinates: [] } se origem e
-   destino forem a mesma cidade. */
-async function obterRotaRodoviaria(cidadeA, cidadeB) {
+   destino forem a mesma cidade (e não houver pontos de passagem).
+
+   `vias` (opcional) são pontos de passagem obrigatórios [{lat, lon}, ...] —
+   o OSRM sempre devolve a rota mais rápida que passa por eles, na ordem. */
+async function obterRotaRodoviaria(cidadeA, cidadeB, vias = []) {
   const normA = normalizarBusca(cidadeA);
   const normB = normalizarBusca(cidadeB);
-  if (normA === normB) return { distanceKm: 0, durationSec: 0, coordinates: [] };
+  if (normA === normB && !vias.length) return { distanceKm: 0, durationSec: 0, coordinates: [] };
 
   const [a, b] = await Promise.all([geocodificarCidade(cidadeA), geocodificarCidade(cidadeB)]);
   if (!a || !b) return null;
 
-  const chave = `${normA}>${normB}`;
+  const chaveVias = vias.map(v => `${v.lat.toFixed(3)},${v.lon.toFixed(3)}`).join('|');
+  const chave = chaveVias ? `${normA}>${chaveVias}>${normB}` : `${normA}>${normB}`;
   const cache = lerCacheRotas();
   if (cache[chave]) {
     const r = cache[chave];
@@ -613,16 +617,120 @@ async function obterRotaRodoviaria(cidadeA, cidadeB) {
   }
 
   try {
-    const url = `https://router.project-osrm.org/route/v1/driving/${a.lon},${a.lat};${b.lon},${b.lat}?overview=full&geometries=geojson`;
-    const res = await fetch(url);
-    const dados = await res.json();
-    const r = dados.routes && dados.routes[0];
+    const rotas = await consultarOSRM([a, ...vias, b], false);
+    const r = rotas[0];
     if (!r) return null;
-    salvarRotaCache(chave, { distance: r.distance, duration: r.duration, coordinates: r.geometry.coordinates });
-    return { distanceKm: r.distance / 1000, durationSec: r.duration, coordinates: r.geometry.coordinates };
+    salvarRotaCache(chave, { distance: r.distanceKm * 1000, duration: r.durationSec, coordinates: r.coordinates });
+    return r;
   } catch (e) {
     return null;
   }
+}
+
+/* Chamada crua ao OSRM público. `alternativas` só vale pra 2 pontos (limite
+   do próprio OSRM) — com pontos de passagem ele devolve só a melhor rota. A
+   primeira rota da lista é sempre a mais rápida. */
+async function consultarOSRM(pontos, alternativas) {
+  const coords = pontos.map(p => `${p.lon},${p.lat}`).join(';');
+  const alt = alternativas && pontos.length === 2 ? '&alternatives=3' : '';
+  const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson${alt}`);
+  const dados = await res.json();
+  return (dados.routes || []).map(r => ({
+    distanceKm: r.distance / 1000,
+    durationSec: r.duration,
+    coordinates: r.geometry.coordinates,
+  }));
+}
+
+/* Rotas alternativas entre duas cidades (sem cache — só é chamada quando o
+   usuário pede pra ver outras opções no formulário de entrega). */
+async function obterRotasAlternativas(cidadeA, cidadeB) {
+  const [a, b] = await Promise.all([geocodificarCidade(cidadeA), geocodificarCidade(cidadeB)]);
+  if (!a || !b) return [];
+  try { return await consultarOSRM([a, b], true); } catch (e) { return []; }
+}
+
+/* Nome "Cidade - UF" de um ponto do mapa (Nominatim reverso) — usado pra dar
+   nome legível ao ponto de passagem de uma rota alternativa escolhida. */
+async function nomeCidadeNoPonto(lat, lon) {
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&zoom=10&lat=${lat}&lon=${lon}`);
+    const d = await res.json();
+    const end = d.address || {};
+    const cidade = end.city || end.town || end.village || end.municipality || end.county;
+    const uf = (end['ISO3166-2-lvl4'] || '').replace('BR-', '');
+    if (cidade) return uf ? `${cidade} - ${uf}` : cidade;
+  } catch (e) { /* sem nome — quem chama usa um rótulo genérico */ }
+  return null;
+}
+
+/* ===================== MALHA DOS ESTADOS (IBGE) =====================
+   Contorno simplificado das 27 UFs (~100KB), usado pra descobrir por quantas
+   divisas estaduais (postos fiscais) uma rota passa. Fica em cache sem
+   expiração, igual à lista de cidades. */
+const UFS_CACHE_CHAVE = 'ibge_ufs_malha_v1';
+const SIGLA_UF_POR_CODIGO = {
+  11: 'RO', 12: 'AC', 13: 'AM', 14: 'RR', 15: 'PA', 16: 'AP', 17: 'TO',
+  21: 'MA', 22: 'PI', 23: 'CE', 24: 'RN', 25: 'PB', 26: 'PE', 27: 'AL', 28: 'SE', 29: 'BA',
+  31: 'MG', 32: 'ES', 33: 'RJ', 35: 'SP', 41: 'PR', 42: 'SC', 43: 'RS',
+  50: 'MS', 51: 'MT', 52: 'GO', 53: 'DF',
+};
+let _malhaUfsPromise = null;
+
+function carregarMalhaUFs() {
+  if (_malhaUfsPromise) return _malhaUfsPromise;
+  _malhaUfsPromise = (async () => {
+    let geo = null;
+    try { geo = JSON.parse(localStorage.getItem(UFS_CACHE_CHAVE)); } catch (e) { /* refaz abaixo */ }
+    if (!geo) {
+      const res = await fetch('https://servicodados.ibge.gov.br/api/v3/malhas/paises/BR?formato=application/vnd.geo+json&intrarregiao=UF&qualidade=minima');
+      geo = await res.json();
+      salvarCacheJSON(UFS_CACHE_CHAVE, geo);
+    }
+    // Normaliza tudo pra lista de polígonos (anéis externos) + bbox, pra o
+    // teste ponto-no-polígono descartar rápido os estados longe do ponto.
+    return geo.features.map(f => {
+      const poligonos = f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates;
+      const aneis = poligonos.map(p => p[0]);
+      const todos = aneis.flat();
+      const lons = todos.map(c => c[0]);
+      const lats = todos.map(c => c[1]);
+      return {
+        uf: SIGLA_UF_POR_CODIGO[f.properties.codarea] || f.properties.codarea,
+        aneis,
+        bbox: [Math.min(...lons), Math.min(...lats), Math.max(...lons), Math.max(...lats)],
+      };
+    });
+  })().catch(() => { _malhaUfsPromise = null; return null; });
+  return _malhaUfsPromise;
+}
+
+function pontoNoAnel(lon, lat, anel) {
+  let dentro = false;
+  for (let i = 0, j = anel.length - 1; i < anel.length; j = i++) {
+    const [xi, yi] = anel[i];
+    const [xj, yj] = anel[j];
+    if ((yi > lat) !== (yj > lat) && lon < (xj - xi) * (lat - yi) / (yj - yi) + xi) dentro = !dentro;
+  }
+  return dentro;
+}
+
+/* Sequência de UFs por onde a rota passa (["RS", "SC", "PR", ...]), a partir
+   de pontos amostrados da geometria ([lon, lat] do OSRM). Pontos que caem
+   fora de todos os polígonos (malha simplificada, borda/litoral) são
+   ignorados. Retorna null se a malha do IBGE não carregar. */
+async function ufsAoLongoDaRota(coordenadas) {
+  const malha = await carregarMalhaUFs();
+  if (!malha || !coordenadas.length) return null;
+  const passo = Math.max(1, Math.floor(coordenadas.length / 400));
+  const sequencia = [];
+  for (let i = 0; i < coordenadas.length; i += passo) {
+    const [lon, lat] = coordenadas[i];
+    const estado = malha.find(e => lon >= e.bbox[0] && lon <= e.bbox[2] && lat >= e.bbox[1] && lat <= e.bbox[3]
+      && e.aneis.some(a => pontoNoAnel(lon, lat, a)));
+    if (estado && sequencia[sequencia.length - 1] !== estado.uf) sequencia.push(estado.uf);
+  }
+  return sequencia;
 }
 
 /* Liga o autocomplete num <input> — dropdown de sugestões, navegação por
@@ -649,6 +757,9 @@ function ativarAutocompleteCidade(input) {
   function escolher(cidade) {
     input.value = cidade;
     dropdown.hidden = true;
+    // Avisa quem estiver ouvindo (ex.: recálculo da rota no formulário de
+    // entrega) — mudar .value por código não dispara "change" sozinho.
+    input.dispatchEvent(new Event('change'));
   }
 
   function renderizar(lista) {

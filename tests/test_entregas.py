@@ -295,3 +295,45 @@ def test_motorista_pode_salvar_km_vazio_da_propria_entrega(client, db_session, m
     client.put(f"/entregas/{minha_entrega.id}/status", headers=headers, params={"status": "em_rota"})
     resp = client.put(f"/deslocamentos-vazios/{minha_entrega.id}", headers=headers, json={"km_vazio": 42})
     assert resp.status_code == 200, resp.text
+
+
+def test_cria_entrega_com_planejamento_de_viagem(client, admin):
+    headers = auth_headers(client, admin.email)
+    payload = {
+        **_payload(),
+        "saida_prevista": "2029-12-28T07:00:00",
+        "rota_via": [{"nome": "Curitiba - PR", "lat": -25.43, "lon": -49.27}],
+        "distancia_km": 4005.3,
+        "tempo_estimado_h": 131.5,
+    }
+    resp = client.post("/entregas/", headers=headers, json=payload)
+    assert resp.status_code == 200, resp.text
+    corpo = resp.json()
+    assert corpo["saida_prevista"].startswith("2029-12-28T07:00")
+    assert corpo["rota_via"] == [{"nome": "Curitiba - PR", "lat": -25.43, "lon": -49.27}]
+    assert corpo["distancia_km"] == 4005.3
+    assert corpo["tempo_estimado_h"] == 131.5
+
+
+def test_editar_rota_via_e_depois_voltar_para_rota_direta(client, admin, db_session):
+    entrega = criar_entrega_orm(db_session)
+    headers = auth_headers(client, admin.email)
+    via = [{"nome": "Uberlândia - MG", "lat": -18.91, "lon": -48.27}]
+    resp = client.put(f"/entregas/{entrega.id}", headers=headers, json={"rota_via": via, "tempo_estimado_h": 50})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["rota_via"] == via
+
+    resp = client.put(f"/entregas/{entrega.id}", headers=headers, json={"rota_via": None})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["rota_via"] is None
+
+
+def test_planejamento_rejeita_valores_invalidos(client, admin):
+    headers = auth_headers(client, admin.email)
+    for extra in (
+        {"distancia_km": -1},
+        {"tempo_estimado_h": -5},
+        {"rota_via": [{"nome": "X", "lat": 120, "lon": 0}]},
+    ):
+        resp = client.post("/entregas/", headers=headers, json={**_payload(), **extra})
+        assert resp.status_code == 422, (extra, resp.text)

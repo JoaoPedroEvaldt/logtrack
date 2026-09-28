@@ -933,6 +933,51 @@ body.dark .ocorrencia-badge-finalizada { background: rgba(39,174,96,0.18); color
 .modal { background: var(--bg-card); border-radius: 16px; padding: 32px; width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto; transition: background 0.3s; }
 .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
 .modal-header h2 { font-size: 18px; font-weight: 700; color: var(--text); }
+
+/* Planejamento da viagem no formulário de entrega (entregas.js). */
+#modal > .modal { max-width: 760px; }
+.vias-lista { display: flex; flex-wrap: wrap; gap: 6px; }
+.vias-lista:empty { display: none; }
+.via-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 20px;
+  padding: 4px 6px 4px 12px; font-size: 12px; color: var(--text);
+}
+.via-chip button {
+  border: none; background: none; cursor: pointer; color: var(--text-light);
+  font-size: 15px; line-height: 1; padding: 0 4px;
+}
+.via-chip button:hover { color: var(--danger); }
+.planejamento {
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; background: var(--bg);
+}
+.planejamento-cabecalho { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 13px; color: var(--text); }
+#planejamento-status { font-size: 12px; color: var(--text-light); }
+.planejamento-numeros { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--text); }
+.planejamento-numeros b { font-size: 15px; }
+.planejamento-detalhe { font-size: 12px; color: var(--text-light); line-height: 1.5; }
+.planejamento-prazo { font-size: 13px; font-weight: 600; border-radius: 8px; padding: 8px 12px; }
+.planejamento-prazo:empty { display: none; }
+.planejamento-prazo.ok { background: rgba(39,174,96,0.12); color: #1E8449; }
+.planejamento-prazo.curto { background: rgba(192,57,43,0.12); color: var(--danger); }
+body.dark .planejamento-prazo.ok { color: #58D68D; }
+body.dark .planejamento-prazo.curto { color: #F1948A; }
+.planejamento-acoes { display: flex; flex-wrap: wrap; gap: 8px; }
+.planejamento-acoes .btn { font-size: 12px; padding: 6px 12px; }
+.planejamento[hidden], .planejamento-acoes .btn[hidden] { display: none; }
+.rotas-alternativas { display: flex; flex-direction: column; gap: 6px; }
+.rotas-alternativas:empty { display: none; }
+.rota-opcao {
+  display: flex; align-items: center; gap: 10px; text-align: left;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card);
+  padding: 8px 12px; font-size: 13px; color: var(--text); cursor: pointer;
+}
+.rota-opcao:hover { border-color: var(--accent); }
+.rota-opcao.escolhida { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.rota-opcao-cor { width: 14px; height: 4px; border-radius: 2px; flex-shrink: 0; }
+.mapa-plano { height: 240px; border-radius: 10px; background: #eef2f7; }
+.prazo-curto-tag { display: block; font-size: 11px; font-weight: 600; color: var(--danger); margin-top: 2px; }
 .btn-fechar { background: none; border: none; cursor: pointer; color: var(--text-light); display: flex; align-items: center; justify-content: center; padding: 4px; border-radius: 6px; transition: background 0.2s, color 0.2s; }
 .btn-fechar:hover { background: var(--bg); color: var(--text); }
 .btn-fechar svg { width: 18px; height: 18px; }

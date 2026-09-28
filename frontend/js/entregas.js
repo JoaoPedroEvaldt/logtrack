@@ -195,6 +195,14 @@ function atualizarResumo(lista) {
   });
 }
 
+/* Entrega que ainda não saiu cuja previsão não cobre saída prevista + tempo
+   estimado de viagem (gravados pelo planejamento do formulário). */
+function prazoCurto(e) {
+  if (e.status !== 'aguardando' || !e.saida_prevista || e.tempo_estimado_h == null) return false;
+  const chegada = new Date(e.saida_prevista).getTime() + parseFloat(e.tempo_estimado_h) * 3600 * 1000;
+  return chegada - new Date(e.previsao).getTime() > 60 * 1000;
+}
+
 function renderizarTabela(lista) {
   const tbody = document.getElementById('tabela-entregas');
 
@@ -213,7 +221,7 @@ function renderizarTabela(lista) {
       <td>${escapeHtml(e.origem)} → ${escapeHtml(e.destino)}</td>
       <td>${celulaAtribuicao(motoristaLabel(e.motorista_id), e.status === 'aguardando')}</td>
       <td>${celulaAtribuicao(veiculoLabel(e.veiculo_id), e.status === 'aguardando')}</td>
-      <td>${formatarDataHora(e.previsao)}</td>
+      <td>${formatarDataHora(e.previsao)}${prazoCurto(e) ? '<span class="prazo-curto-tag" title="A previsão é menor que a saída prevista + tempo estimado de viagem">⚠ prazo curto</span>' : ''}</td>
       <td>${e.valor_frete != null ? 'R$ ' + parseFloat(e.valor_frete).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'}</td>
       <td>${badgeStatus(e.status)}</td>
       <td style="display:flex;gap:6px;">
@@ -311,6 +319,9 @@ function abrirModal(id) {
   }
 
   document.getElementById('modal').classList.add('aberto');
+  // Depois de abrir o modal: o mapa do planejamento precisa do container
+  // visível pra calcular o próprio tamanho.
+  prepararPlanejamento(entrega);
 }
 
 function fecharModal() {
@@ -418,6 +429,309 @@ function simularViagemComParadasLegais(duracaoSegundos) {
   }
 
   return { horasTotais: decorridoH, paradasCurtas, descansosLongos };
+}
+
+/* O OSRM público calcula tempo de CARRO. Pra caminhão carregado:
+   - velocidade limitada a 90 km/h (limite do CTB pra veículo de carga em
+     rodovia), e mesmo abaixo disso um caminhão pesado roda ~15% mais devagar
+     que um carro no mesmo trecho (subida, retomada, ultrapassagem);
+   - abastecimento a cada ~700 km — quando cai perto de um descanso de 11h,
+     o motorista abastece durante ele, então só conta o que sobra;
+   - parada em posto fiscal a cada divisa estadual cruzada (contada pela
+     malha de estados do IBGE, ver ufsAoLongoDaRota em api.js).
+   Validado contra o trecho a trecho do OSRM (Sapucaia do Sul/RS → João
+   Pessoa/PB): 62,2h pela fórmula abaixo x 62,3h somando cada trecho.
+   Valores ajustáveis aqui se a prática da empresa for diferente. */
+const PARAMETROS_CAMINHAO = {
+  velocidadeMaxKmH: 90,
+  fatorCarregado: 0.85,
+  autonomiaKm: 700,
+  abastecimentoMin: 45,
+  postoFiscalMin: 30,
+};
+
+function estimarViagemCaminhao(rota, ufs) {
+  const { velocidadeMaxKmH, fatorCarregado, autonomiaKm, abastecimentoMin, postoFiscalMin } = PARAMETROS_CAMINHAO;
+  const km = rota.distanceKm;
+  const direcaoH = Math.max(
+    rota.durationSec / 3600 / fatorCarregado,
+    km / (velocidadeMaxKmH * fatorCarregado)
+  );
+  const { horasTotais, paradasCurtas, descansosLongos } = simularViagemComParadasLegais(direcaoH * 3600);
+  const abastecimentos = Math.max(0, Math.floor(km / autonomiaKm) - descansosLongos);
+  const divisas = ufs && ufs.length > 1 ? ufs.length - 1 : 0;
+  const totalH = horasTotais + abastecimentos * abastecimentoMin / 60 + divisas * postoFiscalMin / 60;
+  return { km, direcaoH, totalH, paradasCurtas, descansosLongos, abastecimentos, divisas, ufs: ufs || [] };
+}
+
+/* "131.5" (horas) -> "5d 11h 30min"; abaixo de 1 dia cai no formatarDuracao. */
+function formatarHorasLongas(horas) {
+  if (horas < 24) return formatarDuracao(horas * 3600);
+  const totalMin = Math.round(horas * 60);
+  const d = Math.floor(totalMin / 1440);
+  const h = Math.floor((totalMin % 1440) / 60);
+  const min = totalMin % 60;
+  return [`${d}d`, h ? `${h}h` : '', min ? `${min}min` : ''].filter(Boolean).join(' ');
+}
+
+function descreverParadas(est) {
+  const partes = [];
+  if (est.descansosLongos) partes.push(`${est.descansosLongos} descanso${est.descansosLongos > 1 ? 's' : ''} de 11h`);
+  if (est.paradasCurtas) partes.push(`${est.paradasCurtas} parada${est.paradasCurtas > 1 ? 's' : ''} de 30min`);
+  if (est.abastecimentos) partes.push(`${est.abastecimentos} abastecimento${est.abastecimentos > 1 ? 's' : ''}`);
+  if (est.divisas) partes.push(`${est.divisas} posto${est.divisas > 1 ? 's' : ''} fisca${est.divisas > 1 ? 'is' : 'l'}`);
+  return partes;
+}
+
+/* <input type="datetime-local"> trabalha com "AAAA-MM-DDTHH:MM" em hora local. */
+function paraInputDataHora(data) {
+  const p = n => String(n).padStart(2, '0');
+  return `${data.getFullYear()}-${p(data.getMonth() + 1)}-${p(data.getDate())}T${p(data.getHours())}:${p(data.getMinutes())}`;
+}
+
+/* ===================== PLANEJAMENTO NO FORMULÁRIO =====================
+   Ao preencher origem e destino, calcula a melhor rota (a mais rápida do
+   OSRM, passando pelos pontos de "Passar por" se houver), estima o tempo de
+   caminhão e sugere a previsão de entrega = saída prevista + tempo estimado.
+   A previsão continua editável (folga do motorista, manutenção...): se o
+   usuário mexer nela, o sistema para de sobrescrever e só mostra se o prazo
+   escolhido dá ou não dá tempo. */
+let viasAtuais = [];            // [{nome, lat, lon}] — pontos de passagem na ordem
+let planoAtual = null;          // { rota, est } da rota escolhida
+let previsaoEditadaManual = false;
+let planoRequestId = 0;
+let mapaPlano = null;
+let camadaPlano = null;
+let alternativasAtuais = [];
+
+const CORES_ALTERNATIVAS = ['#2E75B6', '#E67E22', '#8E44AD', '#16A085'];
+
+function garantirMapaPlano() {
+  if (mapaPlano) return;
+  mapaPlano = L.map('mapa-plano', { zoomControl: false }).setView([-14.235, -51.925], 4);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors',
+  }).addTo(mapaPlano);
+  camadaPlano = L.layerGroup().addTo(mapaPlano);
+}
+
+function renderizarVias() {
+  document.getElementById('vias-lista').innerHTML = viasAtuais.map((v, i) => `
+    <span class="via-chip">via ${escapeHtml(v.nome)}
+      <button type="button" title="Remover" onclick="removerVia(${i})">×</button>
+    </span>`).join('');
+}
+
+async function adicionarViaDigitada() {
+  const input = document.getElementById('via-cidade');
+  const nome = input.value.trim();
+  if (!nome) return;
+  const ponto = await geocodificarCidade(nome).catch(() => null);
+  if (!ponto) { toastAviso('Não encontrei essa cidade no mapa.'); return; }
+  viasAtuais.push({ nome, lat: ponto.lat, lon: ponto.lon });
+  input.value = '';
+  renderizarVias();
+  recalcularPlano();
+}
+
+function removerVia(i) {
+  viasAtuais.splice(i, 1);
+  renderizarVias();
+  recalcularPlano();
+}
+
+function lerDataInput(id) {
+  const v = document.getElementById(id).value;
+  return v ? new Date(v) : null;
+}
+
+async function recalcularPlano() {
+  const origem = document.getElementById('origem').value.trim();
+  const destino = document.getElementById('destino').value.trim();
+  const painel = document.getElementById('planejamento');
+  const status = document.getElementById('planejamento-status');
+  document.getElementById('rotas-alternativas').innerHTML = '';
+  alternativasAtuais = [];
+
+  if (!origem || !destino) {
+    painel.hidden = true;
+    planoAtual = null;
+    return;
+  }
+
+  const meuId = ++planoRequestId;
+  painel.hidden = false;
+  status.textContent = 'Calculando rota...';
+  garantirMapaPlano();
+  mapaPlano.invalidateSize();
+
+  const rota = await obterRotaRodoviaria(origem, destino, viasAtuais);
+  if (meuId !== planoRequestId) return;
+  if (!rota) {
+    planoAtual = null;
+    status.textContent = 'Não foi possível calcular a rota (cidade não encontrada ou falha de rede). Preencha a previsão manualmente.';
+    document.getElementById('planejamento-numeros').innerHTML = '';
+    document.getElementById('planejamento-detalhe').textContent = '';
+    document.getElementById('planejamento-prazo').textContent = '';
+    camadaPlano.clearLayers();
+    return;
+  }
+
+  const ufs = rota.coordinates.length ? await ufsAoLongoDaRota(rota.coordinates) : [];
+  if (meuId !== planoRequestId) return;
+
+  planoAtual = { rota, est: estimarViagemCaminhao(rota, ufs) };
+  status.textContent = viasAtuais.length ? 'Rota mais rápida passando pelos pontos escolhidos' : 'Rota mais rápida';
+  desenharPlano();
+  if (!previsaoEditadaManual) aplicarChegadaNaPrevisao();
+  atualizarComparacaoPrazo();
+}
+
+function desenharPlano(alternativas = []) {
+  const { rota, est } = planoAtual;
+  document.getElementById('planejamento-numeros').innerHTML = `
+    <span><b>${est.km.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} km</b></span>
+    <span>direção <b>${formatarHorasLongas(est.direcaoH)}</b></span>
+    <span>viagem total <b>${formatarHorasLongas(est.totalH)}</b></span>`;
+  const paradas = descreverParadas(est);
+  document.getElementById('planejamento-detalhe').innerHTML =
+    (paradas.length ? `Inclui ${paradas.join(', ')}.` : 'Viagem curta, sem paradas obrigatórias.')
+    + (est.ufs.length > 1 ? `<br>Estados: ${est.ufs.join(' → ')}` : '')
+    + '<br>Estimativa para caminhão carregado (máx. 90 km/h, Lei do Motorista 13.103/2015). Não considera trânsito, obras nem tempo de carga/descarga.';
+
+  camadaPlano.clearLayers();
+  alternativas.forEach((alt, i) => {
+    if (i === 0) return;
+    L.polyline(alt.coordinates.map(([lon, lat]) => [lat, lon]), { color: CORES_ALTERNATIVAS[i % CORES_ALTERNATIVAS.length], weight: 3, opacity: 0.6, dashArray: '6 6' }).addTo(camadaPlano);
+  });
+  if (!rota.coordinates.length) return;
+  const linha = L.polyline(rota.coordinates.map(([lon, lat]) => [lat, lon]), { color: CORES_ALTERNATIVAS[0], weight: 4 }).addTo(camadaPlano);
+  const inicio = rota.coordinates[0];
+  const fim = rota.coordinates[rota.coordinates.length - 1];
+  L.marker([inicio[1], inicio[0]], { icon: iconeCaminhaoMapa() }).addTo(camadaPlano);
+  L.circleMarker([fim[1], fim[0]], { radius: 7, color: '#1E4D78', weight: 2, fillColor: '#F2A93B', fillOpacity: 1 }).addTo(camadaPlano);
+  viasAtuais.forEach(v => L.circleMarker([v.lat, v.lon], { radius: 5, color: '#1E4D78', weight: 2, fillColor: '#fff', fillOpacity: 1 }).addTo(camadaPlano).bindTooltip(v.nome));
+  mapaPlano.fitBounds(linha.getBounds(), { padding: [16, 16] });
+}
+
+function chegadaEstimada() {
+  const saida = lerDataInput('saida-prevista');
+  if (!planoAtual || !saida) return null;
+  return new Date(saida.getTime() + planoAtual.est.totalH * 3600 * 1000);
+}
+
+function aplicarChegadaNaPrevisao() {
+  const chegada = chegadaEstimada();
+  if (chegada) document.getElementById('previsao').value = paraInputDataHora(chegada);
+}
+
+function usarChegadaEstimada() {
+  previsaoEditadaManual = false;
+  aplicarChegadaNaPrevisao();
+  atualizarComparacaoPrazo();
+}
+
+function atualizarComparacaoPrazo() {
+  const caixa = document.getElementById('planejamento-prazo');
+  const btnUsar = document.getElementById('btn-usar-estimativa');
+  const chegada = chegadaEstimada();
+  const previsao = lerDataInput('previsao');
+  caixa.className = 'planejamento-prazo';
+  btnUsar.hidden = true;
+  if (!chegada) {
+    caixa.textContent = planoAtual ? 'Informe a saída prevista para calcular a chegada.' : '';
+    return;
+  }
+  const chegadaTxt = chegada.toLocaleString('pt-BR', FORMATO_DATA_HORA_CURTO);
+  if (!previsao) {
+    caixa.textContent = `Chegada estimada: ${chegadaTxt}`;
+    return;
+  }
+  const diffH = (previsao - chegada) / 3600000;
+  btnUsar.hidden = Math.abs(diffH) < 1 / 60;
+  if (diffH >= -1 / 60) {
+    caixa.classList.add('ok');
+    caixa.textContent = Math.abs(diffH) < 1 / 60
+      ? `✓ Chegada estimada: ${chegadaTxt}`
+      : `✓ Prazo viável — chegada estimada ${chegadaTxt}, folga de ${formatarHorasLongas(diffH)}`;
+  } else {
+    caixa.classList.add('curto');
+    caixa.textContent = `⚠ Prazo curto — chegada estimada ${chegadaTxt}, faltam ${formatarHorasLongas(-diffH)} em relação à previsão escolhida`;
+  }
+}
+
+async function mostrarRotasAlternativas() {
+  const lista = document.getElementById('rotas-alternativas');
+  if (viasAtuais.length) {
+    lista.innerHTML = '<small style="color:var(--text-light);">Com pontos de passagem a rota já é fixa — remova-os para comparar as alternativas.</small>';
+    return;
+  }
+  const origem = document.getElementById('origem').value.trim();
+  const destino = document.getElementById('destino').value.trim();
+  if (!planoAtual) return;
+  lista.innerHTML = '<small style="color:var(--text-light);">Buscando alternativas...</small>';
+  const meuId = planoRequestId;
+  const rotas = await obterRotasAlternativas(origem, destino);
+  if (meuId !== planoRequestId) return;
+  if (rotas.length < 2) {
+    lista.innerHTML = '<small style="color:var(--text-light);">O mapa não encontrou outra rota razoável — use "Passar por" para forçar um caminho.</small>';
+    return;
+  }
+  alternativasAtuais = await Promise.all(rotas.map(async r => ({ rota: r, est: estimarViagemCaminhao(r, await ufsAoLongoDaRota(r.coordinates)) })));
+  if (meuId !== planoRequestId) return;
+  lista.innerHTML = alternativasAtuais.map((a, i) => `
+    <button type="button" class="rota-opcao ${i === 0 ? 'escolhida' : ''}" onclick="escolherAlternativa(${i})">
+      <span class="rota-opcao-cor" style="background:${CORES_ALTERNATIVAS[i % CORES_ALTERNATIVAS.length]}"></span>
+      <span><b>Rota ${i + 1}${i === 0 ? ' — mais rápida' : ''}</b> · ${a.est.km.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} km · ${formatarHorasLongas(a.est.totalH)}
+      ${a.est.ufs.length > 1 ? `<br><small style="color:var(--text-light);">${a.est.ufs.join(' → ')}</small>` : ''}</span>
+    </button>`).join('');
+  desenharPlano(rotas);
+}
+
+/* Escolher uma rota alternativa vira um ponto de passagem nela — é o que dá
+   pra guardar e redesenhar depois (o OSRM não tem "id" de rota). O ponto é o
+   da alternativa MAIS LONGE da rota principal: o "meio" da alternativa pode
+   cair num trecho que as duas compartilham, e aí o OSRM voltaria pra
+   principal. */
+function pontoMaisDistanteDaPrincipal(coordsAlt, coordsPrincipal) {
+  const amostra = (coords) => coords.filter((_, i) => i % Math.max(1, Math.floor(coords.length / 300)) === 0);
+  const principal = amostra(coordsPrincipal).map(([lon, lat]) => ({ lat, lon }));
+  let melhor = coordsAlt[Math.floor(coordsAlt.length / 2)];
+  let maiorDist = -1;
+  for (const [lon, lat] of amostra(coordsAlt)) {
+    let menor = Infinity;
+    for (const p of principal) menor = Math.min(menor, distanciaHaversineKm({ lat, lon }, p));
+    if (menor > maiorDist) { maiorDist = menor; melhor = [lon, lat]; }
+  }
+  return melhor;
+}
+
+async function escolherAlternativa(i) {
+  if (i === 0) { viasAtuais = []; renderizarVias(); recalcularPlano(); return; }
+  const alt = alternativasAtuais[i];
+  if (!alt) return;
+  const [lon, lat] = pontoMaisDistanteDaPrincipal(alt.rota.coordinates, alternativasAtuais[0].rota.coordinates);
+  const nome = await nomeCidadeNoPonto(lat, lon) || `ponto da rota ${i + 1}`;
+  viasAtuais = [{ nome, lat, lon }];
+  renderizarVias();
+  recalcularPlano();
+}
+
+function prepararPlanejamento(entrega) {
+  viasAtuais = entrega && Array.isArray(entrega.rota_via) ? entrega.rota_via.map(v => ({ ...v })) : [];
+  renderizarVias();
+  document.getElementById('via-cidade').value = '';
+  // Editando: respeita a previsão já gravada (só compara). Nova: sugere.
+  previsaoEditadaManual = !!entrega;
+  let saida = entrega && entrega.saida_prevista ? new Date(entrega.saida_prevista) : null;
+  if (!saida && !entrega) {
+    saida = new Date();
+    saida.setMinutes(0, 0, 0);
+    saida.setHours(saida.getHours() + 1);
+  }
+  document.getElementById('saida-prevista').value = saida ? paraInputDataHora(saida) : '';
+  planoAtual = null;
+  recalcularPlano();
 }
 
 function preencherStatsRota({ distancia, tempo, chegada, chegadaLabel, paradas }) {
@@ -532,7 +846,8 @@ async function abrirModalRota(id) {
 
   const origemNorm = normalizarBusca(entrega.origem);
   const destinoNorm = normalizarBusca(entrega.destino);
-  const mesmaCidade = origemNorm === destinoNorm;
+  const vias = Array.isArray(entrega.rota_via) ? entrega.rota_via : [];
+  const mesmaCidade = origemNorm === destinoNorm && !vias.length;
 
   L.marker([destino.lat, destino.lon]).addTo(camadaRota).bindPopup(`Destino: ${escapeHtml(entrega.destino)}`);
 
@@ -550,20 +865,23 @@ async function abrirModalRota(id) {
   }
 
   {
-    const rotaCalculada = await obterRotaRodoviaria(entrega.origem, entrega.destino);
+    const rotaCalculada = await obterRotaRodoviaria(entrega.origem, entrega.destino, vias);
+    if (meuRequestId !== rotaRequestId) return;
+    const ufsRota = rotaCalculada && rotaCalculada.coordinates.length ? await ufsAoLongoDaRota(rotaCalculada.coordinates) : null;
     if (meuRequestId !== rotaRequestId) return;
 
     if (rotaCalculada) {
       coordenadas = rotaCalculada.coordinates.map(([lon, lat]) => [lat, lon]);
       const km = rotaCalculada.distanceKm;
-      const { horasTotais, paradasCurtas, descansosLongos } = simularViagemComParadasLegais(rotaCalculada.durationSec);
+      const est = estimarViagemCaminhao(rotaCalculada, ufsRota);
+      const horasTotais = est.totalH;
+      const partesParadas = descreverParadas(est);
 
-      const partesParadas = [];
-      if (descansosLongos > 0) partesParadas.push(`${descansosLongos} descanso${descansosLongos > 1 ? 's' : ''} de 11h`);
-      if (paradasCurtas > 0) partesParadas.push(`${paradasCurtas} parada${paradasCurtas > 1 ? 's' : ''} de 30min`);
-
+      // Âncora da chegada: quando saiu de fato (em rota), senão a saída
+      // planejada no cadastro, senão "se sair agora".
       const iniciadoEm = entrega.status === 'em_rota' ? dataUtcDoBackend(entrega.iniciado_em) : null;
-      const ancoraPartida = iniciadoEm || new Date();
+      const saidaPrevista = entrega.saida_prevista ? new Date(entrega.saida_prevista) : null;
+      const ancoraPartida = iniciadoEm || saidaPrevista || new Date();
       const chegada = new Date(ancoraPartida.getTime() + horasTotais * 3600 * 1000);
 
       let chegadaLabel = 'Chegada (saindo agora)';
@@ -573,16 +891,22 @@ async function abrirModalRota(id) {
         chegadaTexto = dataUtcDoBackend(entrega.concluido_em).toLocaleString('pt-BR', FORMATO_DATA_HORA_CURTO);
       } else if (entrega.status === 'em_rota' && iniciadoEm) {
         chegadaLabel = 'Chegada estimada';
+      } else if (saidaPrevista) {
+        chegadaLabel = `Chegada (saída ${saidaPrevista.toLocaleString('pt-BR', FORMATO_DATA_HORA_CURTO)})`;
       }
 
       preencherStatsRota({
         distancia: `${km.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} km`,
-        tempo: formatarDuracao(rotaCalculada.durationSec),
+        tempo: `${formatarHorasLongas(est.direcaoH)} (total ${formatarHorasLongas(est.totalH)})`,
         chegada: chegadaTexto,
         chegadaLabel,
         paradas: partesParadas.length ? partesParadas.join(' + ') : 'Nenhuma',
       });
-      status.textContent = 'Tempo de direção calculado via OpenStreetMap (OSRM). Chegada considera as paradas obrigatórias da Lei do Motorista (Lei 13.103/2015) — direção contínua máx. de 5h30 e descanso de 11h a cada 8h dirigidas. Estimativa de planejamento (não inclui pedágio nem trânsito), não substitui o cronotacógrafo.';
+      status.textContent = (vias.length ? `Passando por ${vias.map(v => v.nome).join(', ')}. ` : '')
+        + (est.ufs.length > 1 ? `Estados: ${est.ufs.join(' → ')}. ` : '')
+        + 'Rota via OpenStreetMap (OSRM), tempo ajustado para caminhão carregado (máx. 90 km/h) com as paradas da Lei do Motorista (Lei 13.103/2015), abastecimentos e postos fiscais nas divisas. Estimativa de planejamento (não inclui trânsito nem carga/descarga), não substitui o cronotacógrafo.';
+      vias.forEach(v => L.circleMarker([v.lat, v.lon], { radius: 6, color: '#1E4D78', weight: 2, fillColor: '#fff', fillOpacity: 1 })
+        .addTo(camadaRota).bindPopup(`Passando por: ${escapeHtml(v.nome)}`));
 
       // Posição do caminhão: parado na origem (ainda não saiu), avançando pelo
       // trajeto real (entrega em rota) ou parado no destino (já entregue).
@@ -630,7 +954,18 @@ async function salvarEntrega() {
     valor_frete: moedaParaNumero(document.getElementById('valor-frete').value),
     motorista_id: parseInt(document.getElementById('motorista-id').value) || null,
     veiculo_id: parseInt(document.getElementById('veiculo-id').value) || null,
+    saida_prevista: document.getElementById('saida-prevista').value || null,
+    rota_via: viasAtuais.length ? viasAtuais : null,
   };
+  // Sem rota calculada (falha de rede, cidade não achada) não sobrescreve a
+  // estimativa gravada de uma entrega em edição com vazio.
+  if (planoAtual) {
+    dados.distancia_km = Math.round(planoAtual.est.km * 10) / 10;
+    dados.tempo_estimado_h = Math.round(planoAtual.est.totalH * 10) / 10;
+  } else if (!entregaEditandoId) {
+    dados.distancia_km = null;
+    dados.tempo_estimado_h = null;
+  }
 
   if (!dados.cliente || !dados.origem || !dados.destino || !dados.previsao) {
     toastAviso('Preencha todos os campos obrigatórios!');
@@ -671,6 +1006,22 @@ async function iniciar() {
   definirPeriodoPadrao();
   ativarAutocompleteCidade(document.getElementById('origem'));
   ativarAutocompleteCidade(document.getElementById('destino'));
+  ativarAutocompleteCidade(document.getElementById('via-cidade'));
+  document.getElementById('origem').addEventListener('change', recalcularPlano);
+  document.getElementById('destino').addEventListener('change', recalcularPlano);
+  document.getElementById('via-cidade').addEventListener('change', () => {
+    // Escolher uma cidade no autocomplete já adiciona (sem precisar do botão).
+    const v = document.getElementById('via-cidade').value;
+    if (/ - [A-Z]{2}$/.test(v)) adicionarViaDigitada();
+  });
+  document.getElementById('saida-prevista').addEventListener('change', () => {
+    if (!previsaoEditadaManual) aplicarChegadaNaPrevisao();
+    atualizarComparacaoPrazo();
+  });
+  document.getElementById('previsao').addEventListener('input', () => {
+    previsaoEditadaManual = true;
+    atualizarComparacaoPrazo();
+  });
   /* Motorista só vê as próprias entregas; cadastros de veículo/motorista/conjunto
      ficam bloqueados pra esse perfil, então nem tenta carregar (e nem precisa). */
   if (localStorage.getItem('perfil') !== 'motorista') {

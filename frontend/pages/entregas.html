@@ -168,9 +168,33 @@
           </select>
           <small id="conjunto-info" style="color:var(--text-light);font-size:11px;"></small>
         </div>
-        <div class="form-group"><label>Previsão *</label><input type="datetime-local" id="previsao" /></div>
         <div class="form-group"><label>Descrição da carga</label><input type="text" id="descricao"
             placeholder="Opcional" /></div>
+        <div class="form-group" style="grid-column:1/-1;">
+          <label>Passar por <span style="font-weight:400;color:var(--text-light);">(opcional — pra mudar a rota)</span></label>
+          <div style="display:flex;gap:8px;">
+            <div style="flex:1;"><input type="text" id="via-cidade" placeholder="Cidade de passagem" style="width:100%;" /></div>
+            <button type="button" class="btn btn-outline" onclick="adicionarViaDigitada()">Adicionar</button>
+          </div>
+          <div id="vias-lista" class="vias-lista"></div>
+        </div>
+        <div class="form-group"><label>Saída prevista</label><input type="datetime-local" id="saida-prevista" /></div>
+        <div class="form-group"><label>Previsão de entrega *</label><input type="datetime-local" id="previsao" /></div>
+        <div class="planejamento" id="planejamento" style="grid-column:1/-1;" hidden>
+          <div class="planejamento-cabecalho">
+            <strong>Planejamento da viagem</strong>
+            <span id="planejamento-status"></span>
+          </div>
+          <div class="planejamento-numeros" id="planejamento-numeros"></div>
+          <div class="planejamento-detalhe" id="planejamento-detalhe"></div>
+          <div class="planejamento-prazo" id="planejamento-prazo"></div>
+          <div class="planejamento-acoes">
+            <button type="button" class="btn btn-outline" id="btn-usar-estimativa" onclick="usarChegadaEstimada()" hidden>Usar chegada estimada</button>
+            <button type="button" class="btn btn-outline" id="btn-alternativas" onclick="mostrarRotasAlternativas()">Ver rotas alternativas</button>
+          </div>
+          <div id="rotas-alternativas" class="rotas-alternativas"></div>
+          <div id="mapa-plano" class="mapa-plano"></div>
+        </div>
       </div>
       <div style="margin-top:24px;display:flex;gap:12px;justify-content:flex-end;">
         <button class="btn btn-outline" onclick="fecharModal()">Cancelar</button>
