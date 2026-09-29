@@ -1349,8 +1349,24 @@ body.dark .trecho-meio .km, body.dark .trecho-meio .km-rotulo { color: #F0A35E; 
 .leaflet-tooltip.mapa-km-rotulo-clicavel { cursor: pointer; }
 .mapa-como-ler { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; font-size: 13px; line-height: 1.45; color: var(--text); }
 .mapa-como-ler > div { display: flex; align-items: center; gap: 10px; }
-.mapa-como-ler > div > span:not(.mapa-num) { flex: 1; }
+.mapa-como-ler > div > span:not(.mapa-num):not(.mapa-caminhao-leg) { flex: 1; }
 .mapa-como-ler .mapa-num { width: 22px; height: 22px; font-size: 11.5px; box-shadow: none; }
 .linha-mini { display: inline-block; width: 22px; height: 0; border-top: 4px solid #2E75B6; border-radius: 2px; }
 .linha-mini-clara { opacity: 0.4; }
 .linha-mini-vazio { border-top: 4px dashed #E67E22; }
+.leaflet-tooltip.mapa-fim-rotulo {
+  background: #2E75B6; color: #fff; border: none; border-radius: 7px; font-weight: 700; font-size: 12px;
+  padding: 4px 9px; box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+}
+.leaflet-tooltip-right.mapa-fim-rotulo::before { border-right-color: #2E75B6; }
+.leaflet-tooltip-left.mapa-fim-rotulo::before { border-left-color: #2E75B6; }
+.leaflet-tooltip-bottom.mapa-fim-rotulo::before { border-bottom-color: #2E75B6; }
+.leaflet-tooltip-top.mapa-fim-rotulo::before { border-top-color: #2E75B6; }
+.mapa-caminhao-leg {
+  display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; flex-shrink: 0;
+  border-radius: 6px; background: rgba(46,117,182,0.14); color: #2E75B6;
+}
+.mapa-caminhao-leg svg { width: 14px; height: 14px; }
+.mapa-link-ciclo { font-weight: 600; color: #2E75B6; text-decoration: none; white-space: nowrap; margin-left: 4px; }
+.mapa-link-ciclo:hover { text-decoration: underline; }
+body.dark .mapa-link-ciclo, body.dark .mapa-caminhao-leg { color: #7CB2E8; }

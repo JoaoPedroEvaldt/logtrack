@@ -327,6 +327,12 @@ function selecionarTrecho(i, rolarAteMapa) {
   }
 }
 
+function navegarPara(i) {
+  selecionarTrecho(i);
+  const card = document.querySelectorAll('.trecho')[i];
+  if (card && window.innerWidth > 1100) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
 function navegarTrecho(passo) {
   if (!trechosAtuais.length) return;
   selecionarTrecho((selecionado + passo + trechosAtuais.length) % trechosAtuais.length);
@@ -363,19 +369,46 @@ async function renderizarMapa() {
       .setLatLng(pontoDoMeio(vazio)).setContent(`2 · ${fmtKm(t.km)} vazio`).addTo(camadaMapa);
     marcadorNumero(vazio[0], 1, 'num-fim').addTo(camadaMapa).bindTooltip(`Terminou a entrega #${t.anterior.id} em ${escapeHtml(t.anterior.destino)}`);
     marcadorNumero(vazio[vazio.length - 1], 3, 'num-ini').addTo(camadaMapa).bindTooltip(`Pegou a carga da entrega #${t.entrega.id} em ${escapeHtml(t.entrega.origem)}`);
-    // Enquadra o trecho vazio (o foco), com folga pra mostrar o começo das
-    // viagens com carga saindo e chegando.
-    mapa.fitBounds(L.latLngBounds(vazio).pad(0.35));
-  } else if (depois) {
-    mapa.fitBounds(L.latLngBounds(depois).pad(0.2));
+  }
+
+  // Fim do ciclo: caminhão no destino da entrega carregada (fim da linha
+  // azul) — dali ele vai partir vazio de novo pra uma próxima carga.
+  const entregou = t.entrega.status === 'entregue';
+  let pontoFinal = depois ? depois[depois.length - 1] : null;
+  if (!pontoFinal) {
+    const p = await geocodificarCidade(t.entrega.destino);
+    if (meuId !== mapaReqId) return;
+    if (p) pontoFinal = [p.lat, p.lon];
+  }
+  // Enquadra o ciclo todo: do fim da entrega anterior (1) até o caminhão no
+  // destino da próxima — a viagem com carga de antes (azul claro) fica só
+  // como contexto, saindo pela borda.
+  const foco = [...(vazio || []), ...(depois || []), ...(pontoFinal ? [pontoFinal] : [])];
+  if (foco.length) mapa.fitBounds(L.latLngBounds(foco).pad(0.15), { animate: false });
+
+  if (pontoFinal) {
+    L.marker(pontoFinal, { icon: iconeCaminhaoMapa('#2E75B6', '#1E4D78'), zIndexOffset: 1100 }).addTo(camadaMapa);
+    // Etiqueta embaixo do caminhão (a dos km do vazio fica em cima da linha
+    // laranja, não disputam espaço); perto da borda de baixo, vai pra cima.
+    const pertoDoRodape = mapa.latLngToContainerPoint(pontoFinal).y > mapa.getSize().y - 60;
+    L.tooltip({ permanent: true, direction: pertoDoRodape ? 'top' : 'bottom', className: 'mapa-fim-rotulo', offset: pertoDoRodape ? [0, -16] : [0, 16] })
+      .setLatLng(pontoFinal).setContent(entregou ? `Entregou em ${escapeHtml(t.entrega.destino)}` : `A caminho de ${escapeHtml(t.entrega.destino)}`).addTo(camadaMapa);
   }
 
   document.getElementById('mapa-legenda-atual').innerHTML =
     `<strong>Trecho ${selecionado + 1} de ${trechosAtuais.length}</strong> · ${escapeHtml(placaDo(t.entrega.veiculo_id))} · ${fmtData(dataUtc(t.entrega.iniciado_em)).slice(0, 10)}`;
+  // Ciclos encadeados do mesmo caminhão: o trecho que terminou onde este
+  // começou, e o que partiu de onde este terminou (se estiverem no filtro).
+  const anteriorIdx = trechosAtuais.findIndex(x => x.entrega.id === t.anterior.id);
+  const proximo = trechosAtuais.findIndex(x => x.anterior.id === t.entrega.id);
   document.getElementById('mapa-como-ler').innerHTML = `
-    <div><span class="mapa-num num-fim">1</span><span>Terminou a entrega #${t.anterior.id} em <strong>${escapeHtml(t.anterior.destino)}</strong></span><i class="linha-mini linha-mini-clara" title="linha azul clara: a viagem com carga que terminou aqui"></i></div>
+    <div><span class="mapa-num num-fim">1</span><span>Terminou a entrega #${t.anterior.id} em <strong>${escapeHtml(t.anterior.destino)}</strong>${anteriorIdx >= 0 ? ` <a href="#" class="mapa-link-ciclo" onclick="event.preventDefault(); navegarPara(${anteriorIdx})">← trecho anterior</a>` : ''}</span><i class="linha-mini linha-mini-clara" title="linha azul clara: a viagem com carga que terminou aqui"></i></div>
     <div><span class="mapa-num num-vazio">2</span><span>Rodou <strong>${fmtKm(t.km)} sem carga</strong></span><i class="linha-mini linha-mini-vazio" title="linha laranja tracejada"></i></div>
-    <div><span class="mapa-num num-ini">3</span><span>Carregou em <strong>${escapeHtml(t.entrega.origem)}</strong> e seguiu com carga até ${escapeHtml(t.entrega.destino)}</span><i class="linha-mini" title="linha azul"></i></div>`;
+    <div><span class="mapa-num num-ini">3</span><span>Carregou em <strong>${escapeHtml(t.entrega.origem)}</strong> e seguiu com carga até ${escapeHtml(t.entrega.destino)}</span><i class="linha-mini" title="linha azul"></i></div>
+    <div><span class="mapa-caminhao-leg">${svgIcone('caminhao', 14)}</span><span>${entregou
+      ? `Entregou em <strong>${escapeHtml(t.entrega.destino)}</strong>: fim do ciclo. Daqui o caminhão parte vazio para a próxima carga.`
+      : `Ainda <strong>a caminho de ${escapeHtml(t.entrega.destino)}</strong>. Quando entregar, o ciclo recomeça.`}
+      ${proximo >= 0 ? `<a href="#" class="mapa-link-ciclo" onclick="event.preventDefault(); navegarPara(${proximo})">Ver próximo trecho →</a>` : ''}</span></div>`;
   document.querySelectorAll('.trecho').forEach((el, i) => el.classList.toggle('destacado', i === selecionado));
 }
 
