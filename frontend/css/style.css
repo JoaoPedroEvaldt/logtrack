@@ -1314,3 +1314,43 @@ body.dark .trecho-meio .km, body.dark .trecho-meio .km-rotulo { color: #F0A35E; 
   .trecho-fluxo { grid-template-columns: 1fr; gap: 8px; }
   .trecho-meio::before { left: 50%; right: auto; top: 0; bottom: 0; border-top: none; border-left: 3px dashed #E67E22; }
 }
+
+/* Mapa da página de deslocamento vazio: seletor de modo, navegação e marcadores numerados. */
+.trecho { cursor: pointer; }
+.trecho:hover { border-color: rgba(230,126,34,0.55); }
+.seletor-modo { display: inline-flex; background: var(--bg); border: 1px solid var(--border); border-radius: 9px; padding: 3px; gap: 2px; }
+.seletor-modo button {
+  border: none; background: none; cursor: pointer; font-size: 12px; font-weight: 600; color: var(--text-light);
+  padding: 6px 11px; border-radius: 7px; white-space: nowrap;
+}
+.seletor-modo button.ativo { background: var(--bg-card); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+.mapa-navegacao { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
+.mapa-navegacao[hidden] { display: none; }
+.mapa-legenda-atual { flex: 1; text-align: center; font-size: 13px; color: var(--text-light); }
+.mapa-legenda-atual strong { color: var(--text); }
+.vazio-mapa-card .vazio-mapa { margin-top: 10px; }
+.mapa-navegacao + .vazio-mapa { margin-top: 0; }
+.mapa-num-wrap { background: none; border: none; }
+.mapa-num {
+  display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%;
+  font: 800 13px 'Segoe UI', Arial, sans-serif; border: 2.5px solid #1E4D78; background: #fff; color: #1E4D78;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.25); flex-shrink: 0;
+}
+.mapa-num.num-ini { background: #F2A93B; color: #1E2A44; }
+.mapa-num.num-vazio { background: #E67E22; border-color: #E67E22; color: #fff; }
+.leaflet-tooltip.mapa-km-rotulo {
+  background: #E67E22; color: #fff; border: none; border-radius: 7px; font-weight: 700; font-size: 12.5px;
+  padding: 4px 9px; box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+}
+.leaflet-tooltip-top.mapa-km-rotulo::before { border-top-color: #E67E22; }
+.leaflet-tooltip-bottom.mapa-km-rotulo::before { border-bottom-color: #E67E22; }
+.leaflet-tooltip-left.mapa-km-rotulo::before { border-left-color: #E67E22; }
+.leaflet-tooltip-right.mapa-km-rotulo::before { border-right-color: #E67E22; }
+.leaflet-tooltip.mapa-km-rotulo-clicavel { cursor: pointer; }
+.mapa-como-ler { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; font-size: 13px; line-height: 1.45; color: var(--text); }
+.mapa-como-ler > div { display: flex; align-items: center; gap: 10px; }
+.mapa-como-ler > div > span:not(.mapa-num) { flex: 1; }
+.mapa-como-ler .mapa-num { width: 22px; height: 22px; font-size: 11.5px; box-shadow: none; }
+.linha-mini { display: inline-block; width: 22px; height: 0; border-top: 4px solid #2E75B6; border-radius: 2px; }
+.linha-mini-clara { opacity: 0.4; }
+.linha-mini-vazio { border-top: 4px dashed #E67E22; }

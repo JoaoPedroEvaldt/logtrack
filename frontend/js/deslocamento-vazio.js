@@ -13,7 +13,6 @@ document.querySelectorAll('.vazio-kpis .card-icon').forEach(el => { el.innerHTML
 let entregas = [], veiculos = [], motoristas = [], abastecimentos = [], deslocamentos = [];
 let precoDieselMedio = null;
 let mapa = null;
-let camadasPorTrecho = new Map();   // id do deslocamento -> L.layerGroup
 let grafico = null;
 let renderId = 0;
 
@@ -129,6 +128,7 @@ async function atualizarTela() {
 
   if (!trechos.length) {
     lista.innerHTML = `<div class="vazio-estado-vazio">Nenhum deslocamento vazio neste período.<br>Ele aparece aqui sozinho quando um caminhão inicia uma entrega depois de ter concluído outra.</div>`;
+    trechosAtuais = [];
     limparMapa();
     atualizarPercentual(0, 0, meuId, true);
     return;
@@ -152,11 +152,13 @@ async function atualizarTela() {
   }
 
   lista.innerHTML = enriquecidos.map(cartaoTrecho).join('');
-  await desenharMapa(enriquecidos, meuId);
+  trechosAtuais = enriquecidos;
+  selecionado = 0;
+  await renderizarMapa();
   atualizarPercentualDoPeriodo(kmTotal, meuId);
 }
 
-function cartaoTrecho(t) {
+function cartaoTrecho(t, i) {
   const { dv, entrega, anterior, km, kmCarga, pct, direcaoH } = t;
   const nivel = nivelDoPercentual(pct);
   const placa = placaDo(entrega.veiculo_id);
@@ -182,7 +184,7 @@ function cartaoTrecho(t) {
     : '';
 
   return `
-  <article class="trecho" id="trecho-${dv.id}">
+  <article class="trecho" id="trecho-${dv.id}" onclick="selecionarTrecho(${i}, true)" title="Clique para ver este trecho no mapa">
     <div class="trecho-topo">
       <div class="trecho-quem"><strong>${escapeHtml(placa)}</strong>${motorista ? ` · ${escapeHtml(motorista)}` : ''} · saiu vazio para a entrega #${entrega.id}</div>
       ${nivel ? `<span class="nivel ${nivel.classe}" title="Parte da viagem feita sem carga">${nivel.nome} · ${Math.round(pct * 100)}% vazio</span>` : ''}
@@ -212,7 +214,7 @@ function cartaoTrecho(t) {
         ? `Com carga depois: ${fmtKm(kmCarga)} · vazio antes: ${fmtKm(km)}
            <div class="barra-proporcao"><span class="barra-carregado" style="width:${(1 - pct) * 100}%"></span><span class="barra-vazio" style="width:${pct * 100}%"></span></div>`
         : ''}</div>
-      <button type="button" class="btn btn-outline btn-mini" onclick="focarTrecho(${dv.id})">${svgIcone('local', 12)} Ver no mapa</button>
+      <button type="button" class="btn btn-outline btn-mini" onclick="event.stopPropagation(); selecionarTrecho(${i}, true)">${svgIcone('local', 12)} Ver no mapa</button>
     </div>
   </article>`;
 }
@@ -262,81 +264,152 @@ function atualizarPercentual(kmVazio, kmCarga, meuId, semDados) {
     : `De ${fmtKm(total)} rodados, ${fmtKm(kmVazio)} foram sem carga (laranja) e ${fmtKm(kmCarga)} com carga (azul). Conta só as viagens desde ${inicioDaMedicao().toLocaleDateString('pt-BR')}, quando o sistema passou a medir o vazio.`;
 }
 
-/* ---------------------------------------------------------------- mapa */
+/* ---------------------------------------------------------------- mapa
+   Dois modos, pra nunca misturar viagens:
+   - "um trecho por vez" (padrão): só a história do trecho escolhido — a
+     entrega anterior (azul claro), o trecho vazio (laranja tracejado, com os
+     km escritos em cima) e a próxima carga (azul), com os pontos numerados
+     1-2-3 iguais aos passos do cartão;
+   - "todos os vazios": visão geral só com as linhas laranjas (sem os trechos
+     com carga), cada uma clicável pra abrir aquele trecho. */
+let trechosAtuais = [];
+let modoMapa = 'um';
+let selecionado = 0;
+let camadaMapa = null;
+let mapaReqId = 0;
+
 function garantirMapa() {
   if (mapa) return;
   mapa = L.map('mapa-vazio-pagina').setView([-14.235, -51.925], 4);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap contributors',
   }).addTo(mapa);
+  camadaMapa = L.layerGroup().addTo(mapa);
 }
 
 function limparMapa() {
   garantirMapa();
-  camadasPorTrecho.forEach(c => mapa.removeLayer(c));
-  camadasPorTrecho = new Map();
-  document.getElementById('btn-mapa-todos').hidden = true;
+  camadaMapa.clearLayers();
+  document.getElementById('mapa-legenda-atual').textContent = '—';
+  document.getElementById('mapa-como-ler').innerHTML = '';
 }
 
 function linhaDaRota(rota) {
   return rota && rota.coordinates.length >= 2 ? rota.coordinates.map(([lon, lat]) => [lat, lon]) : null;
 }
 
-async function desenharMapa(trechos, meuId) {
-  limparMapa();
+function marcadorNumero(latlng, numero, classe) {
+  return L.marker(latlng, {
+    icon: L.divIcon({ className: 'mapa-num-wrap', html: `<span class="mapa-num ${classe}">${numero}</span>`, iconSize: [28, 28], iconAnchor: [14, 14] }),
+    zIndexOffset: 1000,
+  });
+}
+
+function pontoDoMeio(linha) {
+  return linha[Math.floor(linha.length / 2)];
+}
+
+function mudarModoMapa(modo) {
+  modoMapa = modo;
+  document.getElementById('modo-um').classList.toggle('ativo', modo === 'um');
+  document.getElementById('modo-todos').classList.toggle('ativo', modo === 'todos');
+  document.getElementById('mapa-navegacao').hidden = modo !== 'um';
+  document.querySelectorAll('.trecho').forEach((el, i) => el.classList.toggle('destacado', modo === 'um' && i === selecionado));
+  renderizarMapa();
+}
+
+function selecionarTrecho(i, rolarAteMapa) {
+  if (!trechosAtuais[i]) return;
+  selecionado = i;
+  mudarModoMapa('um');
+  if (rolarAteMapa && window.innerWidth <= 1100) {
+    document.getElementById('mapa-vazio-pagina').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
+
+function navegarTrecho(passo) {
+  if (!trechosAtuais.length) return;
+  selecionarTrecho((selecionado + passo + trechosAtuais.length) % trechosAtuais.length);
+  const card = document.querySelectorAll('.trecho')[selecionado];
+  if (card && window.innerWidth > 1100) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function renderizarMapa() {
+  const meuId = ++mapaReqId;
+  garantirMapa();
   document.getElementById('mapa-vazio-pagina').classList.toggle('mapa-escuro', document.body.classList.contains('dark'));
   mapa.invalidateSize();
-  const todos = [];
-  for (const t of trechos) {
-    const rotaAntes = await obterRotaRodoviaria(t.anterior.origem, t.anterior.destino);
-    const rotaDepois = await obterRotaRodoviaria(t.entrega.origem, t.entrega.destino);
-    if (meuId !== renderId) return;
-    const grupo = L.layerGroup();
-    const antes = linhaDaRota(rotaAntes);
-    const vazio = linhaDaRota(t.rotaVazio);
-    const depois = linhaDaRota(rotaDepois);
-    const popup = `<strong>${escapeHtml(placaDo(t.entrega.veiculo_id))}</strong><br>${escapeHtml(t.anterior.destino)} → ${escapeHtml(t.entrega.origem)}<br>${fmtKm(t.km)} sem carga`;
-    if (antes) L.polyline(antes, { color: COR_CARREGADO, weight: 3, opacity: 0.55 }).addTo(grupo).bindPopup(`Entrega #${t.anterior.id} (com carga): ${escapeHtml(t.anterior.origem)} → ${escapeHtml(t.anterior.destino)}`);
-    if (depois) L.polyline(depois, { color: COR_CARREGADO, weight: 3, opacity: 0.55 }).addTo(grupo).bindPopup(`Entrega #${t.entrega.id} (com carga): ${escapeHtml(t.entrega.origem)} → ${escapeHtml(t.entrega.destino)}`);
-    if (vazio) {
-      L.polyline(vazio, { color: COR_VAZIO, weight: 5, dashArray: '9 8' }).addTo(grupo).bindPopup(popup);
-      L.circleMarker(vazio[0], { radius: 7, color: '#1E4D78', weight: 3, fillColor: '#fff', fillOpacity: 1 }).addTo(grupo)
-        .bindPopup(`Terminou a entrega #${t.anterior.id} em ${escapeHtml(t.anterior.destino)}`);
-      L.circleMarker(vazio[vazio.length - 1], { radius: 7, color: '#1E4D78', weight: 2.5, fillColor: '#F2A93B', fillOpacity: 1 }).addTo(grupo)
-        .bindPopup(`Pegou a carga da entrega #${t.entrega.id} em ${escapeHtml(t.entrega.origem)}`);
-      todos.push(...vazio);
-    }
-    if (antes) todos.push(...antes);
-    if (depois) todos.push(...depois);
-    grupo.addTo(mapa);
-    camadasPorTrecho.set(t.dv.id, grupo);
+  if (!trechosAtuais.length) { limparMapa(); return; }
+  if (modoMapa === 'todos') return renderizarTodosVazios();
+
+  const t = trechosAtuais[selecionado];
+  const [rotaAntes, rotaDepois] = [
+    await obterRotaRodoviaria(t.anterior.origem, t.anterior.destino),
+    await obterRotaRodoviaria(t.entrega.origem, t.entrega.destino),
+  ];
+  if (meuId !== mapaReqId) return;
+  camadaMapa.clearLayers();
+
+  const antes = linhaDaRota(rotaAntes);
+  const vazio = linhaDaRota(t.rotaVazio);
+  const depois = linhaDaRota(rotaDepois);
+  if (antes) L.polyline(antes, { color: COR_CARREGADO, weight: 3, opacity: 0.35 }).addTo(camadaMapa)
+    .bindTooltip(`Entrega anterior #${t.anterior.id} (com carga): ${escapeHtml(t.anterior.origem)} → ${escapeHtml(t.anterior.destino)}`, { sticky: true });
+  if (depois) L.polyline(depois, { color: COR_CARREGADO, weight: 4, opacity: 0.85 }).addTo(camadaMapa)
+    .bindTooltip(`Próxima entrega #${t.entrega.id} (com carga): ${escapeHtml(t.entrega.origem)} → ${escapeHtml(t.entrega.destino)}`, { sticky: true });
+  if (vazio) {
+    L.polyline(vazio, { color: COR_VAZIO, weight: 6, dashArray: '10 9' }).addTo(camadaMapa);
+    L.tooltip({ permanent: true, direction: 'top', className: 'mapa-km-rotulo', offset: [0, -8] })
+      .setLatLng(pontoDoMeio(vazio)).setContent(`2 · ${fmtKm(t.km)} vazio`).addTo(camadaMapa);
+    marcadorNumero(vazio[0], 1, 'num-fim').addTo(camadaMapa).bindTooltip(`Terminou a entrega #${t.anterior.id} em ${escapeHtml(t.anterior.destino)}`);
+    marcadorNumero(vazio[vazio.length - 1], 3, 'num-ini').addTo(camadaMapa).bindTooltip(`Pegou a carga da entrega #${t.entrega.id} em ${escapeHtml(t.entrega.origem)}`);
+    // Enquadra o trecho vazio (o foco), com folga pra mostrar o começo das
+    // viagens com carga saindo e chegando.
+    mapa.fitBounds(L.latLngBounds(vazio).pad(0.35));
+  } else if (depois) {
+    mapa.fitBounds(L.latLngBounds(depois).pad(0.2));
   }
-  if (todos.length) mapa.fitBounds(todos, { padding: [24, 24] });
+
+  document.getElementById('mapa-legenda-atual').innerHTML =
+    `<strong>Trecho ${selecionado + 1} de ${trechosAtuais.length}</strong> · ${escapeHtml(placaDo(t.entrega.veiculo_id))} · ${fmtData(dataUtc(t.entrega.iniciado_em)).slice(0, 10)}`;
+  document.getElementById('mapa-como-ler').innerHTML = `
+    <div><span class="mapa-num num-fim">1</span><span>Terminou a entrega #${t.anterior.id} em <strong>${escapeHtml(t.anterior.destino)}</strong></span><i class="linha-mini linha-mini-clara" title="linha azul clara: a viagem com carga que terminou aqui"></i></div>
+    <div><span class="mapa-num num-vazio">2</span><span>Rodou <strong>${fmtKm(t.km)} sem carga</strong></span><i class="linha-mini linha-mini-vazio" title="linha laranja tracejada"></i></div>
+    <div><span class="mapa-num num-ini">3</span><span>Carregou em <strong>${escapeHtml(t.entrega.origem)}</strong> e seguiu com carga até ${escapeHtml(t.entrega.destino)}</span><i class="linha-mini" title="linha azul"></i></div>`;
+  document.querySelectorAll('.trecho').forEach((el, i) => el.classList.toggle('destacado', i === selecionado));
 }
 
-function focarTrecho(id) {
-  const grupo = camadasPorTrecho.get(id);
-  if (!grupo) return;
-  camadasPorTrecho.forEach((g, gid) => {
-    g.eachLayer(l => l.setStyle && l.setStyle({ opacity: gid === id ? 1 : 0.12, fillOpacity: gid === id ? 1 : 0.12 }));
+function renderizarTodosVazios() {
+  camadaMapa.clearLayers();
+  const pontos = [];
+  const rotulosFixos = trechosAtuais.length <= 8; // com muitos trechos, km só ao passar o mouse
+  trechosAtuais.forEach((t, i) => {
+    const vazio = linhaDaRota(t.rotaVazio);
+    if (!vazio) return;
+    const linha = L.polyline(vazio, { color: COR_VAZIO, weight: 6, dashArray: '10 9' }).addTo(camadaMapa);
+    // Linha "invisível" mais grossa por baixo: facilita acertar o clique.
+    L.polyline(vazio, { color: COR_VAZIO, weight: 18, opacity: 0 }).addTo(camadaMapa).on('click', () => selecionarTrecho(i));
+    linha.on('click', () => selecionarTrecho(i));
+    const rotulo = `${escapeHtml(placaDo(t.entrega.veiculo_id))}: ${fmtKm(t.km)}`;
+    if (rotulosFixos) {
+      // Direções alternadas: trechos vizinhos (mesma região) não empilham
+      // as etiquetas uma em cima da outra.
+      const direcao = ['top', 'bottom', 'right', 'left'][i % 4];
+      const offset = { top: [0, -8], bottom: [0, 8], right: [10, 0], left: [-10, 0] }[direcao];
+      const tip = L.tooltip({ permanent: true, direction: direcao, className: 'mapa-km-rotulo mapa-km-rotulo-clicavel', offset, interactive: true })
+        .setLatLng(pontoDoMeio(vazio)).setContent(rotulo).addTo(camadaMapa);
+      tip.getElement() && tip.getElement().addEventListener('click', () => selecionarTrecho(i));
+    } else {
+      linha.bindTooltip(rotulo, { sticky: true });
+    }
+    L.circleMarker(vazio[0], { radius: 5, color: '#1E4D78', weight: 2, fillColor: '#fff', fillOpacity: 1 }).addTo(camadaMapa);
+    L.circleMarker(vazio[vazio.length - 1], { radius: 5, color: '#1E4D78', weight: 2, fillColor: '#F2A93B', fillOpacity: 1 }).addTo(camadaMapa);
+    pontos.push(...vazio);
   });
-  const pontos = [];
-  grupo.eachLayer(l => { if (l.getLatLngs) pontos.push(...l.getLatLngs()); });
-  if (pontos.length) mapa.fitBounds(pontos, { padding: [30, 30] });
-  document.querySelectorAll('.trecho').forEach(el => el.classList.toggle('destacado', el.id === `trecho-${id}`));
-  document.getElementById('btn-mapa-todos').hidden = false;
-  if (window.innerWidth <= 1100) document.getElementById('mapa-vazio-pagina').scrollIntoView({ behavior: 'smooth', block: 'center' });
-}
-
-function mostrarTodosNoMapa() {
-  const pontos = [];
-  camadasPorTrecho.forEach(g => g.eachLayer(l => {
-    if (l.setStyle) l.setStyle({ opacity: l.options.dashArray ? 1 : (l instanceof L.CircleMarker ? 1 : 0.55), fillOpacity: 1 });
-    if (l.getLatLngs) pontos.push(...l.getLatLngs());
-  }));
-  if (pontos.length) mapa.fitBounds(pontos, { padding: [24, 24] });
-  document.querySelectorAll('.trecho.destacado').forEach(el => el.classList.remove('destacado'));
-  document.getElementById('btn-mapa-todos').hidden = true;
+  if (pontos.length) mapa.fitBounds(L.latLngBounds(pontos).pad(0.1));
+  document.getElementById('mapa-como-ler').innerHTML = `
+    <div><i class="linha-mini linha-mini-vazio"></i><span>Cada linha laranja é um trecho que um caminhão rodou <strong>sem carga</strong>, do ponto branco (onde terminou a entrega) ao ponto amarelo (onde pegou a próxima carga).</span></div>
+    <div><span>Clique numa linha ou etiqueta para ver a história completa daquele trecho.</span></div>`;
 }
 
 /* ---------------------------------------------------------------- gráfico e dicas */

@@ -175,22 +175,25 @@
             <span class="nivel nivel-alto">Alto &gt; 40%</span>
           </div>
         </div>
-        <p class="vazio-secao-ajuda">Cada cartão conta a história de um trecho vazio: onde o caminhão terminou a entrega, quanto rodou sem carga e onde pegou a carga seguinte. Clique em <strong>Ver no mapa</strong> para destacar o trajeto.</p>
+        <p class="vazio-secao-ajuda">Cada cartão conta a história de um trecho vazio: onde o caminhão terminou a entrega, quanto rodou sem carga e onde pegou a carga seguinte. <strong>Clique num cartão</strong> para ver aquele trecho no mapa.</p>
         <div id="lista-trechos" class="vazio-trechos"></div>
       </section>
 
       <section class="chart-card vazio-mapa-card">
         <div class="vazio-secao-cabecalho">
-          <h3>Mapa das viagens</h3>
-          <button type="button" class="btn btn-outline btn-mini" id="btn-mapa-todos" onclick="mostrarTodosNoMapa()" hidden>Mostrar todos</button>
+          <h3>Mapa</h3>
+          <div class="seletor-modo" role="tablist">
+            <button type="button" id="modo-um" class="ativo" onclick="mudarModoMapa('um')">Um trecho por vez</button>
+            <button type="button" id="modo-todos" onclick="mudarModoMapa('todos')">Todos os vazios</button>
+          </div>
+        </div>
+        <div class="mapa-navegacao" id="mapa-navegacao">
+          <button type="button" class="btn btn-outline btn-mini" onclick="navegarTrecho(-1)" title="Trecho anterior">◀</button>
+          <div class="mapa-legenda-atual" id="mapa-legenda-atual">—</div>
+          <button type="button" class="btn btn-outline btn-mini" onclick="navegarTrecho(1)" title="Próximo trecho">▶</button>
         </div>
         <div id="mapa-vazio-pagina" class="vazio-mapa"></div>
-        <div class="vazio-legenda-linhas">
-          <span><i class="linha-carregado"></i> com carga</span>
-          <span><i class="linha-vazio"></i> vazio</span>
-          <span><i class="ponto-fim"></i> terminou a entrega</span>
-          <span><i class="ponto-ini"></i> pegou a próxima carga</span>
-        </div>
+        <div class="mapa-como-ler" id="mapa-como-ler"></div>
       </section>
     </div>
 
