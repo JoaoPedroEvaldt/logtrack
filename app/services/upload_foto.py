@@ -33,6 +33,12 @@ def _r2_configurado() -> bool:
     redeploy num host sem disco persistente (ver README.md > Deploy > Fotos)."""
     return bool(settings.R2_ACCOUNT_ID and settings.R2_ACCESS_KEY_ID and settings.R2_SECRET_ACCESS_KEY and settings.R2_BUCKET_NAME)
 
+def _chave_r2(chave: str) -> str:
+    """Chave do objeto no bucket — com o R2_PREFIXO na frente (ver config.py).
+    O caminho público (/uploads/...) e o banco nunca guardam o prefixo, então
+    uma instância não tem como pedir uma chave fora da própria pasta."""
+    return settings.R2_PREFIXO + chave
+
 @lru_cache
 def _cliente_r2():
     return boto3.client(
@@ -63,7 +69,7 @@ async def salvar_foto(subpasta: str, entidade_id: int, foto: UploadFile) -> str:
 
     chave = f"{subpasta}/{entidade_id}_{uuid.uuid4().hex}{extensao}"
     if _r2_configurado():
-        _cliente_r2().put_object(Bucket=settings.R2_BUCKET_NAME, Key=chave, Body=conteudo, ContentType=foto.content_type)
+        _cliente_r2().put_object(Bucket=settings.R2_BUCKET_NAME, Key=_chave_r2(chave), Body=conteudo, ContentType=foto.content_type)
     else:
         caminho = PASTA_UPLOADS / chave
         caminho.parent.mkdir(parents=True, exist_ok=True)
@@ -75,7 +81,7 @@ def apagar_foto(foto_path: Optional[str]):
         return
     chave = foto_path.removeprefix("/uploads/")
     if _r2_configurado():
-        _cliente_r2().delete_object(Bucket=settings.R2_BUCKET_NAME, Key=chave)
+        _cliente_r2().delete_object(Bucket=settings.R2_BUCKET_NAME, Key=_chave_r2(chave))
     else:
         caminho = PASTA_UPLOADS / chave
         if caminho.exists():
@@ -85,8 +91,11 @@ def buscar_foto(chave: str) -> Optional[Tuple[bytes, str]]:
     """Usado pelo router /uploads pra repassar a foto (com o gate de autenticação)
     sem tornar o bucket R2 público nem expor o disco local. Retorna (conteudo, content_type) ou None."""
     if _r2_configurado():
+        # ".." ou "/" no começo poderiam escapar da pasta do R2_PREFIXO.
+        if chave.startswith("/") or ".." in chave.split("/"):
+            return None
         try:
-            objeto = _cliente_r2().get_object(Bucket=settings.R2_BUCKET_NAME, Key=chave)
+            objeto = _cliente_r2().get_object(Bucket=settings.R2_BUCKET_NAME, Key=_chave_r2(chave))
         except ClientError as erro:
             if erro.response.get("Error", {}).get("Code") in ("NoSuchKey", "404"):
                 return None

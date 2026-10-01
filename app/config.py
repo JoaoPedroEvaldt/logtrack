@@ -13,6 +13,10 @@ class Settings(BaseSettings):
     R2_ACCESS_KEY_ID: str = ""
     R2_SECRET_ACCESS_KEY: str = ""
     R2_BUCKET_NAME: str = ""
+    # Pasta dentro do bucket (ex.: "demo/"). O ambiente de demonstração usa o
+    # mesmo bucket do real, mas toda chave ganha esse prefixo — ele só lê e
+    # apaga o que está dentro da própria pasta, nunca as fotos reais.
+    R2_PREFIXO: str = ""
 
     # extra="ignore": .env também guarda POSTGRES_PASSWORD/DOCKER_DATABASE_URL, usadas só pelo docker-compose.yml
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

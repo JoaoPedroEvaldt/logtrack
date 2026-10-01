@@ -205,6 +205,36 @@ def test_upload_foto_veiculo_usa_r2_quando_configurado(client, admin, db_session
     assert resp.content == JPEG_MINIMO
 
 
+def test_r2_prefixo_isola_as_fotos_da_demo(client, admin, db_session, monkeypatch, r2_fake):
+    """Com R2_PREFIXO (ambiente de demonstração no mesmo bucket do real), a foto
+    vai pra dentro da pasta, e uma chave de fora dela (foto real) não é servida."""
+    from app.config import settings
+    monkeypatch.setattr(settings, "R2_ACCOUNT_ID", "conta-teste")
+    monkeypatch.setattr(settings, "R2_ACCESS_KEY_ID", "chave-teste")
+    monkeypatch.setattr(settings, "R2_SECRET_ACCESS_KEY", "segredo-teste")
+    monkeypatch.setattr(settings, "R2_BUCKET_NAME", "bucket-teste")
+    monkeypatch.setattr(settings, "R2_PREFIXO", "demo/")
+    r2_fake.armazenamento["veiculos/1_real.jpg"] = (b"foto real", "image/jpeg")
+
+    veiculo = criar_veiculo_orm(db_session)
+    headers = auth_headers(client, admin.email)
+    token = {"token": headers["Authorization"].split(" ")[1]}
+    upload = client.post(
+        f"/veiculos/{veiculo.id}/foto",
+        headers=headers,
+        files={"foto": ("foto.jpg", JPEG_MINIMO, "image/jpeg")},
+    )
+    assert upload.status_code == 200, upload.text
+    foto_path = upload.json()["foto_path"]
+    assert not foto_path.startswith("/uploads/demo/")
+    assert "demo/" + foto_path.removeprefix("/uploads/") in r2_fake.armazenamento
+    assert client.get(foto_path, params=token).content == JPEG_MINIMO
+
+    assert client.get("/uploads/veiculos/1_real.jpg", params=token).status_code == 404
+    from app.services.upload_foto import buscar_foto
+    assert buscar_foto("../veiculos/1_real.jpg") is None
+
+
 def test_foto_do_veiculo_exige_autenticacao(client, admin, db_session):
     """A rota /uploads não pode ser pública — é a única exceção no app se não exigir token."""
     veiculo = criar_veiculo_orm(db_session)

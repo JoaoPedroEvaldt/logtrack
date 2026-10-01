@@ -93,6 +93,7 @@ def _sem_r2_real(monkeypatch):
     monkeypatch.setattr(settings, "R2_ACCESS_KEY_ID", "")
     monkeypatch.setattr(settings, "R2_SECRET_ACCESS_KEY", "")
     monkeypatch.setattr(settings, "R2_BUCKET_NAME", "")
+    monkeypatch.setattr(settings, "R2_PREFIXO", "")
 
 
 @pytest.fixture()
