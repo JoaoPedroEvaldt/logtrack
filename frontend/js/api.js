@@ -884,22 +884,66 @@ function pontoNoAnel(lon, lat, anel) {
   return dentro;
 }
 
+/* Distância aproximada (km) entre dois pontos [lon, lat] próximos — basta pra
+   medir o comprimento dos trechos da rota em cada estado. */
+function kmEntrePontos([lon1, lat1], [lon2, lat2]) {
+  const kmPorGrau = 111.32;
+  const dx = (lon2 - lon1) * kmPorGrau * Math.cos((lat1 + lat2) / 2 * Math.PI / 180);
+  const dy = (lat2 - lat1) * kmPorGrau;
+  return Math.hypot(dx, dy);
+}
+
+/* Trecho mínimo pra contar como passagem por um estado. Rodovia que corre
+   colada na divisa (BR-153 em Porto União/União da Vitória, região do rio
+   Uruguai) cruza a linha várias vezes em poucos km, e a malha simplificada
+   do IBGE erra a borda em alguns km — sem esse filtro a rota virava
+   "RS → SC → RS → SC → PR → SC → PR", contando posto fiscal a cada vaivém. */
+const UF_TRECHO_MINIMO_KM = 30;
+
 /* Sequência de UFs por onde a rota passa (["RS", "SC", "PR", ...]), a partir
    de pontos amostrados da geometria ([lon, lat] do OSRM). Pontos que caem
    fora de todos os polígonos (malha simplificada, borda/litoral) são
-   ignorados. Retorna null se a malha do IBGE não carregar. */
+   ignorados. Trechos intermediários mais curtos que UF_TRECHO_MINIMO_KM são
+   absorvidos pelos vizinhos (o estado de origem e o de destino sempre
+   ficam). Retorna null se a malha do IBGE não carregar. */
 async function ufsAoLongoDaRota(coordenadas) {
   const malha = await carregarMalhaUFs();
   if (!malha || !coordenadas.length) return null;
   const passo = Math.max(1, Math.floor(coordenadas.length / 400));
-  const sequencia = [];
+  const trechos = [];
+  let anterior = null;
   for (let i = 0; i < coordenadas.length; i += passo) {
     const [lon, lat] = coordenadas[i];
+    const km = anterior ? kmEntrePontos(anterior, coordenadas[i]) : 0;
+    anterior = coordenadas[i];
     const estado = malha.find(e => lon >= e.bbox[0] && lon <= e.bbox[2] && lat >= e.bbox[1] && lat <= e.bbox[3]
       && e.aneis.some(a => pontoNoAnel(lon, lat, a)));
-    if (estado && sequencia[sequencia.length - 1] !== estado.uf) sequencia.push(estado.uf);
+    const ultimo = trechos[trechos.length - 1];
+    if (!estado || (ultimo && ultimo.uf === estado.uf)) {
+      if (ultimo) ultimo.km += km;
+    } else {
+      trechos.push({ uf: estado.uf, km });
+    }
   }
-  return sequencia;
+
+  // Remove sempre o trecho curto mais curto primeiro e junta os vizinhos se
+  // forem o mesmo estado (SC → RS curto → SC vira um SC só).
+  for (;;) {
+    let menor = -1;
+    for (let i = 1; i < trechos.length - 1; i++) {
+      if (trechos[i].km < UF_TRECHO_MINIMO_KM && (menor < 0 || trechos[i].km < trechos[menor].km)) menor = i;
+    }
+    if (menor < 0) break;
+    const [curto] = trechos.splice(menor, 1);
+    const antes = trechos[menor - 1];
+    const depois = trechos[menor];
+    antes.km += curto.km;
+    if (antes.uf === depois.uf) {
+      antes.km += depois.km;
+      trechos.splice(menor, 1);
+    }
+  }
+  return trechos.map(t => t.uf);
 }
 
 /* Liga o autocomplete num <input> — dropdown de sugestões, navegação por
