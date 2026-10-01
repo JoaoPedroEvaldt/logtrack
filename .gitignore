@@ -9,3 +9,4 @@ __pycache__/
 uploads/
 *.dump
 DEPLOY_NOTES.md
+demo.env
