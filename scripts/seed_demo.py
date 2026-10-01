@@ -228,6 +228,14 @@ def horario_de_saida(dt: datetime) -> datetime:
     return dt
 
 
+def utc(dt: datetime) -> datetime:
+    """Horario de Brasilia -> UTC. O backend grava iniciado_em/concluido_em
+    com datetime.utcnow() e criado_em/finalizado_em com o now() do Postgres
+    (UTC no servidor); so previsao/saida_prevista sao hora local (vem do
+    formulario). Brasil sem horario de verao desde 2019: sempre +3h."""
+    return dt + timedelta(hours=3)
+
+
 def host_do_banco(url: str) -> str:
     u = make_url(url)
     return f"{u.host or 'local'}/{u.database}"
@@ -357,7 +365,7 @@ def simular_conjunto(db, idx, conjunto, motorista, cavalo, operador, agora, em_m
             motorista_id=motorista.id, veiculo_id=cavalo.id,
             previsao=previsao, saida_prevista=saida,
             distancia_km=round(km, 1), tempo_estimado_h=round(estimado_h, 1),
-            criado_em=saida - timedelta(days=random.uniform(1, 4)),
+            criado_em=utc(saida - timedelta(days=random.uniform(1, 4))),
         )
 
         if saida > agora:
@@ -366,10 +374,10 @@ def simular_conjunto(db, idx, conjunto, motorista, cavalo, operador, agora, em_m
             resumo["entregas"] += 1
             return anterior, km_odometro, resumo
 
-        entrega.iniciado_em = saida
+        entrega.iniciado_em = utc(saida)
         if chegada <= agora:
             entrega.status = "entregue"
-            entrega.concluido_em = chegada
+            entrega.concluido_em = utc(chegada)
         else:
             entrega.status = "atrasado" if agora > previsao else "em_rota"
         db.add(entrega)
@@ -405,16 +413,16 @@ def simular_conjunto(db, idx, conjunto, motorista, cavalo, operador, agora, em_m
         if atrasa and entrega.concluido_em:
             db.add(Ocorrencia(entrega_id=entrega.id, usuario_id=operador.id, tipo="atraso",
                               descricao="Fila para descarga no cliente, motorista aguardou liberação da doca.",
-                              status="finalizada", finalizado_em=chegada,
-                              criado_em=previsao - timedelta(hours=2)))
+                              status="finalizada", finalizado_em=utc(chegada),
+                              criado_em=utc(previsao - timedelta(hours=2))))
         elif entrega.concluido_em and random.random() < 0.05:
             tipo, desc = random.choice([
                 ("cliente_ausente", "Recebimento fechado na chegada, descarga feita no dia seguinte."),
                 ("problema_mecanico", "Mangueira de ar rompida, troca feita em borracharia na rodovia."),
             ])
             db.add(Ocorrencia(entrega_id=entrega.id, usuario_id=operador.id, tipo=tipo, descricao=desc,
-                              status="finalizada", finalizado_em=chegada,
-                              criado_em=saida + timedelta(hours=estimado_h / 2)))
+                              status="finalizada", finalizado_em=utc(chegada),
+                              criado_em=utc(saida + timedelta(hours=estimado_h / 2))))
 
         if not entrega.concluido_em:
             return entrega, km_odometro, resumo
@@ -484,7 +492,7 @@ def popular(db, senha: str) -> dict:
         entrega.status = "ocorrencia"
         db.add(Ocorrencia(entrega_id=entrega.id, usuario_id=operador.id, tipo="problema_mecanico",
                           descricao="Luz de advertência do motor acesa, motorista aguardando socorro mecânico no posto.",
-                          status="aberta", criado_em=agora - timedelta(hours=3)))
+                          status="aberta", criado_em=utc(agora - timedelta(hours=3))))
 
     # E outra atrasada (passou da previsao e ainda nao chegou).
     if len(ativas) > 1:
@@ -507,7 +515,7 @@ def popular(db, senha: str) -> dict:
         db.add(Entrega(cliente=cliente, origem=origem, destino=destino, descricao_carga=carga,
                        peso_kg=30000, valor_frete=round(km_rodoviario(origem, destino) * 7.5 / 50) * 50,
                        motorista_id=motoristas[i].id, veiculo_id=cavalos[i].id, status="cancelado",
-                       previsao=quando + timedelta(days=3), criado_em=quando - timedelta(days=2)))
+                       previsao=quando + timedelta(days=3), criado_em=utc(quando - timedelta(days=2))))
         total += 1
 
     criar_manutencoes(db, cavalos, odometros, hoje, idx_parado)

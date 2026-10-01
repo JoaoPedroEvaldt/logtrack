@@ -769,9 +769,11 @@ async function abrirModalRota(id) {
       const horasTotais = est.totalH;
       const partesParadas = descreverParadas(est);
 
-      // Âncora da chegada: quando saiu de fato (em rota), senão a saída
-      // planejada no cadastro, senão "se sair agora".
-      const iniciadoEm = entrega.status === 'em_rota' ? dataUtcDoBackend(entrega.iniciado_em) : null;
+      // Âncora da chegada: quando saiu de fato (em viagem), senão a saída
+      // planejada no cadastro, senão "se sair agora". "Atrasado" e
+      // "ocorrência" com iniciado_em também são caminhão já na estrada.
+      const emViagem = ['em_rota', 'atrasado', 'ocorrencia'].includes(entrega.status) && !!entrega.iniciado_em;
+      const iniciadoEm = emViagem ? dataUtcDoBackend(entrega.iniciado_em) : null;
       const saidaPrevista = entrega.saida_prevista ? new Date(entrega.saida_prevista) : null;
       const ancoraPartida = iniciadoEm || saidaPrevista || new Date();
       const chegada = new Date(ancoraPartida.getTime() + horasTotais * 3600 * 1000);
@@ -781,7 +783,7 @@ async function abrirModalRota(id) {
       if (entrega.status === 'entregue' && entrega.concluido_em) {
         chegadaLabel = 'Entregue em';
         chegadaTexto = dataUtcDoBackend(entrega.concluido_em).toLocaleString('pt-BR', FORMATO_DATA_HORA_CURTO);
-      } else if (entrega.status === 'em_rota' && iniciadoEm) {
+      } else if (emViagem) {
         chegadaLabel = 'Chegada estimada';
       } else if (saidaPrevista) {
         chegadaLabel = `Chegada (saída ${saidaPrevista.toLocaleString('pt-BR', FORMATO_DATA_HORA_CURTO)})`;
@@ -803,13 +805,13 @@ async function abrirModalRota(id) {
       // Posição do caminhão: parado na origem (ainda não saiu), avançando pelo
       // trajeto real (entrega em rota) ou parado no destino (já entregue).
       let fracAtual = 0;
-      if (entrega.status === 'em_rota' && iniciadoEm) {
+      if (emViagem) {
         fracAtual = Math.max(0, Math.min(1, (Date.now() - iniciadoEm.getTime()) / (horasTotais * 3600 * 1000)));
       } else if (entrega.status === 'entregue') {
         fracAtual = 1;
       }
       const posicaoCaminhao = fracAtual === 0 ? [origem.lat, origem.lon] : pontoNaLinha(coordenadas, fracAtual);
-      const popupCaminhao = entrega.status === 'em_rota'
+      const popupCaminhao = emViagem
         ? `Posição estimada — ${Math.round(fracAtual * 100)}% do trajeto`
         : `Origem: ${escapeHtml(entrega.origem)}`;
       L.marker(posicaoCaminhao, { icon: iconeCaminhaoMapa() }).addTo(camadaRota).bindPopup(popupCaminhao);
