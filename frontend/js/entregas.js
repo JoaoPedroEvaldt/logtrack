@@ -268,6 +268,7 @@ function filtrar() {
 
   atualizarResumo(filtradas);
   renderizarTabela(filtradas);
+  atualizarRotograma(filtradas, motoristaId);
 }
 
 function limparFiltros() {

@@ -1370,3 +1370,53 @@ body.dark .trecho-meio .km, body.dark .trecho-meio .km-rotulo { color: #F0A35E; 
 .mapa-link-ciclo { font-weight: 600; color: #2E75B6; text-decoration: none; white-space: nowrap; margin-left: 4px; }
 .mapa-link-ciclo:hover { text-decoration: underline; }
 body.dark .mapa-link-ciclo, body.dark .mapa-caminhao-leg { color: #7CB2E8; }
+
+/* Rotograma do motorista (tela de Entregas). */
+.rotograma { background: var(--bg-card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; margin-bottom: 20px; }
+.rotograma[hidden] { display: none; }
+.rotograma-cabecalho { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+.rotograma-rotulo { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-light); }
+.rotograma-cabecalho h2 { font-size: 20px; font-weight: 700; color: var(--text); margin: 2px 0; }
+.rotograma-sub { font-size: 12.5px; color: var(--text-light); }
+.rotograma-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+.rotograma-kpi { border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; }
+.rotograma-kpi small { display: block; font-size: 10.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-light); }
+.rotograma-kpi strong { font-size: 20px; font-weight: 800; color: var(--text); letter-spacing: -0.02em; }
+.rotograma-kpi span { margin-left: 6px; font-size: 11.5px; color: var(--text-light); }
+.rotograma-grade { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 20px; align-items: start; }
+.rotograma-paradas { display: flex; flex-direction: column; max-height: 560px; overflow-y: auto; padding-right: 4px; }
+.rot-viagem { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s; }
+.rot-viagem:hover { border-color: rgba(46,117,182,0.55); }
+.rot-viagem.selecionada { border-color: #2E75B6; box-shadow: 0 0 0 2px rgba(46,117,182,0.25); }
+.rot-parada { display: flex; align-items: flex-start; gap: 10px; }
+.rot-parada .mapa-num { width: 24px; height: 24px; font-size: 12px; box-shadow: none; }
+.rot-parada-info { flex: 1; min-width: 0; }
+.rot-cidade { font-size: 14px; font-weight: 700; color: var(--text); }
+.rot-det { font-size: 12px; color: var(--text-light); margin-top: 3px; line-height: 1.4; }
+.rot-tag { display: inline-block; font-size: 10.5px; font-weight: 700; border-radius: 20px; padding: 1px 8px; margin-left: 4px; vertical-align: 1px; }
+.rot-tag-carga { background: rgba(39,174,96,0.14); color: #1E8449; }
+.rot-tag-descarga { background: rgba(46,117,182,0.14); color: #2E75B6; }
+body.dark .rot-tag-carga { color: #58D68D; }
+body.dark .rot-tag-descarga { color: #7CB2E8; }
+.rot-trecho { font-size: 12px; color: var(--text-light); padding: 8px 0 8px 22px; margin-left: 11px; }
+.rot-trecho strong { color: var(--text); }
+.rot-trecho-carregado { border-left: 3px solid #2E75B6; margin: 6px 0 6px 11px; padding: 4px 0 4px 20px; }
+.rot-trecho-vazio { border-left: 3px dashed #E67E22; margin: 0 0 0 25px; padding: 10px 0 10px 20px; }
+.rot-trecho-vazio strong { color: #D35400; }
+body.dark .rot-trecho-vazio strong { color: #F0A35E; }
+.rot-acoes { display: flex; justify-content: flex-end; margin-top: 6px; }
+.rotograma-mapa-col { position: sticky; top: 16px; }
+.rotograma-mapa-topo { display: flex; justify-content: space-between; align-items: center; gap: 10px; min-height: 30px; margin-bottom: 8px; font-size: 13px; color: var(--text-light); }
+.rotograma-mapa-topo strong { color: var(--text); }
+.rotograma-mapa { height: 520px; border-radius: 12px; background: #eef2f7; }
+.rotograma-legenda { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12px; color: var(--text-light); margin-top: 10px; }
+.rotograma-legenda span { display: inline-flex; align-items: center; gap: 7px; }
+@media (max-width: 1100px) {
+  .rotograma-grade { grid-template-columns: 1fr; }
+  .rotograma-mapa-col { position: static; }
+  .rotograma-mapa { height: 380px; }
+  .rotograma-paradas { max-height: none; }
+}
+@media (max-width: 768px) {
+  .rotograma-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

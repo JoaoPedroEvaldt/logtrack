@@ -119,6 +119,38 @@
       <button class="btn btn-outline" onclick="limparFiltros()" style="font-size:12px;">Limpar filtros</button>
     </div>
 
+    <!-- Rotograma: aparece ao filtrar um motorista (ver js/rotograma.js) -->
+    <section class="rotograma" id="rotograma" hidden data-staff-only>
+      <div class="rotograma-cabecalho">
+        <div>
+          <span class="rotograma-rotulo">Rotograma</span>
+          <h2 id="rotograma-titulo">—</h2>
+          <div class="rotograma-sub" id="rotograma-sub"></div>
+        </div>
+      </div>
+      <div class="rotograma-kpis">
+        <div class="rotograma-kpi"><small>KM total</small><strong id="rot-km-total">—</strong></div>
+        <div class="rotograma-kpi"><small>Carregado</small><strong id="rot-km-carregado">—</strong></div>
+        <div class="rotograma-kpi"><small>Vazio</small><strong id="rot-km-vazio">—</strong><span id="rot-km-vazio-pct"></span></div>
+        <div class="rotograma-kpi"><small>Frete total</small><strong id="rot-frete">—</strong></div>
+      </div>
+      <div class="rotograma-grade">
+        <div class="rotograma-paradas" id="rotograma-paradas"></div>
+        <div class="rotograma-mapa-col">
+          <div class="rotograma-mapa-topo">
+            <span id="rotograma-mapa-legenda">Todas as viagens</span>
+            <button type="button" class="btn btn-outline btn-mini" id="rotograma-ver-todas" onclick="rotogramaVerTodas()" hidden>Ver todas</button>
+          </div>
+          <div id="rotograma-mapa" class="rotograma-mapa"></div>
+          <div class="rotograma-legenda">
+            <span><i class="linha-mini"></i> Carregado</span>
+            <span><i class="linha-mini linha-mini-vazio"></i> Vazio</span>
+            <span>Clique numa viagem para ver o trajeto dela.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <div class="table-container">
       <table>
         <thead>
@@ -266,6 +298,7 @@
   <script src="../js/toasts.js"></script>
   <script src="../js/icons.js"></script>
   <script src="../js/entregas.js"></script>
+  <script src="../js/rotograma.js"></script>
 </body>
 
 </html>
