@@ -16,12 +16,12 @@ class LogAcesso(Base):
     ip             = Column(String(45), nullable=True)
     tentativa_ok   = Column(Boolean, nullable=False)
     # default no Python (nao server_default=func.now()) de proposito: o
-    # bloqueio por forca bruta compara criado_em contra datetime.now() no
-    # auth.py, e func.now() do Postgres devolve hora local (America/Sao_Paulo)
-    # enquanto o do SQLite (usado nos testes) devolve UTC - descasando os dois
-    # em 3h dependendo do banco. Gerar o timestamp em Python garante que quem
-    # grava a linha e quem calcula a janela de bloqueio usam o mesmo relogio.
-    criado_em      = Column(DateTime, nullable=False, default=datetime.now)
+    # bloqueio por forca bruta compara criado_em contra datetime.utcnow() no
+    # auth.py, e o func.now() depende da timezone de cada banco. Gerar o
+    # timestamp em Python garante que quem grava a linha e quem calcula a
+    # janela de bloqueio usam o mesmo relogio. Em UTC, como os demais
+    # timestamps do sistema (a tela converte para Brasilia ao exibir).
+    criado_em      = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     usuario        = relationship("Usuario")
 

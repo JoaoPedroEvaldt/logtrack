@@ -144,14 +144,35 @@ function estadoCarregando(colspan) {
   return colspan ? `<tr><td colspan="${colspan}" style="padding:0;">${conteudo}</td></tr>` : conteudo;
 }
 
+// "2026-10-01" sozinho o JS lê como meia-noite UTC, que no Brasil ainda é o
+// dia 30/09 -- por isso data pura vira meia-noite local antes de formatar.
 function formatarData(data) {
   if (!data) return '—';
-  return new Date(data).toLocaleDateString('pt-BR');
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(data) ? new Date(data + 'T00:00:00') : new Date(data);
+  return d.toLocaleDateString('pt-BR');
 }
 
+// Para campos em hora local (previsao, saida_prevista -- vêm do formulário).
 function formatarDataHora(data) {
   if (!data) return '—';
   return new Date(data).toLocaleString('pt-BR');
+}
+
+// O backend grava criado_em, iniciado_em, concluido_em, finalizado_em em UTC
+// sem o "Z" no fim; sem ele o JS leria como hora local (3h adiantado).
+function dataUtc(iso) {
+  if (!iso) return null;
+  return new Date(/Z$|[+-]\d{2}:\d{2}$/.test(iso) ? iso : iso + 'Z');
+}
+
+// "AAAA-MM-DD" do dia local (toISOString() daria o dia seguinte depois das 21h).
+function dataLocalISO(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function formatarDataHoraUtc(iso) {
+  if (!iso) return '—';
+  return dataUtc(iso).toLocaleString('pt-BR');
 }
 
 /* ===================== MOEDA (R$) ===================== */
@@ -314,8 +335,8 @@ async function carregarNotificacoes() {
   const listaVencimentos = (vencimentos && !vencimentos.detail) ? vencimentos : [];
   const seteDiasAtras = Date.now() - 7 * 86400000;
   const ocorrenciasRecentes = (ocorrencias && !ocorrencias.detail ? ocorrencias : [])
-    .filter(o => new Date(o.criado_em).getTime() >= seteDiasAtras)
-    .sort((a, b) => new Date(b.criado_em) - new Date(a.criado_em));
+    .filter(o => dataUtc(o.criado_em).getTime() >= seteDiasAtras)
+    .sort((a, b) => dataUtc(b.criado_em) - dataUtc(a.criado_em));
 
   const itens = [
     ...listaVencimentos.map(v => ({
@@ -325,7 +346,7 @@ async function carregarNotificacoes() {
     })),
     ...ocorrenciasRecentes.map(o => ({
       titulo: 'Nova ocorrência registrada',
-      sub: formatarDataHora(o.criado_em),
+      sub: formatarDataHoraUtc(o.criado_em),
       classe: 'badge-em_rota',
     })),
   ];

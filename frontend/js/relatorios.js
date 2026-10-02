@@ -12,7 +12,7 @@ const LABEL_TIPO_OCORRENCIA = { atraso: 'Atraso', acidente: 'Acidente', cliente_
 function definirPeriodoPadrao() {
   const hoje = new Date();
   const seisMesesAtras = new Date(hoje.getFullYear(), hoje.getMonth() - 5, 1);
-  document.getElementById('data-fim').value = hoje.toISOString().slice(0, 10);
+  document.getElementById('data-fim').value = dataLocalISO(hoje);
   document.getElementById('data-inicio').value = seisMesesAtras.toISOString().slice(0, 10);
 }
 
@@ -66,7 +66,7 @@ function periodoSelecionado() {
 
 function entregasNoPeriodo({ inicio, fim, conjunto }) {
   return todasEntregas.filter(e => {
-    const dataRef = e.concluido_em ? new Date(e.concluido_em) : new Date(e.criado_em);
+    const dataRef = dataUtc(e.concluido_em || e.criado_em);
     if (inicio && dataRef < inicio) return false;
     if (fim && dataRef > fim) return false;
     if (conjunto) {
@@ -79,7 +79,7 @@ function entregasNoPeriodo({ inicio, fim, conjunto }) {
 
 function ocorrenciasNoPeriodo({ inicio, fim, conjunto }) {
   return todasOcorrencias.filter(o => {
-    const d = new Date(o.criado_em);
+    const d = dataUtc(o.criado_em);
     if (inicio && d < inicio) return false;
     if (fim && d > fim) return false;
     if (conjunto) {
@@ -107,7 +107,7 @@ function deslocamentosVazioNoPeriodo({ inicio, fim, conjunto, veiculoVazio }) {
       // Data de referência é iniciado_em (quando o trecho vazio terminou e a
       // entrega em si começou) — concluido_em/criado_em não fazem sentido aqui,
       // porque o deslocamento vazio é sobre o que aconteceu ANTES da entrega partir.
-      const d = new Date(entrega.iniciado_em);
+      const d = dataUtc(entrega.iniciado_em);
       if (inicio && d < inicio) return false;
       if (fim && d > fim) return false;
       if (veiculoVazio && entrega.veiculo_id !== veiculoVazio.id) return false;
@@ -146,7 +146,7 @@ function renderizarGraficoMensal(entregas, inicio, fim) {
   const meses = mesesDoPeriodo(inicio || new Date(hoje.getFullYear(), hoje.getMonth() - 5, 1), fim || hoje);
   const dados = meses.map(m => entregas.filter(e => {
     if (e.status !== 'entregue' || !e.concluido_em) return false;
-    const d = new Date(e.concluido_em);
+    const d = dataUtc(e.concluido_em);
     return d.getFullYear() === m.ano && d.getMonth() === m.mes;
   }).length);
 
@@ -201,7 +201,7 @@ async function renderizarMapaVazio(deslocamentos) {
   document.getElementById('mapa-vazio').classList.toggle('mapa-escuro', escuro);
   mapaVazio.invalidateSize();
 
-  const ordenados = [...deslocamentos].sort((a, b) => new Date(a.entrega.iniciado_em) - new Date(b.entrega.iniciado_em));
+  const ordenados = [...deslocamentos].sort((a, b) => dataUtc(a.entrega.iniciado_em) - dataUtc(b.entrega.iniciado_em));
 
   const todosPontos = [];
   // Um deslocamento por vez (não Promise.all) para não estourar o limite de
@@ -219,7 +219,7 @@ async function renderizarMapaVazio(deslocamentos) {
     const placaTexto = veiculo ? veiculo.placa : `Veículo #${entrega.veiculo_id}`;
     const trechoTexto = `${anterior.destino} → ${entrega.origem}`;
     const kmTexto = parseFloat(dv.km_vazio).toLocaleString('pt-BR') + ' km';
-    const popup = `<strong>${escapeHtml(placaTexto)}</strong><br>${escapeHtml(trechoTexto)}<br>${kmTexto} vazio · ${formatarDataHora(entrega.iniciado_em)}`;
+    const popup = `<strong>${escapeHtml(placaTexto)}</strong><br>${escapeHtml(trechoTexto)}<br>${kmTexto} vazio · ${formatarDataHoraUtc(entrega.iniciado_em)}`;
 
     // Mesmo trajeto real do modal de Rota (entregas.js) quando o OSRM devolve
     // geometria; sem rota calculável, cai pra linha reta entre as cidades —
@@ -375,7 +375,7 @@ async function exportarPDF() {
     body: entregasFiltradas.map(e => [
       e.cliente, e.origem, e.destino,
       LABEL_STATUS[e.status] || e.status,
-      formatarDataHora(e.previsao), formatarDataHora(e.concluido_em)
+      formatarDataHora(e.previsao), formatarDataHoraUtc(e.concluido_em)
     ]),
     ...PDF_ESTILO_TABELA,
     columnStyles: { 3: { cellWidth: 27 } },
@@ -398,7 +398,7 @@ async function exportarPDF() {
           veiculo ? veiculo.placa : '—',
           LABEL_TIPO_OCORRENCIA[o.tipo] || o.tipo,
           o.descricao,
-          formatarDataHora(o.criado_em)
+          formatarDataHoraUtc(o.criado_em)
         ];
       }),
       ...PDF_ESTILO_TABELA,
@@ -439,7 +439,7 @@ async function exportarPDF() {
           v ? v.placa : `#${entrega.veiculo_id}`,
           `${anterior.destino} → ${entrega.origem}`,
           parseFloat(dv.km_vazio).toLocaleString('pt-BR'),
-          formatarDataHora(entrega.iniciado_em)
+          formatarDataHoraUtc(entrega.iniciado_em)
         ];
       }),
       ...PDF_ESTILO_TABELA,

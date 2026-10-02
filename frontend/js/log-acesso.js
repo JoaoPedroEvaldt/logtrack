@@ -14,7 +14,7 @@ function renderizarLogAcesso(lista) {
 
   tbody.innerHTML = lista.map(l => `
     <tr>
-      <td>${formatarDataHora(l.criado_em)}</td>
+      <td>${formatarDataHoraUtc(l.criado_em)}</td>
       <td>${escapeHtml(l.email_tentado)}</td>
       <td>${l.usuario_nome ? escapeHtml(l.usuario_nome) : '<span style="color:var(--text-light);">—</span>'}</td>
       <td>${l.ip ? escapeHtml(l.ip) : '—'}</td>

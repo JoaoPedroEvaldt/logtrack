@@ -21,13 +21,6 @@ const PRECO_DIESEL_REFERENCIA = 6.0; // só se não houver nenhum abastecimento 
 const COR_CARREGADO = '#2E75B6';
 const COR_VAZIO = '#E67E22';
 
-/* iniciado_em/concluido_em são gravados em UTC puro (datetime.utcnow() no
-   backend) — sem o "Z" o navegador leria como hora local. */
-function dataUtc(iso) {
-  if (!iso) return null;
-  return new Date(iso.endsWith('Z') ? iso : iso + 'Z');
-}
-
 function fmtData(d) {
   return d ? d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
 }

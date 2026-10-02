@@ -684,15 +684,6 @@ function pontoNaLinha(coordenadas, frac) {
   return coordenadas[coordenadas.length - 1];
 }
 
-/* iniciado_em/concluido_em são gravados no backend via datetime.utcnow() (UTC
-   "puro"), diferente de criado_em (hora local do servidor Postgres) — sem o
-   "Z", o Date() do navegador interpretaria a string como horário local e
-   erraria por horas. */
-function dataUtcDoBackend(iso) {
-  if (!iso) return null;
-  return new Date(iso.endsWith('Z') ? iso : iso + 'Z');
-}
-
 async function abrirModalRota(id) {
   const meuRequestId = ++rotaRequestId;
   const entrega = entregas.find(e => e.id === id);
@@ -773,7 +764,7 @@ async function abrirModalRota(id) {
       // planejada no cadastro, senão "se sair agora". "Atrasado" e
       // "ocorrência" com iniciado_em também são caminhão já na estrada.
       const emViagem = ['em_rota', 'atrasado', 'ocorrencia'].includes(entrega.status) && !!entrega.iniciado_em;
-      const iniciadoEm = emViagem ? dataUtcDoBackend(entrega.iniciado_em) : null;
+      const iniciadoEm = emViagem ? dataUtc(entrega.iniciado_em) : null;
       const saidaPrevista = entrega.saida_prevista ? new Date(entrega.saida_prevista) : null;
       const ancoraPartida = iniciadoEm || saidaPrevista || new Date();
       const chegada = new Date(ancoraPartida.getTime() + horasTotais * 3600 * 1000);
@@ -782,7 +773,7 @@ async function abrirModalRota(id) {
       let chegadaTexto = chegada.toLocaleString('pt-BR', FORMATO_DATA_HORA_CURTO);
       if (entrega.status === 'entregue' && entrega.concluido_em) {
         chegadaLabel = 'Entregue em';
-        chegadaTexto = dataUtcDoBackend(entrega.concluido_em).toLocaleString('pt-BR', FORMATO_DATA_HORA_CURTO);
+        chegadaTexto = dataUtc(entrega.concluido_em).toLocaleString('pt-BR', FORMATO_DATA_HORA_CURTO);
       } else if (emViagem) {
         chegadaLabel = 'Chegada estimada';
       } else if (saidaPrevista) {

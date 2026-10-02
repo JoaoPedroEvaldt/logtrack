@@ -31,7 +31,7 @@ function renderizarGraficoMensal(entregas) {
 
   const dados = meses.map(m => entregas.filter(e => {
     if (e.status !== 'entregue' || !e.concluido_em) return false;
-    const d = new Date(e.concluido_em);
+    const d = dataUtc(e.concluido_em);
     return d.getFullYear() === m.ano && d.getMonth() === m.mes;
   }).length);
 

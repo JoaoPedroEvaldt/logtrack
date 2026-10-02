@@ -51,12 +51,12 @@ async function carregarOcorrencias() {
       <div class="ocorrencia-corpo">
         <div class="ocorrencia-topo">
           <div class="ocorrencia-titulo">${TIPOS_OCORRENCIA[o.tipo] || escapeHtml(o.tipo)}</div>
-          <span class="ocorrencia-data">${formatarDataHora(o.criado_em)}</span>
+          <span class="ocorrencia-data">${formatarDataHoraUtc(o.criado_em)}</span>
         </div>
         <div class="ocorrencia-ref">Entrega #${o.entrega_id}${veiculo ? ' · Veículo ' + escapeHtml(veiculo.placa) : ''}</div>
         <div class="ocorrencia-desc">${escapeHtml(o.descricao)}</div>
         ${finalizada
-          ? `<div class="ocorrencia-badge-finalizada">${svgIcone('check', 12)} Finalizada em ${formatarDataHora(o.finalizado_em)}</div>`
+          ? `<div class="ocorrencia-badge-finalizada">${svgIcone('check', 12)} Finalizada em ${formatarDataHoraUtc(o.finalizado_em)}</div>`
           : `<div class="ocorrencia-acoes">
               <button class="btn btn-primary" style="font-size:11px;padding:4px 10px;" onclick="finalizarOcorrencia(${o.id})">${svgIcone('check', 12)} Finalizar</button>
               <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="editarOcorrencia(${o.id})">${svgIcone('editar', 12)} Editar</button>
@@ -95,7 +95,7 @@ function atualizarEntregasDoVeiculo() {
 
   const entregasVeiculo = entregasCompletas
     .filter(e => e.veiculo_id === veiculoId)
-    .sort((a, b) => new Date(b.criado_em) - new Date(a.criado_em));
+    .sort((a, b) => dataUtc(b.criado_em) - dataUtc(a.criado_em));
 
   if (entregasVeiculo.length === 0) {
     selEntrega.innerHTML = '<option value="">Nenhuma entrega encontrada para este veículo</option>';

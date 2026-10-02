@@ -1,7 +1,7 @@
 """Testes das contas do dashboard: resumo, vencimentos, agrupamentos por
 status/dia, desempenho por motorista, e a comparação do faturamento com o mês
 anterior, usando a mesma quantidade de dias decorridos em ambos os meses."""
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 
 from app.models.motorista import Motorista
 from app.models.ocorrencia import Ocorrencia
@@ -16,7 +16,8 @@ from tests.conftest import (
 
 
 def _hoje_no_mes_atual():
-    return date.today()
+    # "Hoje" no fuso de Brasilia, como o dashboard calcula.
+    return (datetime.utcnow() - timedelta(hours=3)).date()
 
 
 def _mes_anterior(d):
@@ -35,13 +36,13 @@ def test_faturamento_compara_com_mes_anterior(client, db_session, admin):
     # Mês atual: uma entrega de R$1000, sem custos.
     e1 = criar_entrega_orm(db_session, motorista_id=motorista.id, veiculo_id=veiculo.id, status="entregue")
     e1.valor_frete = 1000
-    e1.concluido_em = hoje
+    e1.concluido_em = datetime.utcnow()  # concluido_em e gravado em UTC
     db_session.commit()
 
     # Mês anterior: uma entrega de R$500.
     e2 = criar_entrega_orm(db_session, motorista_id=motorista.id, veiculo_id=veiculo.id, status="entregue")
     e2.valor_frete = 500
-    e2.concluido_em = anterior
+    e2.concluido_em = datetime.combine(anterior, time(12))
     db_session.commit()
 
     headers = auth_headers(client, "admin@teste.com")
@@ -153,21 +154,20 @@ def test_entregas_por_status_agrupa_corretamente(client, admin, db_session):
 
 
 def test_entregas_por_dia_agrupa_por_data_de_criacao(client, admin, db_session):
-    """criado_em setado explicitamente (mesmo motivo do teste de /resumo acima):
-    isola o agrupamento por dia da hora exata em que o teste roda."""
-    agora = datetime.now()
-    for _ in range(3):
+    """criado_em e gravado em UTC; o dia e o de Brasilia (UTC-3). Uma entrega
+    criada as 23h30 de Brasilia (02h30 UTC do dia seguinte) conta no proprio
+    dia, nao no seguinte -- era o bug de "virar o dia as 21h"."""
+    for criado_utc in (datetime(2026, 9, 30, 12, 0),   # 09h00 de 30/09
+                       datetime(2026, 10, 1, 2, 30),   # 23h30 de 30/09
+                       datetime(2026, 10, 1, 3, 30)):  # 00h30 de 01/10
         e = criar_entrega_orm(db_session)
-        e.criado_em = agora
+        e.criado_em = criado_utc
         db_session.commit()
 
     headers = auth_headers(client, admin.email)
     resp = client.get("/dashboard/entregas-por-dia", headers=headers)
     assert resp.status_code == 200, resp.text
-    dados = resp.json()
-    assert len(dados) == 1  # todas criadas "agora", no mesmo dia
-    assert dados[0]["dia"] == str(date.today())
-    assert dados[0]["total"] == 3
+    assert resp.json() == [{"dia": "2026-09-30", "total": 2}, {"dia": "2026-10-01", "total": 1}]
 
 
 def test_desempenho_motoristas_calcula_faturamento_e_ignora_sem_entrega_ou_inativo(client, admin, db_session):

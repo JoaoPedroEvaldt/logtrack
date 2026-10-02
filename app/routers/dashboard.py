@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from sqlalchemy import func
-from datetime import date, timedelta
+from sqlalchemy import Date, func
+from sqlalchemy.ext.compiler import compiles
+from sqlalchemy.sql.functions import FunctionElement
+from datetime import date, datetime, time, timedelta
 from app.database import get_db
 from app.models.entrega import Entrega
 from app.models.veiculo import Veiculo
@@ -15,19 +17,44 @@ from app.routers.auth import exigir_staff
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
+# criado_em/concluido_em ficam em UTC no banco e o servidor do Render roda em
+# UTC; sem converter, o "dia" virava às 21h de Brasília (entrega concluída à
+# noite contava como de amanhã). Brasil sem horário de verão desde 2019.
+FUSO_BRASILIA = timedelta(hours=-3)
+
+def hoje_brasilia() -> date:
+    return (datetime.utcnow() + FUSO_BRASILIA).date()
+
+class dia_brasilia(FunctionElement):
+    """Data (no fuso de Brasília) de uma coluna gravada em UTC. Compilado por
+    banco porque o SQLite dos testes não sabe somar intervalo a timestamp."""
+    type = Date()
+    inherit_cache = True
+
+@compiles(dia_brasilia)
+def _dia_brasilia_pg(element, compiler, **kw):
+    return "CAST((%s - INTERVAL '3 hours') AS DATE)" % compiler.process(element.clauses, **kw)
+
+@compiles(dia_brasilia, "sqlite")
+def _dia_brasilia_sqlite(element, compiler, **kw):
+    return "date(%s, '-3 hours')" % compiler.process(element.clauses, **kw)
+
+def inicio_do_dia_utc(dia: date) -> datetime:
+    return datetime.combine(dia, time()) - FUSO_BRASILIA
+
 @router.get("/resumo")
 def resumo(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
-    hoje = date.today()
+    hoje = hoje_brasilia()
 
     entregas_hoje = db.query(Entrega).filter(
-        func.date(Entrega.criado_em) == hoje
+        dia_brasilia(Entrega.criado_em) == hoje
     ).count()
 
     em_rota = db.query(Entrega).filter(Entrega.status == "em_rota").count()
 
     concluidas_hoje = db.query(Entrega).filter(
         Entrega.status == "entregue",
-        func.date(Entrega.concluido_em) == hoje
+        dia_brasilia(Entrega.concluido_em) == hoje
     ).count()
 
     atrasadas = db.query(Entrega).filter(Entrega.status == "atrasado").count()
@@ -61,7 +88,7 @@ def resumo(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)
 @router.get("/vencimentos")
 def vencimentos(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     """CNH de motoristas e CRLV/seguro de veículos vencidos ou vencendo nos próximos 30 dias."""
-    hoje = date.today()
+    hoje = hoje_brasilia()
     limite = hoje + timedelta(days=30)
     alertas = []
 
@@ -107,10 +134,11 @@ def entregas_por_status(db: Session = Depends(get_db), atual: Usuario = Depends(
 
 @router.get("/entregas-por-dia")
 def entregas_por_dia(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
+    dia = dia_brasilia(Entrega.criado_em)
     resultado = db.query(
-        func.date(Entrega.criado_em).label("dia"),
+        dia.label("dia"),
         func.count(Entrega.id).label("total")
-    ).group_by(func.date(Entrega.criado_em)).order_by("dia").all()
+    ).group_by(dia).order_by(dia).all()
 
     return [{"dia": str(r.dia), "total": r.total} for r in resultado]
 
@@ -141,8 +169,8 @@ def _totais_periodo(db: Session, inicio: date, fim: date):
     o mês atual com o anterior sem duplicar a query inteira de novo."""
     entregas = db.query(Entrega).filter(
         Entrega.status == "entregue",
-        Entrega.concluido_em >= inicio,
-        Entrega.concluido_em < fim
+        Entrega.concluido_em >= inicio_do_dia_utc(inicio),
+        Entrega.concluido_em < inicio_do_dia_utc(fim)
     ).all()
     manutencoes = db.query(Manutencao).filter(
         Manutencao.data_manutencao >= inicio,
@@ -167,7 +195,7 @@ def faturamento(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_s
     usando o MESMO NÚMERO DE DIAS decorridos, não o mês anterior inteiro. Sem isso,
     no dia 7 do mês a comparação seria "7 dias vs 31 dias", inflando/distorcendo a
     variação por pura diferença de tempo decorrido, não de desempenho real."""
-    hoje = date.today()
+    hoje = hoje_brasilia()
     inicio_mes = date(hoje.year, hoje.month, 1)
     fim_mes = date(hoje.year + 1, 1, 1) if hoje.month == 12 else date(hoje.year, hoje.month + 1, 1)
     inicio_mes_anterior = date(hoje.year - 1, 12, 1) if hoje.month == 1 else date(hoje.year, hoje.month - 1, 1)

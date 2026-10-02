@@ -21,10 +21,9 @@ JANELA_BLOQUEIO_MINUTOS = 15
 
 @router.post("/login")
 def login(request: Request, form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    # datetime.now() (hora local), nao utcnow() - o Postgres grava criado_em via
-    # func.now() na timezone da sessao (America/Sao_Paulo aqui), e comparar contra
-    # um limite em UTC deixava a janela sempre 3h "no futuro", nunca disparando.
-    limite = datetime.now() - timedelta(minutes=JANELA_BLOQUEIO_MINUTOS)
+    # Mesmo relogio do LogAcesso.criado_em (utcnow, gerado em Python) - se um
+    # lado usasse hora local e o outro UTC, a janela ficaria 3h deslocada.
+    limite = datetime.utcnow() - timedelta(minutes=JANELA_BLOQUEIO_MINUTOS)
     tentativas_recentes = db.query(LogAcesso).filter(
         LogAcesso.email_tentado == form.username,
         LogAcesso.tentativa_ok.is_(False),
