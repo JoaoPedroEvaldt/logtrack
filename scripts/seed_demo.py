@@ -29,6 +29,9 @@ Uso:
     # apagar tudo e popular de novo (entre uma banca e outra)
     python scripts/seed_demo.py --database-url "postgresql://..." --reset
 
+    # apagar tudo e deixar o sistema zerado, so com os 2 logins
+    python scripts/seed_demo.py --database-url "postgresql://..." --reset --vazio
+
     --senha define a senha dos logins (senao uma aleatoria e gerada e mostrada);
     --sim pula a confirmacao interativa. Sem --database-url usa o DATABASE_URL
     do .env.
@@ -527,6 +530,7 @@ def main() -> None:
     parser.add_argument("--database-url", help="banco da DEMO (padrao: DATABASE_URL do .env)")
     parser.add_argument("--reset", action="store_true", help="apaga os dados de demo existentes antes de popular")
     parser.add_argument("--senha", help="senha dos logins de demo (padrao: gera uma aleatoria)")
+    parser.add_argument("--vazio", action="store_true", help="cria so os logins, sem frota nem viagens")
     parser.add_argument("--sim", action="store_true", help="nao pede confirmacao")
     parser.add_argument("--semente", type=int, default=2026, help="semente do sorteio (mesma semente = mesmos dados)")
     args = parser.parse_args()
@@ -551,7 +555,11 @@ def main() -> None:
         conferir_banco_de_demo(db, args.reset)
         if args.reset:
             apagar_tudo(db)
-        resumo = popular(db, senha)
+        if args.vazio:
+            criar_usuarios(db, senha)
+            resumo = None
+        else:
+            resumo = popular(db, senha)
         db.commit()
     except BaseException:
         db.rollback()
@@ -559,7 +567,10 @@ def main() -> None:
     finally:
         db.close()
 
-    print(f"\nPronto: {resumo['entregas']} entregas ({resumo['em_andamento']} em andamento agora).")
+    if resumo is None:
+        print("\nPronto: sistema zerado, so com os logins.")
+    else:
+        print(f"\nPronto: {resumo['entregas']} entregas ({resumo['em_andamento']} em andamento agora).")
     print(f"Login administrador: {EMAIL_ADMIN} / {senha}")
     print(f"Login operador:      {EMAIL_OPERADOR} / {senha}")
 
