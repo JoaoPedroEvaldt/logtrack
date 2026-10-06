@@ -378,7 +378,9 @@ async function exportarPDF() {
       formatarDataHora(e.previsao), formatarDataHoraUtc(e.concluido_em)
     ]),
     ...PDF_ESTILO_TABELA,
-    columnStyles: { 3: { cellWidth: 27 } },
+    // Datas com largura fixa: um texto longo sem espaço em origem/destino
+    // espremia estas colunas a 1 caractere e cada linha virava meia página.
+    columnStyles: { 3: { cellWidth: 27 }, 4: { cellWidth: 30 }, 5: { cellWidth: 30 } },
     didDrawPage: pdfCabecalhoRodape(doc, 'Entregas do período', geradoEm),
     didParseCell: badgeStatusEntregas.didParseCell,
     didDrawCell: badgeStatusEntregas.didDrawCell,
@@ -437,7 +439,7 @@ async function exportarPDF() {
         const v = todosVeiculos.find(v => v.id === entrega.veiculo_id);
         return [
           v ? v.placa : `#${entrega.veiculo_id}`,
-          `${anterior.destino} → ${entrega.origem}`,
+          `${anterior.destino} » ${entrega.origem}`, // "→" não existe na fonte padrão do jsPDF
           parseFloat(dv.km_vazio).toLocaleString('pt-BR'),
           formatarDataHoraUtc(entrega.iniciado_em)
         ];

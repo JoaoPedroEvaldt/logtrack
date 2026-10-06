@@ -1213,8 +1213,16 @@ function pdfColunaBadgeStatus(colunaIndex, obterStatus, obterLabel) {
     },
     didDrawCell(data) {
       if (data.section !== 'body' || data.column.index !== colunaIndex) return;
-      const status = obterStatus(data.row.index);
-      const label = obterLabel(data.row.index);
+      // Linha mais alta que a página é quebrada pelo autoTable e o pedaço da
+      // página seguinte pode chegar com um índice fora da lista — sem selo nele.
+      let status, label;
+      try {
+        status = obterStatus(data.row.index);
+        label = obterLabel(data.row.index);
+      } catch (e) {
+        return;
+      }
+      if (!status || !label) return;
       const cor = pdfHexParaRgb(corPorStatus(status));
       const cellDoc = data.doc;
       cellDoc.setFont('helvetica', 'normal');
