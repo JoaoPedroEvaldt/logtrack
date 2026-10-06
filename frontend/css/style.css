@@ -5,6 +5,10 @@
   font-family: 'Segoe UI', sans-serif;
 }
 
+/* O atributo hidden sempre esconde, mesmo em elementos cuja classe define
+   display (ex.: .acerto-grade { display: grid } aparecia vazio sem motorista). */
+[hidden] { display: none !important; }
+
 /* Sem isso, o <option> herda só a cor do texto do <select> e mantém o fundo
    branco padrão do navegador — no tema escuro isso vira texto claro sobre
    fundo claro (opção só aparece ao passar o mouse, quando o destaque do SO
@@ -1497,6 +1501,8 @@ a.link-ficha:hover { color: var(--accent-dark); text-decoration: underline; }
 .acerto-linha strong { display: block; font-size: 14px; color: var(--text); }
 .acerto-linha span { font-size: 12px; color: var(--text-light); }
 .acerto-linha b { font-size: 15px; white-space: nowrap; }
+/* Valores do histórico (comissão, diárias, vales, saldo) numa linha só, sem "R$" sozinho em cima. */
+#acertos-historico td:nth-child(n+5):nth-child(-n+8) { white-space: nowrap; }
 .acerto-linha b.positivo { color: var(--secondary); }
 .acerto-linha b.negativo { color: var(--danger); }
 .acerto-saldo { display: flex; flex-direction: column; gap: 2px; margin-top: 14px; padding: 16px; border-radius: 10px; background: rgba(39,174,96,0.10); color: var(--text); }

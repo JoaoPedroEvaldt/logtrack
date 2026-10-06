@@ -223,6 +223,12 @@ async function carregarHistorico() {
   renderizarHistorico((await get('/acertos')) || [], null);
 }
 
+/* "01/09 a 30/09/2026" quando o período é do mesmo ano (cabe numa linha da tabela). */
+function periodoCurto(inicio, fim) {
+  const ini = formatarData(inicio), f = formatarData(fim);
+  return inicio.slice(0, 4) === fim.slice(0, 4) ? `${ini.slice(0, 5)} a ${f}` : `${ini} a ${f}`;
+}
+
 function renderizarHistorico(lista, motoristaId) {
   const nome = motoristaId ? (motoristasAcerto.find(m => m.id === motoristaId) || {}).nome : null;
   document.getElementById('historico-sub').textContent = nome ? `Somente ${nome}` : 'Todos os motoristas';
@@ -236,7 +242,7 @@ function renderizarHistorico(lista, motoristaId) {
     <tr>
       <td><strong>${String(a.id).padStart(4, '0')}</strong></td>
       <td><a class="link-ficha" href="motorista-ficha.html?id=${a.motorista_id}">${escapeHtml(a.motorista || '—')}</a></td>
-      <td>${formatarData(a.periodo_inicio)} a ${formatarData(a.periodo_fim)}</td>
+      <td style="white-space:nowrap;">${periodoCurto(a.periodo_inicio, a.periodo_fim)}</td>
       <td>${a.qtd_viagens}</td>
       <td>${reais(a.comissao)}</td>
       <td>${reais(a.diarias_motorista)}</td>

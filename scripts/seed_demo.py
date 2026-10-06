@@ -315,7 +315,7 @@ def criar_frota(db, hoje: date):
     conjuntos = []
     for i in range(8):
         conjuntos.append(Conjunto(
-            nome=f"Conjunto {i + 1:02d} — {cavalos[i].placa}",
+            nome=f"Conjunto {i + 1:02d}",
             motorista_id=motoristas[i].id, cavalo_id=cavalos[i].id, semirreboque1_id=semis[i].id,
         ))
     db.add_all(conjuntos)
