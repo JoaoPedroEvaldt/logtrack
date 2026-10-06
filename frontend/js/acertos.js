@@ -248,9 +248,9 @@ function renderizarHistorico(lista, motoristaId) {
       <td>${reais(a.diarias_motorista)}</td>
       <td>${reais(a.total_adiantamentos)}</td>
       <td><strong>${reais(a.saldo)}</strong></td>
-      <td>${formatarDataHoraUtc(a.criado_em)}</td>
+      <td title="${formatarDataHoraUtc(a.criado_em)}">${formatarDataHoraUtc(a.criado_em).slice(0, 10)}</td>
       <td class="acerto-acoes">
-        <button class="btn btn-outline acerto-btn-mini" onclick="abrirDetalheAcerto(${a.id})">${svgIcone(admin ? 'editar' : 'info', 12)} ${admin ? 'Abrir / corrigir' : 'Abrir'}</button>
+        <button class="btn btn-outline acerto-btn-mini" onclick="abrirDetalheAcerto(${a.id})" title="${admin ? 'Abrir e corrigir este acerto' : 'Abrir este acerto'}">${svgIcone(admin ? 'editar' : 'info', 12)} Abrir</button>
         <button class="btn btn-outline acerto-btn-mini" onclick="gerarRecibo(${a.id})">${svgIcone('download', 12)} Recibo</button>
       </td>
     </tr>`).join('');

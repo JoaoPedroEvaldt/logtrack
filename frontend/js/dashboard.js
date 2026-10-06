@@ -78,7 +78,8 @@ function renderizarGraficoStatus(entregas) {
     type: 'doughnut',
     data: {
       labels: ['Concluídas', 'Em trânsito', 'Pendentes'],
-      datasets: [{ data: [concluidas, emTransito, pendentes], backgroundColor: ['#1E2A44', '#F2A93B', '#D8DCE6'], borderWidth: 0 }]
+      // No tema escuro o azul-marinho some no fundo do cartão: usa um azul mais claro.
+      datasets: [{ data: [concluidas, emTransito, pendentes], backgroundColor: [document.body.classList.contains('dark') ? '#5B7BB5' : '#1E2A44', '#F2A93B', '#D8DCE6'], borderWidth: 0 }]
     },
     options: {
       responsive: true,
