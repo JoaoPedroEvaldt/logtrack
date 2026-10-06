@@ -70,6 +70,23 @@ def _validar_veiculo_sem_manutencao(veiculo_id, db: Session):
             detail=f'Veículo está em manutenção (#{manutencao.id} — {manutencao.tipo}). Finalize a manutenção antes de usá-lo em uma entrega.'
         )
 
+def _travar_viagem_acertada(entrega: Entrega, atual: Usuario, status_novo=None, motorista_novo=..., muda_frete=False):
+    """Viagem já paga num acerto fechado: trocar o motorista ou tirá-la de
+    "entregue" deixaria o pagamento errado, então exige reabrir o acerto.
+    Corrigir o frete recalcula o acerto — como vale e diária, só o admin."""
+    if not entrega.acerto_id:
+        return
+    reabrir = f"Esta viagem já foi paga no acerto #{entrega.acerto_id}. Reabra o acerto antes de"
+    if status_novo is not None and status_novo != "entregue":
+        raise HTTPException(status_code=400, detail=f"{reabrir} mudar o status.")
+    if motorista_novo is not ... and motorista_novo != entrega.motorista_id:
+        raise HTTPException(status_code=400, detail=f"{reabrir} trocar o motorista.")
+    if muda_frete and atual.perfil != "administrador":
+        raise HTTPException(
+            status_code=403,
+            detail=f"Esta viagem já foi paga no acerto #{entrega.acerto_id}. Só um administrador pode corrigir o frete.",
+        )
+
 @router.post("/", response_model=EntregaResponse, include_in_schema=False)
 @router.post("", response_model=EntregaResponse)
 def criar_entrega(dados: EntregaCreate, db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
@@ -120,9 +137,11 @@ def atualizar_status(id: int, status: str, db: Session = Depends(get_db), atual:
         raise HTTPException(status_code=400, detail=f"Status inválido. Use: {status_validos}")
     if status == "cancelado" and atual.perfil == "motorista":
         raise HTTPException(status_code=403, detail="Motorista não pode cancelar uma entrega. Peça a um operador ou administrador.")
+    _travar_viagem_acertada(entrega, atual, status_novo=status)
     if status == "em_rota":
         _validar_motorista_veiculo_livres(entrega.motorista_id, entrega.veiculo_id, db, excluir_id=entrega.id)
         _validar_veiculo_sem_manutencao(entrega.veiculo_id, db)
+    status_anterior = entrega.status
     entrega.status = status
     entrega_anterior_id = None
     if status == "em_rota":
@@ -140,7 +159,8 @@ def atualizar_status(id: int, status: str, db: Session = Depends(get_db), atual:
             db.add(dv)
         dv.entrega_anterior_id = entrega_anterior_id
         dv.km_vazio = None
-    if status == "entregue":
+    # Marcar "entregue" de novo não muda a data de conclusão (é a que sai no recibo do acerto).
+    if status == "entregue" and not (status_anterior == "entregue" and entrega.concluido_em):
         entrega.concluido_em = datetime.utcnow()
     db.commit()
     db.refresh(entrega)
@@ -159,6 +179,11 @@ def atualizar_entrega(id: int, dados: EntregaUpdate, db: Session = Depends(get_d
     motorista_id = atualizacoes.get("motorista_id", entrega.motorista_id)
     veiculo_id = atualizacoes.get("veiculo_id", entrega.veiculo_id)
     status_final = atualizacoes.get("status", entrega.status)
+    _travar_viagem_acertada(
+        entrega, atual, status_novo=atualizacoes.get("status"),
+        motorista_novo=atualizacoes.get("motorista_id", ...),
+        muda_frete="valor_frete" in atualizacoes and atualizacoes["valor_frete"] != float(entrega.valor_frete or 0),
+    )
     if "motorista_id" in atualizacoes or "veiculo_id" in atualizacoes:
         _validar_motorista_e_veiculo_existem(motorista_id, veiculo_id, db)
     if status_final == "em_rota":
@@ -180,6 +205,7 @@ def deletar_entrega(id: int, db: Session = Depends(get_db), atual: Usuario = Dep
     entrega = db.query(Entrega).filter(Entrega.id == id).first()
     if not entrega:
         raise HTTPException(status_code=404, detail="Entrega não encontrada")
+    _travar_viagem_acertada(entrega, atual, status_novo="cancelado")
     entrega.status = "cancelado"
     db.commit()
     return {"message": "Entrega cancelada com sucesso"}

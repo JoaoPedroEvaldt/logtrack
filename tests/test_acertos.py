@@ -147,6 +147,37 @@ def test_corrigir_vale_diaria_e_frete_depois_de_fechar_recalcula_o_acerto(client
     assert r.json()["observacao"] == "corrigido"
 
 
+def test_viagem_paga_nao_muda_de_status_nem_de_motorista_sem_reabrir(client, db_session, admin, operador):
+    motorista, entrega, headers = _cenario(client, db_session, admin)
+    outro = criar_motorista_orm(db_session, nome="Outro Motorista", cpf="52998224725", cnh_numero="98765432100")
+    acerto = client.post("/acertos", headers=headers, json={
+        "motorista_id": motorista.id, "periodo_inicio": str(INICIO), "periodo_fim": str(HOJE)}).json()
+    concluido = client.get(f"/entregas/{entrega.id}", headers=headers).json()["concluido_em"]
+
+    # Tirar de "entregue", cancelar ou trocar o motorista bagunçaria o pagamento.
+    assert client.put(f"/entregas/{entrega.id}/status", headers=headers, params={"status": "em_rota"}).status_code == 400
+    assert client.delete(f"/entregas/{entrega.id}", headers=headers).status_code == 400
+    r = client.put(f"/entregas/{entrega.id}", headers=headers, json={"motorista_id": outro.id})
+    assert r.status_code == 400 and "Reabra o acerto" in r.json()["detail"]
+
+    # Frete de viagem paga: só o admin corrige (o acerto acompanha).
+    headers_operador = auth_headers(client, operador.email)
+    assert client.put(f"/entregas/{entrega.id}", headers=headers_operador, json={"valor_frete": 1}).status_code == 403
+    # Salvar o formulário sem mudar nada continua funcionando para o operador.
+    r = client.put(f"/entregas/{entrega.id}", headers=headers_operador, json={
+        "cliente": "Cliente Corrigido", "valor_frete": 22000, "motorista_id": motorista.id, "status": "entregue"})
+    assert r.status_code == 200, r.text
+
+    # Marcar "entregue" de novo não mexe na data que sai no recibo.
+    assert client.put(f"/entregas/{entrega.id}/status", headers=headers, params={"status": "entregue"}).status_code == 200
+    assert client.get(f"/entregas/{entrega.id}", headers=headers).json()["concluido_em"] == concluido
+    assert client.get(f"/acertos/{acerto['id']}", headers=headers).json()["saldo"] == pytest.approx(860)
+
+    # Depois de reabrir o acerto, a viagem volta a poder ser alterada.
+    client.delete(f"/acertos/{acerto['id']}", headers=headers)
+    assert client.put(f"/entregas/{entrega.id}", headers=headers, json={"motorista_id": outro.id}).status_code == 200
+
+
 def test_nao_fecha_acerto_com_data_futura_nem_vazio(client, db_session, admin):
     motorista = criar_motorista_orm(db_session)
     headers = auth_headers(client, admin.email)
