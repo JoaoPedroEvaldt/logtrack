@@ -365,17 +365,6 @@ function garantirMapaRota() {
 /* Opções de toLocaleString pro formato "dd/mm hh:mm" usado nas datas de chegada/entrega da rota. */
 const FORMATO_DATA_HORA_CURTO = { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' };
 
-/* Distância em linha reta (km) entre dois pontos — usada só como aproximação
-   quando o OSRM não retorna uma rota rodoviária de verdade. */
-function distanciaHaversineKm(a, b) {
-  const R = 6371;
-  const toRad = g => g * Math.PI / 180;
-  const dLat = toRad(b.lat - a.lat);
-  const dLon = toRad(b.lon - a.lon);
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
-}
-
 /* <input type="datetime-local"> trabalha com "AAAA-MM-DDTHH:MM" em hora local. */
 function paraInputDataHora(data) {
   const p = n => String(n).padStart(2, '0');
@@ -655,34 +644,6 @@ async function calcularESalvarKmVazio(entregaId, entregaAnteriorId) {
   try {
     await put(`/deslocamentos-vazios/${entregaId}`, { km_vazio: Math.round(rota.distanceKm * 10) / 10 });
   } catch (e) { /* métrica secundária — falha de rede aqui não deve incomodar o usuário */ }
-}
-
-/* Interpola um ponto ao longo da polyline pela fração (0 a 1) da distância
-   percorrida — usado pra posicionar o caminhão no trajeto real (não em linha
-   reta) quando a entrega já está em rota. */
-function pontoNaLinha(coordenadas, frac) {
-  if (coordenadas.length < 2) return coordenadas[0];
-  const segmentos = [];
-  let total = 0;
-  for (let i = 0; i < coordenadas.length - 1; i++) {
-    const d = distanciaHaversineKm(
-      { lat: coordenadas[i][0], lon: coordenadas[i][1] },
-      { lat: coordenadas[i + 1][0], lon: coordenadas[i + 1][1] }
-    );
-    segmentos.push(d);
-    total += d;
-  }
-  let alvo = total * Math.max(0, Math.min(1, frac));
-  for (let i = 0; i < segmentos.length; i++) {
-    if (alvo <= segmentos[i] || i === segmentos.length - 1) {
-      const t = segmentos[i] > 0 ? Math.min(1, alvo / segmentos[i]) : 0;
-      const [lat1, lon1] = coordenadas[i];
-      const [lat2, lon2] = coordenadas[i + 1];
-      return [lat1 + (lat2 - lat1) * t, lon1 + (lon2 - lon1) * t];
-    }
-    alvo -= segmentos[i];
-  }
-  return coordenadas[coordenadas.length - 1];
 }
 
 async function abrirModalRota(id) {

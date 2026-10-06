@@ -668,6 +668,47 @@ function iconeCaminhaoMapa(corPreenchimento = '#2E75B6', corBorda = '#1E4D78') {
   });
 }
 
+/* (distanciaHaversineKm e pontoNaLinha moraram em entregas.js; vieram pra
+   cá porque o Mapa da frota também posiciona caminhões no trajeto.) */
+/* Distância em linha reta (km) entre dois pontos — usada só como aproximação
+   quando o OSRM não retorna uma rota rodoviária de verdade. */
+function distanciaHaversineKm(a, b) {
+  const R = 6371;
+  const toRad = g => g * Math.PI / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLon = toRad(b.lon - a.lon);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
+/* Interpola um ponto ao longo da polyline pela fração (0 a 1) da distância
+   percorrida — usado pra posicionar o caminhão no trajeto real (não em linha
+   reta) quando a entrega já está em rota. */
+function pontoNaLinha(coordenadas, frac) {
+  if (coordenadas.length < 2) return coordenadas[0];
+  const segmentos = [];
+  let total = 0;
+  for (let i = 0; i < coordenadas.length - 1; i++) {
+    const d = distanciaHaversineKm(
+      { lat: coordenadas[i][0], lon: coordenadas[i][1] },
+      { lat: coordenadas[i + 1][0], lon: coordenadas[i + 1][1] }
+    );
+    segmentos.push(d);
+    total += d;
+  }
+  let alvo = total * Math.max(0, Math.min(1, frac));
+  for (let i = 0; i < segmentos.length; i++) {
+    if (alvo <= segmentos[i] || i === segmentos.length - 1) {
+      const t = segmentos[i] > 0 ? Math.min(1, alvo / segmentos[i]) : 0;
+      const [lat1, lon1] = coordenadas[i];
+      const [lat2, lon2] = coordenadas[i + 1];
+      return [lat1 + (lat2 - lat1) * t, lon1 + (lon2 - lon1) * t];
+    }
+    alvo -= segmentos[i];
+  }
+  return coordenadas[coordenadas.length - 1];
+}
+
 /* Geocodifica as duas cidades e busca (ou reaproveita do cache) o trajeto
    rodoviário real entre elas via OSRM — usado tanto pro modal de Rota quanto
    pro mapa de deslocamento vazio, sempre com a geometria completa
