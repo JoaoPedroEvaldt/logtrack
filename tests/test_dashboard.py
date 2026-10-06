@@ -1,6 +1,7 @@
 """Testes das contas do dashboard: resumo, vencimentos, agrupamentos por
 status/dia, desempenho por motorista, e a comparação do faturamento com o mês
 anterior, usando a mesma quantidade de dias decorridos em ambos os meses."""
+import pytest
 from datetime import date, datetime, time, timedelta
 
 from app.models.motorista import Motorista
@@ -52,9 +53,12 @@ def test_faturamento_compara_com_mes_anterior(client, db_session, admin):
 
     assert dados["receita_bruta"] == 1000
     assert dados["mes_anterior"]["receita_bruta"] == 500
-    assert dados["mes_anterior"]["faturamento_liquido"] == 500
+    # Visão da empresa: líquido já descontada a comissão de 13% do motorista.
+    assert dados["mes_anterior"]["comissao"] == 65
+    assert dados["mes_anterior"]["faturamento_liquido"] == 435
     # mês anterior não deve vazar pro total do mês atual
-    assert dados["faturamento_liquido"] == 1000
+    assert dados["comissao"] == 130
+    assert dados["faturamento_liquido"] == 870
 
 
 def test_resumo_conta_entregas_e_disponibilidade(client, admin, db_session):
@@ -211,3 +215,27 @@ def test_desempenho_motoristas_calcula_faturamento_e_ignora_sem_entrega_ou_inati
     assert linha_top["concluidas"] == 1
     assert linha_top["atrasadas"] == 1
     assert linha_top["faturamento"] == 1000.0
+
+
+def test_liquido_da_empresa_desconta_comissao_e_abastecimento(client, db_session, admin):
+    """Frete de R$22.000: motorista ganha 13% (R$2.860) sem descontar o diesel;
+    a empresa fica com o frete menos a comissão e o abastecimento."""
+    from app.models.abastecimento import Abastecimento
+
+    veiculo = criar_veiculo_orm(db_session)
+    motorista = criar_motorista_orm(db_session)
+    entrega = criar_entrega_orm(db_session, motorista_id=motorista.id, veiculo_id=veiculo.id, status="entregue")
+    entrega.valor_frete = 22000
+    entrega.concluido_em = datetime.utcnow()
+    db_session.add(Abastecimento(veiculo_id=veiculo.id, motorista_id=motorista.id, data_abastecimento=_hoje_no_mes_atual(),
+                                 litros=500, valor_total=3000))
+    db_session.commit()
+
+    headers = auth_headers(client, "admin@teste.com")
+    fat = client.get("/dashboard/faturamento", headers=headers).json()
+    assert fat["comissao"] == pytest.approx(2860)
+    assert fat["faturamento_liquido"] == pytest.approx(22000 - 2860 - 3000)
+
+    desempenho = client.get("/dashboard/desempenho-motoristas", headers=headers).json()
+    assert desempenho[0]["faturamento"] == 22000
+    assert desempenho[0]["comissao"] == pytest.approx(2860)

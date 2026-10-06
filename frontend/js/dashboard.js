@@ -195,11 +195,14 @@ function renderizarFaturamento(fat) {
   const custoTotal = fat.custo_manutencao + fat.custo_abastecimento;
   document.getElementById('fat-receita').textContent = formatarMoeda(fat.receita_bruta);
   document.getElementById('fat-custos').textContent = formatarMoeda(custoTotal);
+  document.getElementById('fat-comissao').textContent = formatarMoeda(fat.comissao);
   document.getElementById('fat-liquido').textContent = formatarMoeda(fat.faturamento_liquido);
 
   const anterior = fat.mes_anterior || {};
   document.getElementById('fat-receita-var').innerHTML = badgeVariacao(fat.receita_bruta, anterior.receita_bruta, true);
   document.getElementById('fat-custos-var').innerHTML = badgeVariacao(custoTotal, anterior.custo_total, false);
+  // Comissão sobe junto com o frete — variação neutra (só acompanha a receita).
+  document.getElementById('fat-comissao-var').textContent = '13% de cada frete entregue';
   document.getElementById('fat-liquido-var').innerHTML = badgeVariacao(fat.faturamento_liquido, anterior.faturamento_liquido, true);
 
   const tbodyConjunto = document.getElementById('tabela-faturamento-conjunto');
@@ -232,7 +235,7 @@ function renderizarTopMotoristas(lista) {
   if (!tbody) return;
   const top5 = [...lista].sort((a, b) => b.faturamento - a.faturamento).slice(0, 5);
   if (top5.length === 0) {
-    tbody.innerHTML = estadoVazio(3, 'Sem entregas no histórico', null, 'vazio');
+    tbody.innerHTML = estadoVazio(4, 'Sem entregas no histórico', null, 'vazio');
     return;
   }
   tbody.innerHTML = top5.map((m, i) => `
@@ -240,6 +243,7 @@ function renderizarTopMotoristas(lista) {
       <td>${medalha(i)} ${escapeHtml(m.motorista)}</td>
       <td>${m.concluidas}</td>
       <td><strong>${formatarMoeda(m.faturamento)}</strong></td>
+      <td>${formatarMoeda(m.comissao)}</td>
     </tr>
   `).join('');
 }

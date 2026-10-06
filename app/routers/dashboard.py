@@ -22,6 +22,10 @@ router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 # noite contava como de amanhã). Brasil sem horário de verão desde 2019.
 FUSO_BRASILIA = timedelta(hours=-3)
 
+# Comissão do motorista: 13% do frete de cada entrega concluída, sem descontar
+# abastecimento — vai somando frete a frete. Para a empresa ela é custo.
+COMISSAO_MOTORISTA = 0.13
+
 def hoje_brasilia() -> date:
     return (datetime.utcnow() + FUSO_BRASILIA).date()
 
@@ -160,7 +164,8 @@ def desempenho_motoristas(db: Session = Depends(get_db), atual: Usuario = Depend
      .all()
 
     return [
-        {"motorista": r.nome, "total": r.total, "concluidas": r.concluidas, "atrasadas": r.atrasadas, "faturamento": float(r.faturamento)}
+        {"motorista": r.nome, "total": r.total, "concluidas": r.concluidas, "atrasadas": r.atrasadas, "faturamento": float(r.faturamento),
+         "comissao": float(r.faturamento) * COMISSAO_MOTORISTA}
         for r in resultado
     ]
 
@@ -183,13 +188,14 @@ def _totais_periodo(db: Session, inicio: date, fim: date):
     receita_bruta = sum(float(e.valor_frete or 0) for e in entregas)
     custo_manutencao = sum(float(m.custo or 0) for m in manutencoes)
     custo_abastecimento = sum(float(a.valor_total or 0) for a in abastecimentos)
-    return entregas, manutencoes, abastecimentos, receita_bruta, custo_manutencao, custo_abastecimento
+    comissao = receita_bruta * COMISSAO_MOTORISTA
+    return entregas, manutencoes, abastecimentos, receita_bruta, custo_manutencao, custo_abastecimento, comissao
 
 @router.get("/faturamento")
 def faturamento(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
-    """Faturamento líquido do mês atual: receita das entregas concluídas menos
-    custos de manutenção, abastecimento e comissão do motorista (13% da receita)
-    no período, detalhado por conjunto (veículo + motorista fixo). Movimento que
+    """Faturamento líquido do mês atual (visão da empresa): receita das entregas
+    concluídas menos manutenção, abastecimento e comissão do motorista (13% da
+    receita) no período, detalhado por conjunto (veículo + motorista fixo). Movimento que
     não pertence a nenhum conjunto cadastrado entra como linha "Sem conjunto".
     Inclui também os totais do mês anterior, só pra comparação (sem detalhamento) —
     usando o MESMO NÚMERO DE DIAS decorridos, não o mês anterior inteiro. Sem isso,
@@ -203,9 +209,9 @@ def faturamento(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_s
     dias_decorridos = (hoje - inicio_mes).days + 1
     fim_mes_anterior_comparavel = min(inicio_mes_anterior + timedelta(days=dias_decorridos), inicio_mes)
 
-    entregas, manutencoes, abastecimentos, receita_bruta, custo_manutencao, custo_abastecimento = \
+    entregas, manutencoes, abastecimentos, receita_bruta, custo_manutencao, custo_abastecimento, comissao_total = \
         _totais_periodo(db, inicio_mes, fim_mes)
-    _, _, _, receita_bruta_ant, custo_manutencao_ant, custo_abastecimento_ant = \
+    _, _, _, receita_bruta_ant, custo_manutencao_ant, custo_abastecimento_ant, comissao_ant = \
         _totais_periodo(db, inicio_mes_anterior, fim_mes_anterior_comparavel)
 
     conjuntos = db.query(Conjunto).filter(Conjunto.status != "inativo").all()
@@ -247,7 +253,7 @@ def faturamento(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_s
         )
         abastecimento = sum(float(a.valor_total or 0) for a in abastecimentos if a.veiculo_id in veic_ids)
         manutencao = sum(float(m.custo or 0) for m in manutencoes if m.veiculo_id in veic_ids)
-        comissao = receita * 0.13
+        comissao = receita * COMISSAO_MOTORISTA
         if receita or abastecimento or manutencao:
             por_conjunto.append({
                 "conjunto_id": c.id,
@@ -281,7 +287,7 @@ def faturamento(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_s
             if a.motorista_id == mid and a.veiculo_id not in todos_veic_ids
         )
         if receita or abastecimento:
-            comissao = receita * 0.13
+            comissao = receita * COMISSAO_MOTORISTA
             por_conjunto.append({
                 "conjunto_id": None,
                 "conjunto": "Sem conjunto",
@@ -302,11 +308,13 @@ def faturamento(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_s
         "receita_bruta": receita_bruta,
         "custo_manutencao": custo_manutencao,
         "custo_abastecimento": custo_abastecimento,
-        "faturamento_liquido": receita_bruta - custo_manutencao - custo_abastecimento,
+        "comissao": comissao_total,
+        "faturamento_liquido": receita_bruta - custo_manutencao - custo_abastecimento - comissao_total,
         "por_conjunto": por_conjunto,
         "mes_anterior": {
             "receita_bruta": receita_bruta_ant,
             "custo_total": custo_manutencao_ant + custo_abastecimento_ant,
-            "faturamento_liquido": receita_bruta_ant - custo_manutencao_ant - custo_abastecimento_ant
+            "comissao": comissao_ant,
+            "faturamento_liquido": receita_bruta_ant - custo_manutencao_ant - custo_abastecimento_ant - comissao_ant
         }
     }
