@@ -37,6 +37,21 @@ app.add_middleware(
 # municípios em frontend/data) — no plano gratuito do Render isso pesa.
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 
+# Sem Cache-Control, o navegador reaproveitava por conta própria um .js
+# antigo depois de um deploy (StaticFiles só manda ETag/Last-Modified) e
+# misturava versões — ex.: mapa-frota.js novo com api.js velho, tela presa
+# em "carregando". no-cache não desliga o cache: o navegador só pergunta se
+# mudou (resposta 304, sem baixar de novo) antes de usar.
+EXTENSOES_SEMPRE_CONFERIR = (".html", ".js", ".css")
+
+@app.middleware("http")
+async def conferir_versao_dos_arquivos(request: Request, call_next):
+    resposta = await call_next(request)
+    caminho = request.url.path
+    if caminho == "/" or caminho.endswith(EXTENSOES_SEMPRE_CONFERIR):
+        resposta.headers["Cache-Control"] = "no-cache"
+    return resposta
+
 # Regras do próprio banco (CHECKs da migração 0001) que a validação da API não
 # repete. Sem estes handlers, um valor fora da regra virava "Internal Server
 # Error" em texto puro — a tela não conseguia ler a resposta e ficava muda.

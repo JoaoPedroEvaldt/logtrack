@@ -78,26 +78,38 @@ async function montarCaminhoes(veiculos, entregas, conjuntos, manutencoes, nomeM
     if (viagem) {
       const atrasado = viagem.status !== 'em_rota' || new Date() > new Date(viagem.previsao);
       c.estado = atrasado ? 'alerta' : 'viagem';
-      await calcularPosicaoEmViagem(c);
     } else {
       c.estado = manutencao ? 'manutencao' : 'disponivel';
       c.cidade = ultima ? ultima.destino : (proxima ? proxima.origem : null);
-      if (c.cidade) {
-        const ponto = await geocodificarCidade(c.cidade);
-        if (ponto) c.posicao = [ponto.lat, ponto.lon];
-      }
-    }
-
-    const rastreador = await posicaoDoRastreador(v);
-    if (rastreador) {
-      c.posicao = [rastreador.lat, rastreador.lon];
-      c.fonte = 'rastreador';
-      c.atualizadoEm = rastreador.atualizadoEm;
     }
     lista.push(c);
   }
+
+  // Todos ao mesmo tempo, e cada um por conta própria: um caminhão com
+  // cidade que não se acha no mapa, ou o serviço de rotas fora do ar, deixa
+  // só aquele sem posição — nunca a tela inteira presa em "carregando".
+  await Promise.all(lista.map(c => comLimiteDeTempo(localizar(c), 20000).catch(() => {})));
   const ordem = { alerta: 0, viagem: 1, disponivel: 2, manutencao: 3 };
   return lista.sort((a, b) => ordem[a.estado] - ordem[b.estado] || a.veiculo.placa.localeCompare(b.veiculo.placa));
+}
+
+function comLimiteDeTempo(promessa, ms) {
+  return Promise.race([promessa, new Promise((_, rejeita) => setTimeout(() => rejeita(new Error('tempo esgotado')), ms))]);
+}
+
+async function localizar(c) {
+  if (c.viagem) {
+    await calcularPosicaoEmViagem(c);
+  } else if (c.cidade) {
+    const ponto = await geocodificarCidade(c.cidade);
+    if (ponto) c.posicao = [ponto.lat, ponto.lon];
+  }
+  const rastreador = await posicaoDoRastreador(c.veiculo);
+  if (rastreador) {
+    c.posicao = [rastreador.lat, rastreador.lon];
+    c.fonte = 'rastreador';
+    c.atualizadoEm = rastreador.atualizadoEm;
+  }
 }
 
 /* Mesma estimativa do modal de Rota (entregas.js): trajeto rodoviário, tempo
@@ -358,7 +370,20 @@ function avancarPosicoes() {
   if (selecionadoId) selecionar(selecionadoId, false); else desenharCaminhoes();
 }
 
+/* Nunca deixa a tela presa em "Localizando caminhões...": se algo falhar,
+   diz o que fazer (o caso mais comum foi o navegador com um arquivo antigo
+   em cache logo depois de uma atualização do sistema). */
+function carregarComAviso() {
+  return carregar().catch(erro => {
+    console.error(erro);
+    if (caminhoes.length) return; // já tinha um mapa na tela: mantém
+    document.getElementById('frota-lista').innerHTML = estadoVazio(null,
+      'Não foi possível montar o mapa agora',
+      'Atualize a página (Ctrl + F5). Se continuar, confira a internet — as rotas vêm de um serviço externo.', 'alerta');
+  });
+}
+
 garantirMapa();
-carregar();
+carregarComAviso();
 setInterval(avancarPosicoes, ATUALIZAR_A_CADA_MS);
-setInterval(carregar, 10 * ATUALIZAR_A_CADA_MS);
+setInterval(carregarComAviso, 10 * ATUALIZAR_A_CADA_MS);
