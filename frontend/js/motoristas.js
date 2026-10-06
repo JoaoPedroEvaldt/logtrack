@@ -38,6 +38,10 @@ async function carregarMotoristas() {
     (entregas || []).filter(e => e.status === 'em_rota' && e.motorista_id).map(e => e.motorista_id)
   );
   filtrarMotoristas();
+
+  // Botão "Editar" da ficha do motorista abre esta tela com ?editar=ID.
+  const editarId = parseInt(new URLSearchParams(location.search).get('editar'), 10);
+  if (editarId && motoristasCarregados.some(m => m.id === editarId)) editarMotorista(editarId);
 }
 
 function filtrarMotoristas() {
@@ -72,7 +76,7 @@ function renderizarMotoristas(data) {
         <td>
           <div class="tabela-pessoa">
             <span class="avatar-mini" style="background:${corAvatar(m.id)};">${iniciaisNome(m.nome)}</span>
-            ${escapeHtml(m.nome) || '—'}
+            <a class="link-ficha" href="motorista-ficha.html?id=${m.id}" title="Abrir ficha do motorista">${escapeHtml(m.nome) || '—'}</a>
           </div>
         </td>
         <td>${alertaCNH}${escapeHtml(m.cnh_numero)}</td>
@@ -81,6 +85,7 @@ function renderizarMotoristas(data) {
         <td><span class="badge badge-${STATUS_BADGE_MOTORISTA[statusEfetivo(m)] || 'cancelado'}">${STATUS_LABEL_MOTORISTA[statusEfetivo(m)] || escapeHtml(m.status)}</span></td>
         <td>${m.possui_login ? `<span class="badge badge-entregue" title="${escapeHtml(m.email || '')}">Com acesso</span>` : '<span class="badge badge-cancelado">Sem acesso</span>'}</td>
         <td style="display:flex;gap:6px;">
+          <a class="btn btn-outline" style="font-size:11px;padding:4px 10px;text-decoration:none;" href="motorista-ficha.html?id=${m.id}">${svgIcone('usuario', 12)} Ficha</a>
           <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="editarMotorista(${m.id})">${svgIcone('editar', 12)} Editar</button>
           <button class="btn btn-danger" style="font-size:11px;padding:4px 10px;" onclick="excluirMotorista(${m.id})">${svgIcone('excluir', 12)} Excluir</button>
         </td>

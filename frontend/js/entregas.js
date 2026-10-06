@@ -912,6 +912,9 @@ async function iniciar() {
      ficam bloqueados pra esse perfil, então nem tenta carregar (e nem precisa). */
   if (localStorage.getItem('perfil') !== 'motorista') {
     await Promise.all([carregarVeiculos(), carregarMotoristas(), carregarConjuntosMotoristas(), carregarManutencoesAtivas()]);
+    // "Ver rotograma" da ficha do motorista chega com ?motorista=ID já filtrado.
+    const motoristaUrl = new URLSearchParams(location.search).get('motorista');
+    if (motoristaUrl) document.getElementById('filtro-motorista').value = motoristaUrl;
   }
   carregarEntregas();
 }

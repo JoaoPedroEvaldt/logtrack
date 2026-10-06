@@ -240,7 +240,7 @@ function renderizarTopMotoristas(lista) {
   }
   tbody.innerHTML = top5.map((m, i) => `
     <tr>
-      <td>${medalha(i)} ${escapeHtml(m.motorista)}</td>
+      <td>${medalha(i)} <a class="link-ficha" href="motorista-ficha.html?id=${m.motorista_id}">${escapeHtml(m.motorista)}</a></td>
       <td>${m.concluidas}</td>
       <td><strong>${formatarMoeda(m.faturamento)}</strong></td>
       <td>${formatarMoeda(m.comissao)}</td>

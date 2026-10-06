@@ -239,3 +239,4 @@ def test_liquido_da_empresa_desconta_comissao_e_abastecimento(client, db_session
     desempenho = client.get("/dashboard/desempenho-motoristas", headers=headers).json()
     assert desempenho[0]["faturamento"] == 22000
     assert desempenho[0]["comissao"] == pytest.approx(2860)
+    assert desempenho[0]["motorista_id"] == motorista.id  # link pra ficha do motorista

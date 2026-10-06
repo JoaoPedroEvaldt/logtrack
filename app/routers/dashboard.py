@@ -152,6 +152,7 @@ def desempenho_motoristas(db: Session = Depends(get_db), atual: Usuario = Depend
         func.sum(Entrega.valor_frete).filter(Entrega.status == "entregue"), 0
     )
     resultado = db.query(
+        Motorista.id,
         Motorista.nome,
         func.count(Entrega.id).label("total"),
         func.count(Entrega.id).filter(Entrega.status == "entregue").label("concluidas"),
@@ -164,7 +165,7 @@ def desempenho_motoristas(db: Session = Depends(get_db), atual: Usuario = Depend
      .all()
 
     return [
-        {"motorista": r.nome, "total": r.total, "concluidas": r.concluidas, "atrasadas": r.atrasadas, "faturamento": float(r.faturamento),
+        {"motorista_id": r.id, "motorista": r.nome, "total": r.total, "concluidas": r.concluidas, "atrasadas": r.atrasadas, "faturamento": float(r.faturamento),
          "comissao": float(r.faturamento) * COMISSAO_MOTORISTA}
         for r in resultado
     ]
