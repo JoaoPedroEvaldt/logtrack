@@ -3,160 +3,685 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>LogTrack — Sobre o Sistema</title>
-  <meta name="description" content="LogTrack — Sistema inteligente de gestão operacional para transportadoras: problema, solução, funcionalidades e tecnologia por trás do projeto." />
-  <link rel="stylesheet" href="css/style.css" />
+  <title>LogTrack — Gestão operacional para transportadoras</title>
+  <meta name="description" content="LogTrack — da carga ao acerto do motorista: rota por estrada com chegada prevista pela Lei do Motorista, mapa da frota, km rodado vazio, abastecimentos, manutenções e relatórios." />
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 56 66'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%232E75B6'/%3E%3Cstop offset='100%25' stop-color='%231E4D78'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M28 2C14.7 2 4 12.5 4 25.5 4 42 28 62 28 62S52 42 52 25.5C52 12.5 41.3 2 28 2Z' fill='url(%23g)'/%3E%3Cg fill='%23FFFFFF'%3E%3Crect x='10' y='18' width='6' height='9'/%3E%3Crect x='17' y='15' width='23' height='12' rx='1'/%3E%3Ccircle cx='14' cy='29' r='2.3'/%3E%3Ccircle cx='31' cy='29' r='2.3'/%3E%3Ccircle cx='38' cy='29' r='2.3'/%3E%3C/g%3E%3Ccircle cx='45' cy='9' r='7' fill='%2327AE60' opacity='0.25'/%3E%3Ccircle cx='45' cy='9' r='4' fill='%2327AE60'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&display=swap" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
   <style>
-    .sobre-page { background: var(--bg); min-height: 100vh; }
-    .sobre-hero {
-      background: linear-gradient(135deg, #1E4D78 0%, #2E75B6 100%);
-      padding: 64px 24px 80px;
-      text-align: center;
-      color: white;
+    /* Página de apresentação: sempre no tema escuro, com as cores da marca
+       (azul-marinho do menu + âmbar de destaque do sistema). */
+    :root {
+      --lp-bg: #0D1424;
+      --lp-bg-2: #111A2E;
+      --lp-card: #16213A;
+      --lp-card-2: #1B2740;
+      --lp-borda: rgba(255,255,255,0.08);
+      --lp-texto: #F3F4F6;
+      --lp-suave: #9AA3B5;
+      --lp-ambar: #F2A93B;
+      --lp-ambar-escuro: #DC922A;
+      --lp-azul: #4F8EF7;
+      --lp-verde: #27AE60;
+      --lp-laranja: #F2803B;
+      --lp-raio: 14px;
     }
-    .sobre-hero .logo-icon svg { margin: 0 auto 16px; display: block; }
-    .sobre-hero h1 { font-size: 34px; font-weight: 800; letter-spacing: -0.01em; }
-    .sobre-hero p.tagline { font-size: 16px; color: rgba(255,255,255,0.85); margin-top: 10px; max-width: 560px; margin-left: auto; margin-right: auto; }
-    .sobre-hero .btn-voltar {
-      display: inline-flex; align-items: center; gap: 8px; margin-top: 28px;
-      background: white; color: var(--primary); font-weight: 700; font-size: 14px;
-      padding: 12px 24px; border-radius: var(--radius); text-decoration: none;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.15); transition: transform 0.15s;
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--lp-bg);
+      color: var(--lp-texto);
+      line-height: 1.5;
+      overflow-x: hidden;
     }
-    .sobre-hero .btn-voltar:hover { transform: translateY(-2px); }
+    a { color: inherit; }
+    .lp-titulo { font-family: 'Barlow Condensed', 'Segoe UI', sans-serif; font-weight: 700; letter-spacing: -0.01em; line-height: 1.08; }
+    .lp-wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
 
-    .sobre-container { max-width: 980px; margin: -48px auto 0; padding: 0 24px 64px; position: relative; }
+    /* ---------- Topo ---------- */
+    .lp-topo { position: absolute; top: 0; left: 0; right: 0; z-index: 10; }
+    .lp-topo .lp-wrap { display: flex; align-items: center; justify-content: space-between; height: 72px; }
+    .lp-marca { display: flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 700; font-size: 18px; }
+    .lp-marca .logo-icon { width: 34px; height: 34px; border-radius: 9px; background: var(--lp-ambar); display: flex; align-items: center; justify-content: center; }
+    .lp-marca .logo-icon svg { width: 19px; height: 19px; }
+    .lp-nav { display: flex; align-items: center; gap: 22px; font-size: 14px; }
+    .lp-nav a { text-decoration: none; color: var(--lp-suave); transition: color .15s; }
+    .lp-nav a:hover { color: var(--lp-texto); }
 
-    .sobre-secao { background: var(--bg-card); border-radius: 16px; box-shadow: var(--shadow); border: 1px solid var(--border); padding: 36px; margin-bottom: 24px; }
-    .sobre-secao h2 { font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
-    .sobre-secao > p { color: var(--text-light); font-size: 14px; line-height: 1.7; }
-
-    .problema-solucao { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-    .ps-card { padding: 20px; border-radius: var(--radius); }
-    .ps-card.problema { background: rgba(192,57,43,0.06); border: 1px solid rgba(192,57,43,0.15); }
-    .ps-card.solucao { background: rgba(39,174,96,0.06); border: 1px solid rgba(39,174,96,0.15); }
-    .ps-card h3 { font-size: 14px; font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
-    .ps-card.problema h3 { color: var(--danger); }
-    .ps-card.solucao h3 { color: var(--secondary); }
-    .ps-card p { font-size: 13px; color: var(--text); line-height: 1.7; }
-
-    .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-top: 20px; }
-    .feature-item { display: flex; gap: 14px; align-items: flex-start; }
-    .feature-item .info-icon { margin-top: 2px; }
-    .feature-item h4 { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
-    .feature-item p { font-size: 12.5px; color: var(--text-light); line-height: 1.5; }
-
-    .tech-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
-    .tech-badge {
-      display: inline-flex; align-items: center; gap: 8px;
-      background: var(--bg); border: 1px solid var(--border); border-radius: 20px;
-      padding: 8px 16px; font-size: 13px; font-weight: 600; color: var(--text);
+    .lp-btn {
+      display: inline-flex; align-items: center; gap: 8px; justify-content: center;
+      padding: 12px 22px; border-radius: 10px; font-weight: 700; font-size: 14px;
+      text-decoration: none; border: 1px solid transparent; transition: transform .15s, background .15s, border-color .15s;
+      cursor: pointer; white-space: nowrap;
     }
-    .tech-badge .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary-light); flex-shrink: 0; }
+    .lp-btn:hover { transform: translateY(-1px); }
+    .lp-btn svg { width: 16px; height: 16px; }
+    .lp-btn-ambar { background: var(--lp-ambar); color: #1B2740; }
+    .lp-btn-ambar:hover { background: var(--lp-ambar-escuro); }
+    .lp-btn-linha { border-color: rgba(255,255,255,0.18); color: var(--lp-texto); background: rgba(255,255,255,0.03); }
+    .lp-btn-linha:hover { border-color: rgba(255,255,255,0.35); }
+    .lp-nav .lp-btn { padding: 8px 16px; color: #1B2740; }
 
-    .sobre-footer { text-align: center; color: var(--text-light); font-size: 12px; padding-bottom: 24px; }
+    /* ---------- Abertura ---------- */
+    .lp-hero {
+      position: relative;
+      padding: 132px 0 88px;
+      background:
+        radial-gradient(900px 420px at 80% 0%, rgba(79,142,247,0.16), transparent 70%),
+        radial-gradient(1px 1px at 1px 1px, rgba(255,255,255,0.07) 1px, transparent 0) 0 0 / 22px 22px,
+        linear-gradient(180deg, #13203A 0%, var(--lp-bg) 100%);
+    }
+    .lp-hero .lp-wrap { display: grid; grid-template-columns: 1.02fr 1fr; gap: 48px; align-items: center; }
+    .lp-selo {
+      display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--lp-texto);
+      padding: 6px 12px; border-radius: 999px; border: 1px solid var(--lp-borda); background: rgba(255,255,255,0.04);
+    }
+    .lp-selo::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--lp-ambar); }
+    .lp-hero h1 { font-size: 58px; margin: 20px 0 18px; }
+    .lp-hero h1 span { color: var(--lp-ambar); display: block; }
+    .lp-hero p.lp-lead { color: var(--lp-suave); font-size: 16.5px; max-width: 520px; }
+    .lp-acoes { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 28px; }
+    .lp-checks { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 22px; font-size: 13px; color: var(--lp-suave); list-style: none; }
+    .lp-checks li { display: flex; align-items: center; gap: 6px; }
+    .lp-checks svg { width: 14px; height: 14px; color: var(--lp-verde); }
 
+    /* ---------- Janelas de exemplo (miniaturas do sistema) ---------- */
+    .lp-janela {
+      background: var(--lp-card); border: 1px solid var(--lp-borda); border-radius: var(--lp-raio);
+      box-shadow: 0 24px 60px rgba(0,0,0,0.45); overflow: hidden; position: relative;
+    }
+    .lp-janela-barra { display: flex; align-items: center; gap: 6px; padding: 9px 12px; border-bottom: 1px solid var(--lp-borda); background: var(--lp-card-2); }
+    .lp-janela-barra i { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.15); }
+    .lp-janela-barra span { margin-left: 8px; font-size: 11px; color: var(--lp-suave); padding: 2px 8px; border: 1px solid var(--lp-borda); border-radius: 6px; }
+    .lp-mapa { background: #1a2233; }
+    .lp-mapa .leaflet-tile { filter: invert(1) hue-rotate(185deg) brightness(0.78) contrast(0.92) saturate(0.35); }
+    .lp-mapa .leaflet-control-attribution { background: rgba(13,20,36,0.7); color: #6b7487; font-size: 9px; }
+    .lp-mapa .leaflet-control-attribution a { color: #8b95a8; }
+    .lp-ponto { width: 12px; height: 12px; border-radius: 50%; background: var(--lp-azul); border: 2px solid #fff; box-shadow: 0 0 0 3px rgba(79,142,247,0.3); }
+    .lp-ponto.vazio { background: var(--lp-laranja); box-shadow: 0 0 0 3px rgba(242,128,59,0.3); }
+    .lp-caminhao { width: 22px; height: 22px; border-radius: 50%; background: var(--lp-verde); border: 3px solid #fff; box-shadow: 0 0 0 6px rgba(39,174,96,0.28); }
+
+    .lp-frota { display: grid; grid-template-columns: 150px 1fr; height: 330px; }
+    .lp-frota-lista { padding: 8px; display: flex; flex-direction: column; gap: 7px; border-right: 1px solid var(--lp-borda); overflow: hidden; }
+    .lp-frota-item { border: 1px solid var(--lp-borda); border-radius: 9px; padding: 8px; font-size: 10.5px; background: rgba(255,255,255,0.02); }
+    .lp-frota-item.ativo { border-color: var(--lp-azul); background: rgba(79,142,247,0.08); }
+    .lp-placas { display: flex; gap: 3px; margin-bottom: 5px; }
+    .lp-placa { background: #fff; color: #111; font-weight: 700; font-size: 8.5px; letter-spacing: .04em; padding: 0 4px 1px; border-radius: 2px; border-top: 3px solid #1F4FB4; font-family: Consolas, monospace; }
+    .lp-status { font-size: 9px; font-weight: 600; color: var(--lp-verde); }
+    .lp-status.vazio { color: var(--lp-laranja); }
+    .lp-frota-item b { display: block; font-size: 10.5px; margin: 2px 0; line-height: 1.25; }
+    .lp-frota-item small { color: var(--lp-suave); font-size: 9.5px; }
+    .lp-barra { height: 3px; border-radius: 3px; background: rgba(255,255,255,0.08); margin-top: 6px; overflow: hidden; }
+    .lp-barra i { display: block; height: 100%; background: var(--lp-azul); }
+    .lp-frota-mapa { position: relative; }
+    .lp-frota-mapa .lp-mapa { position: absolute; inset: 0; }
+    .lp-info-mapa {
+      position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 500;
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
+      background: var(--lp-borda); border: 1px solid var(--lp-borda); border-radius: 8px; overflow: hidden;
+    }
+    .lp-info-mapa div { background: rgba(22,33,58,0.95); padding: 6px 8px; font-size: 9px; color: var(--lp-suave); }
+    .lp-info-mapa b { display: block; color: var(--lp-texto); font-size: 11.5px; }
+    .lp-info-mapa b.laranja { color: var(--lp-laranja); }
+
+    /* ---------- Faixa de estrada ---------- */
+    .lp-estrada { height: 6px; background: repeating-linear-gradient(90deg, var(--lp-ambar) 0 34px, transparent 34px 60px); opacity: .95; }
+    .lp-faixa { background: var(--lp-bg-2); border-bottom: 1px solid var(--lp-borda); }
+    .lp-faixa .lp-wrap { display: grid; grid-template-columns: repeat(3, 1fr); }
+    .lp-faixa-item { display: flex; gap: 14px; padding: 26px 24px; }
+    .lp-faixa-item + .lp-faixa-item { border-left: 1px solid var(--lp-borda); }
+    .lp-faixa-item h3 { font-size: 15px; margin-bottom: 3px; }
+    .lp-faixa-item p { font-size: 13px; color: var(--lp-suave); }
+
+    .lp-icone { width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .lp-icone svg { width: 18px; height: 18px; }
+    .lp-i-azul { background: rgba(79,142,247,0.14); color: #7FB0FF; }
+    .lp-i-verde { background: rgba(39,174,96,0.14); color: #4ED68A; }
+    .lp-i-ambar { background: rgba(242,169,59,0.14); color: var(--lp-ambar); }
+    .lp-i-laranja { background: rgba(242,128,59,0.14); color: #FF9F66; }
+    .lp-i-roxo { background: rgba(155,111,247,0.14); color: #B595FF; }
+    .lp-i-vermelho { background: rgba(231,76,60,0.14); color: #FF7B6B; }
+
+    /* ---------- Seções de destaque ---------- */
+    .lp-secao { padding: 88px 0; border-bottom: 1px solid var(--lp-borda); }
+    .lp-secao.alt { background: var(--lp-bg-2); }
+    .lp-dupla { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; }
+    .lp-dupla.invertida > :first-child { order: 2; }
+    .lp-rotulo { font-size: 11.5px; font-weight: 700; letter-spacing: .1em; color: var(--lp-ambar); text-transform: uppercase; }
+    .lp-secao h2 { font-size: 40px; margin: 10px 0 14px; }
+    .lp-secao .lp-sub { color: var(--lp-suave); font-size: 15.5px; max-width: 520px; }
+    .lp-lista { list-style: none; margin-top: 24px; display: flex; flex-direction: column; gap: 16px; }
+    .lp-lista li { display: flex; gap: 12px; }
+    .lp-lista .lp-check { width: 22px; height: 22px; border-radius: 6px; background: rgba(79,142,247,0.14); color: #7FB0FF; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+    .lp-lista .lp-check svg { width: 13px; height: 13px; }
+    .lp-lista b { display: block; font-size: 14.5px; }
+    .lp-lista span { color: var(--lp-suave); font-size: 13.5px; }
+
+    /* Rota da viagem */
+    .lp-rota { display: grid; grid-template-columns: 200px 1fr; height: 340px; }
+    .lp-rota-painel { padding: 10px; display: flex; flex-direction: column; gap: 8px; border-right: 1px solid var(--lp-borda); }
+    .lp-opcao { display: flex; gap: 8px; align-items: flex-start; border: 1px solid var(--lp-borda); border-radius: 9px; padding: 8px; font-size: 11px; }
+    .lp-opcao.ativa { border-color: var(--lp-azul); background: rgba(79,142,247,0.08); }
+    .lp-opcao .radio { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--lp-suave); margin-top: 2px; flex-shrink: 0; }
+    .lp-opcao.ativa .radio { border-color: var(--lp-azul); box-shadow: inset 0 0 0 2px var(--lp-card), inset 0 0 0 6px var(--lp-azul); }
+    .lp-opcao div { flex: 1; }
+    .lp-opcao b { display: block; font-size: 11px; }
+    .lp-opcao small { color: var(--lp-suave); font-size: 9.5px; }
+    .lp-opcao em { font-style: normal; text-align: right; font-weight: 700; font-size: 11px; }
+    .lp-opcao em small { display: block; font-weight: 400; }
+    .lp-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 600; }
+    .lp-chip i { width: 15px; height: 15px; border-radius: 50%; background: var(--lp-azul); color: #fff; font-style: normal; font-size: 9px; display: flex; align-items: center; justify-content: center; }
+    .lp-previsao { margin-top: auto; background: rgba(255,255,255,0.04); border-radius: 9px; padding: 9px; font-size: 9.5px; color: var(--lp-suave); }
+    .lp-previsao b { display: block; color: var(--lp-texto); font-size: 14px; margin: 2px 0; }
+    .lp-paradas { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+    .lp-paradas span { background: rgba(242,169,59,0.12); color: var(--lp-ambar); border-radius: 5px; padding: 1px 5px; font-size: 9px; }
+    .lp-rota-mapa { position: relative; }
+    .lp-rota-mapa .lp-mapa { position: absolute; inset: 0; }
+
+    /* Km vazio */
+    .lp-vazio-mapa { height: 340px; position: relative; }
+    .lp-vazio-mapa .lp-mapa { position: absolute; inset: 0; }
+    .lp-legenda { position: absolute; top: 10px; left: 10px; z-index: 500; display: flex; gap: 10px; font-size: 10px; background: rgba(22,33,58,0.92); border: 1px solid var(--lp-borda); padding: 5px 9px; border-radius: 7px; }
+    .lp-legenda span { display: flex; align-items: center; gap: 5px; }
+    .lp-legenda i { width: 14px; height: 3px; border-radius: 2px; background: var(--lp-azul); }
+    .lp-legenda i.laranja { background: var(--lp-laranja); }
+
+    /* Acerto */
+    .lp-acerto-moldura { position: relative; padding: 0 14px 14px 0; }
+    .lp-acerto-moldura::before { content: ''; position: absolute; inset: 14px 0 0 14px; border-radius: var(--lp-raio); background: var(--lp-ambar); transform: rotate(1.2deg); }
+    .lp-acerto { position: relative; padding: 18px 20px; }
+    .lp-acerto-topo { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+    .lp-acerto-topo b { font-size: 14px; }
+    .lp-acerto-topo small { display: block; color: var(--lp-suave); font-size: 11.5px; }
+    .lp-pill { font-size: 10.5px; font-weight: 600; color: #4ED68A; background: rgba(39,174,96,0.14); padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+    .lp-linha { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--lp-borda); font-size: 13.5px; color: var(--lp-suave); }
+    .lp-linha b { color: var(--lp-texto); white-space: nowrap; }
+    .lp-linha b.menos { color: #FF7B6B; }
+    .lp-saldo { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; padding: 14px; border-radius: 10px; background: rgba(39,174,96,0.12); color: #4ED68A; font-weight: 600; font-size: 13.5px; }
+    .lp-saldo b { font-size: 21px; font-family: 'Barlow Condensed', 'Segoe UI', sans-serif; }
+    .lp-recibo { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 12px; color: var(--lp-suave); }
+    .lp-recibo svg { width: 15px; height: 15px; color: var(--lp-ambar); }
+
+    /* ---------- Recursos ---------- */
+    .lp-cabeca { max-width: 620px; margin-bottom: 36px; }
+    .lp-grade { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .lp-recurso { background: var(--lp-card); border: 1px solid var(--lp-borda); border-radius: var(--lp-raio); padding: 22px; transition: border-color .15s, transform .15s; }
+    .lp-recurso:hover { border-color: rgba(255,255,255,0.18); transform: translateY(-2px); }
+    .lp-recurso h3 { font-size: 15px; margin: 16px 0 6px; display: flex; align-items: center; gap: 8px; }
+    .lp-recurso p { font-size: 13.5px; color: var(--lp-suave); }
+    .lp-novo { font-size: 9.5px; font-weight: 800; letter-spacing: .05em; background: var(--lp-ambar); color: #1B2740; padding: 1px 6px; border-radius: 999px; }
+    .lp-nota { margin-top: 20px; font-size: 13px; color: var(--lp-suave); }
+    .lp-nota b { color: var(--lp-texto); }
+
+    /* ---------- Como funciona ---------- */
+    .lp-passos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; counter-reset: passo; }
+    .lp-passo { position: relative; background: var(--lp-card); border: 1px solid var(--lp-borda); border-radius: var(--lp-raio); padding: 26px 22px 22px; }
+    .lp-passo::before {
+      counter-increment: passo; content: counter(passo);
+      font-family: 'Barlow Condensed', 'Segoe UI', sans-serif; font-weight: 700; font-size: 15px;
+      width: 32px; height: 32px; border-radius: 50%; background: var(--lp-ambar); color: #1B2740;
+      display: flex; align-items: center; justify-content: center; margin-bottom: 14px;
+    }
+    .lp-passo h3 { font-size: 16px; margin-bottom: 6px; }
+    .lp-passo p { font-size: 13.5px; color: var(--lp-suave); }
+
+    /* ---------- Tecnologia ---------- */
+    .lp-tech { display: grid; grid-template-columns: 1fr 1fr; gap: 0; background: var(--lp-card); border: 1px solid var(--lp-borda); border-radius: 18px; overflow: hidden; }
+    .lp-tech > div { padding: 32px; }
+    .lp-tech > div:first-child { background: linear-gradient(135deg, rgba(242,169,59,0.08), transparent 60%); border-right: 1px solid var(--lp-borda); }
+    .lp-tech h3 { font-size: 22px; margin-bottom: 8px; }
+    .lp-tech p { color: var(--lp-suave); font-size: 14px; }
+    .lp-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+    .lp-badges span { font-size: 12.5px; font-weight: 600; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--lp-borda); background: rgba(255,255,255,0.03); display: inline-flex; align-items: center; gap: 7px; }
+    .lp-badges span::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--lp-azul); }
+    .lp-seguranca { list-style: none; display: flex; flex-direction: column; gap: 13px; }
+    .lp-seguranca li { display: flex; gap: 10px; font-size: 14px; }
+    .lp-seguranca svg { width: 16px; height: 16px; color: var(--lp-verde); flex-shrink: 0; margin-top: 3px; }
+
+    /* ---------- Chamada final ---------- */
+    .lp-final { padding: 88px 0; }
+    .lp-final-card {
+      position: relative; text-align: center; padding: 56px 24px 62px; border-radius: 20px; overflow: hidden;
+      background: radial-gradient(600px 240px at 50% 0%, rgba(79,142,247,0.25), transparent 70%), linear-gradient(135deg, #1B2740, #22355A);
+      border: 1px solid var(--lp-borda);
+    }
+    .lp-final-card::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 6px; background: repeating-linear-gradient(90deg, var(--lp-ambar) 0 34px, transparent 34px 60px); }
+    .lp-final-card h2 { font-size: 40px; margin-bottom: 10px; }
+    .lp-final-card p { color: var(--lp-suave); max-width: 460px; margin: 0 auto 26px; }
+
+    .lp-rodape { border-top: 1px solid var(--lp-borda); padding: 22px 0; font-size: 12.5px; color: var(--lp-suave); }
+    .lp-rodape .lp-wrap { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .lp-rodape b { color: var(--lp-texto); }
+
+    /* Sem isso, a miniatura (lista que rola de lado) alarga a coluna e o texto sai da tela no celular. */
+    .lp-hero .lp-wrap > *, .lp-dupla > *, .lp-tech > *, .lp-frota > *, .lp-rota > * { min-width: 0; }
+
+    /* ---------- Telas menores ---------- */
+    @media (max-width: 960px) {
+      .lp-hero .lp-wrap, .lp-dupla { grid-template-columns: minmax(0, 1fr); gap: 40px; }
+      .lp-dupla.invertida > :first-child { order: 0; }
+      .lp-grade, .lp-passos { grid-template-columns: 1fr 1fr; }
+      .lp-tech { grid-template-columns: 1fr; }
+      .lp-tech > div:first-child { border-right: 0; border-bottom: 1px solid var(--lp-borda); }
+    }
     @media (max-width: 640px) {
-      .problema-solucao { grid-template-columns: 1fr; }
-      .sobre-secao { padding: 24px; }
-      .sobre-hero h1 { font-size: 26px; }
+      .lp-wrap { padding: 0 16px; }
+      .lp-nav a:not(.lp-btn) { display: none; }
+      .lp-hero { padding: 104px 0 64px; }
+      .lp-hero h1 { font-size: 42px; }
+      .lp-secao, .lp-final { padding: 64px 0; }
+      .lp-secao h2, .lp-final-card h2 { font-size: 32px; }
+      .lp-faixa .lp-wrap, .lp-grade, .lp-passos { grid-template-columns: 1fr; }
+      .lp-faixa-item { padding: 18px 0; }
+      .lp-faixa-item + .lp-faixa-item { border-left: 0; border-top: 1px solid var(--lp-borda); }
+      .lp-frota { grid-template-columns: 1fr; height: auto; }
+      .lp-frota-lista { flex-direction: row; border-right: 0; border-bottom: 1px solid var(--lp-borda); overflow-x: auto; }
+      .lp-frota-item { min-width: 140px; }
+      .lp-frota-mapa { height: 260px; }
+      .lp-rota { grid-template-columns: 1fr; height: auto; }
+      .lp-rota-painel { border-right: 0; border-bottom: 1px solid var(--lp-borda); }
+      .lp-rota-mapa { height: 240px; }
+      .lp-tech > div { padding: 24px; }
+      .lp-recurso { padding: 16px; display: grid; grid-template-columns: 38px 1fr; gap: 2px 14px; }
+      .lp-recurso .lp-icone { grid-row: span 2; }
+      .lp-recurso h3 { margin: 0; }
     }
   </style>
 </head>
-<body class="sobre-page">
+<body>
 
-  <div class="sobre-hero">
-    <span class="logo-icon">
-      <svg viewBox="0 0 56 66" width="52" height="62" role="img" aria-label="LogTrack">
-        <defs>
-          <linearGradient id="lt-grad-sobre" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="#FFFFFF"/>
-            <stop offset="100%" stop-color="#E8F1FA"/>
-          </linearGradient>
-        </defs>
-        <path d="M28 2C14.7 2 4 12.5 4 25.5 4 42 28 62 28 62S52 42 52 25.5C52 12.5 41.3 2 28 2Z" fill="url(#lt-grad-sobre)"/>
-        <g fill="#1E4D78">
-          <rect x="10" y="18" width="6" height="9"/>
-          <rect x="17" y="15" width="23" height="12" rx="1"/>
-          <circle cx="14" cy="29" r="2.3"/>
-          <circle cx="31" cy="29" r="2.3"/>
-          <circle cx="38" cy="29" r="2.3"/>
-        </g>
-        <circle cx="45" cy="9" r="7" fill="#27AE60" opacity="0.35"/>
-        <circle cx="45" cy="9" r="4" fill="#27AE60"/>
-      </svg>
-    </span>
-    <h1>LogTrack</h1>
-    <p class="tagline">Sistema inteligente de gestão operacional para transportadoras — entregas, motoristas, veículos, manutenções e ocorrências, tudo em um só lugar.</p>
-    <a href="index.html" class="btn-voltar">
-      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-      Voltar ao login
-    </a>
-  </div>
+  <header class="lp-topo">
+    <div class="lp-wrap">
+      <a class="lp-marca" href="sobre.html">
+        <span class="logo-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#1B2740" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+        </span>
+        LogTrack
+      </a>
+      <nav class="lp-nav">
+        <a href="#recursos">Recursos</a>
+        <a href="#como-funciona">Como funciona</a>
+        <a href="#tecnologia">Tecnologia</a>
+        <a class="lp-btn lp-btn-ambar" href="index.html">Entrar</a>
+      </nav>
+    </div>
+  </header>
 
-  <div class="sobre-container">
-
-    <section class="sobre-secao">
-      <h2>O problema</h2>
-      <p>Transportadoras de pequeno e médio porte costumam controlar entregas, motoristas e veículos por planilhas soltas, papel e mensagens de WhatsApp. Sem um sistema central, informação se perde, prazos escapam do controle e decisões são tomadas sem dados confiáveis.</p>
-      <div class="problema-solucao" style="margin-top:24px;">
-        <div class="ps-card problema">
-          <h3><span class="ps-icone" data-icone="alerta"></span> Sem sistema centralizado</h3>
-          <p>Cada motorista, veículo e entrega vive numa fonte de informação diferente. Ocorrências não ficam registradas, manutenções são esquecidas e ninguém sabe, em tempo real, quantas entregas estão atrasadas.</p>
+  <!-- ===================== ABERTURA ===================== -->
+  <section class="lp-hero">
+    <div class="lp-wrap">
+      <div>
+        <span class="lp-selo">Feito a partir da rotina real de uma transportadora</span>
+        <h1 class="lp-titulo">Da carga ao acerto, <span>tudo no mesmo lugar.</span></h1>
+        <p class="lp-lead">O LogTrack acompanha cada viagem da transportadora: a rota por estrada com a chegada prevista pela Lei do Motorista, o caminhão no mapa, o km rodado vazio e o acerto do motorista com recibo pronto para assinar.</p>
+        <div class="lp-acoes">
+          <a class="lp-btn lp-btn-ambar" href="index.html">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+            Entrar no sistema
+          </a>
+          <a class="lp-btn lp-btn-linha" href="#recursos">Ver os recursos</a>
         </div>
-        <div class="ps-card solucao">
-          <h3><span class="ps-icone" data-icone="check"></span> Com o LogTrack</h3>
-          <p>Uma única fonte de verdade: cadastro de motoristas e veículos, acompanhamento de entregas por status, histórico de manutenções, registro de ocorrências e relatórios gerenciais — acessível de qualquer lugar, com controle de acesso por perfil.</p>
+        <ul class="lp-checks">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Rotas por estrada</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Paradas da Lei do Motorista</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Acesso por perfil</li>
+        </ul>
+      </div>
+
+      <div class="lp-janela" aria-label="Exemplo da tela Mapa da frota (dados fictícios)">
+        <div class="lp-janela-barra"><i></i><i></i><i></i><span>Mapa da frota</span></div>
+        <div class="lp-frota">
+          <div class="lp-frota-lista">
+            <div class="lp-frota-item ativo">
+              <div class="lp-placas"><span class="lp-placa">LTK1A23</span><span class="lp-placa">LTK4B56</span></div>
+              <span class="lp-status">● Em viagem</span>
+              <b>Caxias do Sul - RS → Guarulhos - SP</b>
+              <small>Rafael Costa</small>
+              <div class="lp-barra"><i style="width:46%"></i></div>
+            </div>
+            <div class="lp-frota-item">
+              <div class="lp-placas"><span class="lp-placa">LTK7C89</span></div>
+              <span class="lp-status">● Em viagem</span>
+              <b>Rio Verde - GO → Paranaguá - PR</b>
+              <small>Diego Moura</small>
+              <div class="lp-barra"><i style="width:72%"></i></div>
+            </div>
+            <div class="lp-frota-item">
+              <div class="lp-placas"><span class="lp-placa">LTK2D34</span></div>
+              <span class="lp-status vazio">● Vazio · carrega amanhã</span>
+              <b>Paranaguá - PR → Chapecó - SC</b>
+              <small>Paulo Nunes</small>
+            </div>
+          </div>
+          <div class="lp-frota-mapa">
+            <div class="lp-mapa" id="mapa-hero"></div>
+            <div class="lp-info-mapa">
+              <div>Chegada prevista<b>09/10 18:40</b></div>
+              <div>Andamento<b>46%</b></div>
+              <div>Carga<b>Móveis · 27 t</b></div>
+            </div>
+          </div>
         </div>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <section class="sobre-secao">
-      <h2>Funcionalidades</h2>
-      <p>Um módulo para cada frente da operação, todos conectados aos mesmos dados.</p>
-      <div class="feature-grid" id="feature-grid"></div>
-    </section>
-
-    <section class="sobre-secao">
-      <h2>Tecnologia</h2>
-      <p>Construído com uma stack moderna, focada em segurança e simplicidade de manutenção.</p>
-      <div class="tech-grid" id="tech-grid"></div>
-    </section>
-
+  <div class="lp-estrada" aria-hidden="true"></div>
+  <div class="lp-faixa">
+    <div class="lp-wrap">
+      <div class="lp-faixa-item">
+        <span class="lp-icone lp-i-azul"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg></span>
+        <div><h3>Mapa da frota</h3><p>Cada caminhão, a carga e a previsão de chegada.</p></div>
+      </div>
+      <div class="lp-faixa-item">
+        <span class="lp-icone lp-i-verde"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg></span>
+        <div><h3>Acerto do motorista</h3><p>Comissão, diárias e vales sem conta de cabeça.</p></div>
+      </div>
+      <div class="lp-faixa-item">
+        <span class="lp-icone lp-i-laranja"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></span>
+        <div><h3>Km rodado vazio</h3><p>Quanto o caminhão rodou sem carga entre uma viagem e outra.</p></div>
+      </div>
+    </div>
   </div>
 
-  <div class="sobre-footer">© 2025 LogTrack — Projeto acadêmico de gestão operacional para transportadoras</div>
+  <!-- ===================== ROTA DA VIAGEM ===================== -->
+  <section class="lp-secao">
+    <div class="lp-wrap lp-dupla">
+      <div>
+        <span class="lp-rotulo">Rota da viagem</span>
+        <h2 class="lp-titulo">Você escolhe a rota. A chegada prevista já vem calculada.</h2>
+        <p class="lp-sub">Ao lançar a viagem, o sistema traça o caminho por estrada e mostra as alternativas. Se o caminhão precisa passar por alguma cidade, é só incluir.</p>
+        <ul class="lp-lista">
+          <li><span class="lp-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+            <div><b>Km e tempo de cada opção</b><span>Compare as rotas antes de decidir, com "passar por" para as cidades obrigatórias.</span></div></li>
+          <li><span class="lp-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+            <div><b>Chegada prevista pela Lei do Motorista</b><span>Conta a parada de 30 min a cada 5h30 ao volante e o descanso de 11h, mais abastecimento e posto fiscal na divisa.</span></div></li>
+          <li><span class="lp-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+            <div><b>Aviso de prazo curto</b><span>Se o prazo do cliente não fecha com a viagem, o sistema avisa na hora.</span></div></li>
+        </ul>
+      </div>
+      <div class="lp-janela" aria-label="Exemplo do planejamento de rota (dados fictícios)">
+        <div class="lp-janela-barra"><i></i><i></i><i></i><span>Nova viagem · Rota</span></div>
+        <div class="lp-rota">
+          <div class="lp-rota-painel">
+            <div class="lp-opcao">
+              <span class="radio"></span>
+              <div><b>Mais rápida</b><small>pelo litoral</small></div>
+              <em>1.128 km<small>14h50</small></em>
+            </div>
+            <div class="lp-opcao ativa">
+              <span class="radio"></span>
+              <div><b>Passando por Lages</b><small>pela serra</small></div>
+              <em>1.096 km<small>15h20</small></em>
+            </div>
+            <span class="lp-chip"><i>1</i>Lages - SC</span>
+            <div class="lp-previsao">
+              Chegada prevista
+              <b>08/10 15:30</b>
+              saída 07/10 06:00
+              <div class="lp-paradas"><span>2 paradas de 30 min</span><span>1 descanso de 11h</span><span>1 abastecimento</span><span>posto fiscal</span></div>
+            </div>
+          </div>
+          <div class="lp-rota-mapa"><div class="lp-mapa" id="mapa-rota"></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
 
-  <script src="js/icons.js"></script>
-  <script>
-    document.querySelectorAll('.ps-icone').forEach(el => {
-      el.innerHTML = svgIcone(el.dataset.icone, 16);
-    });
+  <!-- ===================== KM VAZIO ===================== -->
+  <section class="lp-secao alt">
+    <div class="lp-wrap lp-dupla invertida">
+      <div>
+        <span class="lp-rotulo">Deslocamento vazio</span>
+        <h2 class="lp-titulo">O km que ninguém paga, finalmente na conta</h2>
+        <p class="lp-sub">Entre descarregar e pegar a próxima carga, o caminhão muitas vezes roda vazio. O LogTrack calcula esse trecho sozinho e mostra no mapa, viagem por viagem.</p>
+        <ul class="lp-lista">
+          <li><span class="lp-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+            <div><b>Carregado e vazio separados</b><span>Os trechos sem carga aparecem em laranja, ligando uma entrega à próxima.</span></div></li>
+          <li><span class="lp-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+            <div><b>Diesel gasto no vazio</b><span>Com o consumo do caminhão, o sistema estima quanto o vazio custou.</span></div></li>
+          <li><span class="lp-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+            <div><b>Entra no relatório</b><span>O total do período vai para o relatório de desempenho.</span></div></li>
+        </ul>
+      </div>
+      <div class="lp-janela" aria-label="Exemplo do mapa de deslocamento vazio (dados fictícios)">
+        <div class="lp-janela-barra"><i></i><i></i><i></i><span>Deslocamento vazio · Outubro</span></div>
+        <div class="lp-vazio-mapa">
+          <div class="lp-mapa" id="mapa-vazio"></div>
+          <div class="lp-legenda"><span><i></i>Carregado</span><span><i class="laranja"></i>Vazio</span></div>
+          <div class="lp-info-mapa">
+            <div>Rodado no mês<b>3.420 km</b></div>
+            <div>Carregado<b>2.810 km</b></div>
+            <div>Vazio<b class="laranja">610 km</b></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
 
-    const FEATURES = [
-      { icone: 'caminhao', titulo: 'Entregas', texto: 'Acompanhamento por status: aguardando, em rota, entregue, atrasado, ocorrência ou cancelado, com filtros e resumo por indicador.' },
-      { icone: 'usuario', titulo: 'Motoristas', texto: 'Cadastro de CPF, CNH e validade, com alerta automático de CNH prestes a vencer. Login de acesso é opcional.' },
-      { icone: 'caminhao', titulo: 'Veículos e Conjuntos', texto: 'Frota organizada por tipo, com montagem de conjuntos (cavalo + semirreboques) vinculados a um motorista.' },
-      { icone: 'editar', titulo: 'Manutenções', texto: 'Histórico completo por veículo, com custo, quilometragem e exportação de relatório em PDF.' },
-      { icone: 'alerta', titulo: 'Ocorrências', texto: 'Registro de atrasos, acidentes e problemas vinculado à entrega e ao veículo, com edição e exclusão.' },
-      { icone: 'relogio', titulo: 'Relatórios', texto: 'Indicadores de desempenho por período, com exportação em PDF para prestação de contas.' },
-      { icone: 'link', titulo: 'Dashboard', texto: 'Visão gerencial em tempo real: entregas do dia, faturamento do mês e ranking de motoristas.' },
-      { icone: 'usuario', titulo: 'Usuários e Perfis', texto: 'Controle de acesso por perfil — administrador, operador e motorista — cada um vendo só o que precisa.' },
-    ];
+  <!-- ===================== ACERTO ===================== -->
+  <section class="lp-secao">
+    <div class="lp-wrap lp-dupla">
+      <div>
+        <span class="lp-rotulo">Acerto do motorista</span>
+        <h2 class="lp-titulo">O envelope do mês fechado sem planilha</h2>
+        <p class="lp-sub">Escolha o motorista e o período. O sistema junta as viagens concluídas, as diárias e os vales, e mostra quanto vai no envelope.</p>
+        <ul class="lp-lista">
+          <li><span class="lp-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+            <div><b>Comissão e diárias pelas regras da casa</b><span>13% do frete de cada viagem e um terço de cada diária para o motorista.</span></div></li>
+          <li><span class="lp-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+            <div><b>Nada é pago duas vezes</b><span>O que entrou num acerto fica preso a ele. Viagem que fecha depois entra no próximo.</span></div></li>
+          <li><span class="lp-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+            <div><b>Recibo pronto para assinar</b><span>PDF com o valor por extenso e espaço para a assinatura do motorista.</span></div></li>
+        </ul>
+      </div>
+      <div class="lp-acerto-moldura">
+        <div class="lp-janela lp-acerto" aria-label="Exemplo de acerto do motorista (dados fictícios)">
+          <div class="lp-acerto-topo">
+            <div><b>Acerto · Rafael Costa</b><small>01/09 a 30/09 · 6 viagens</small></div>
+            <span class="lp-pill">● Fechado</span>
+          </div>
+          <div class="lp-linha">Frete das viagens<b>R$ 48.000,00</b></div>
+          <div class="lp-linha">Comissão (13% do frete)<b>R$ 6.240,00</b></div>
+          <div class="lp-linha">Diárias (⅓ de R$ 3.000,00)<b>R$ 1.000,00</b></div>
+          <div class="lp-linha">Vales dos dias 5 e 15<b class="menos">− R$ 3.000,00</b></div>
+          <div class="lp-saldo">Saldo no envelope<b>R$ 4.240,00</b></div>
+          <div class="lp-recibo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>Recibo em PDF: "quatro mil, duzentos e quarenta reais"</div>
+        </div>
+      </div>
+    </div>
+  </section>
 
-    document.getElementById('feature-grid').innerHTML = FEATURES.map(f => `
-      <div class="feature-item">
-        <span class="info-icon">${svgIcone(f.icone, 16)}</span>
+  <!-- ===================== RECURSOS ===================== -->
+  <section class="lp-secao alt" id="recursos">
+    <div class="lp-wrap">
+      <div class="lp-cabeca">
+        <span class="lp-rotulo">Recursos</span>
+        <h2 class="lp-titulo">Um módulo para cada parte da operação</h2>
+        <p class="lp-sub">Todos usam os mesmos dados: o que é lançado numa tela já aparece nas outras.</p>
+      </div>
+      <div class="lp-grade" id="lp-grade"></div>
+      <p class="lp-nota"><b>Preparado para crescer:</b> o mapa da frota já tem o espaço para receber a posição de um rastreador no lugar da posição estimada.</p>
+    </div>
+  </section>
+
+  <!-- ===================== COMO FUNCIONA ===================== -->
+  <section class="lp-secao" id="como-funciona">
+    <div class="lp-wrap">
+      <div class="lp-cabeca">
+        <span class="lp-rotulo">Como funciona</span>
+        <h2 class="lp-titulo">Do cadastro ao fechamento em três passos</h2>
+      </div>
+      <div class="lp-passos">
+        <div class="lp-passo"><h3>Cadastre a frota</h3><p>Motoristas, cavalos e carretas. Monte os conjuntos e cada um já sai com o seu motorista.</p></div>
+        <div class="lp-passo"><h3>Lance a viagem</h3><p>Escolha a rota, confira a chegada prevista e acompanhe o caminhão no mapa até a entrega.</p></div>
+        <div class="lp-passo"><h3>Feche o mês</h3><p>O painel mostra o faturamento e o líquido, e o acerto de cada motorista sai com recibo.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== TECNOLOGIA ===================== -->
+  <section class="lp-secao alt" id="tecnologia">
+    <div class="lp-wrap">
+      <div class="lp-tech">
         <div>
-          <h4>${f.titulo}</h4>
-          <p>${f.texto}</p>
+          <span class="lp-rotulo">Tecnologia</span>
+          <h3 class="lp-titulo" style="margin-top:10px;">Por dentro do LogTrack</h3>
+          <p>Uma API em Python com banco PostgreSQL, telas em HTML e JavaScript, publicado na nuvem e com testes automáticos rodando a cada mudança.</p>
+          <div class="lp-badges">
+            <span>FastAPI</span><span>PostgreSQL</span><span>SQLAlchemy</span><span>Alembic</span>
+            <span>JWT + bcrypt</span><span>Leaflet + OpenStreetMap</span><span>OSRM</span>
+            <span>Docker</span><span>GitHub Actions</span><span>pytest</span>
+          </div>
+        </div>
+        <div>
+          <span class="lp-rotulo">Proteção</span>
+          <h3 class="lp-titulo" style="margin-top:10px;">Segurança e controle</h3>
+          <ul class="lp-seguranca" style="margin-top:16px;">
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Senhas guardadas com bcrypt, nunca em texto puro</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Login com token JWT e bloqueio após tentativas erradas</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Perfis de acesso: cada pessoa vê só o que precisa</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Registro de acessos para o administrador</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Pagamento fechado só muda com o administrador</li>
+          </ul>
         </div>
       </div>
-    `).join('');
+    </div>
+  </section>
 
-    const TECH = ['FastAPI', 'PostgreSQL', 'SQLAlchemy', 'JWT + bcrypt', 'Docker', 'JavaScript'];
-    document.getElementById('tech-grid').innerHTML = TECH.map(t => `<span class="tech-badge"><span class="dot"></span>${t}</span>`).join('');
+  <!-- ===================== CHAMADA FINAL ===================== -->
+  <section class="lp-final">
+    <div class="lp-wrap">
+      <div class="lp-final-card">
+        <h2 class="lp-titulo">Veja o LogTrack funcionando</h2>
+        <p>Entre no sistema e acompanhe a operação: viagens, frota, abastecimentos e acertos.</p>
+        <a class="lp-btn lp-btn-ambar" href="index.html">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+          Entrar no sistema
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <footer class="lp-rodape">
+    <div class="lp-wrap">
+      <span><b>LogTrack</b> · Gestão operacional para transporte rodoviário de cargas</span>
+      <span>Projeto acadêmico · 2026</span>
+    </div>
+  </footer>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script>
+    /* ---------- Grade de recursos ---------- */
+    const ICONES = {
+      painel: '<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>',
+      caminhao: '<rect x="1" y="3" width="15" height="13" rx="1"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>',
+      mapa: '<polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/>',
+      dinheiro: '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/>',
+      bomba: '<path d="M3 22V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v17"/><path d="M2 22h14"/><path d="M15 9h2a2 2 0 0 1 2 2v6a1.5 1.5 0 0 0 3 0V8l-3-3"/><rect x="6" y="6" width="6" height="5" rx="1"/>',
+      chave: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+      alerta: '<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+      engate: '<rect x="2" y="7" width="8" height="8" rx="1"/><rect x="12" y="5" width="10" height="10" rx="1"/><circle cx="6" cy="18" r="2"/><circle cx="16" cy="18" r="2"/><line x1="10" y1="11" x2="12" y2="11"/>',
+      grafico: '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
+      escudo: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+      ficha: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="17" y1="8" x2="23" y2="8"/><line x1="17" y1="12" x2="23" y2="12"/>',
+      usuarios: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+    };
+    const RECURSOS = [
+      { icone: 'painel', cor: 'azul', titulo: 'Painel gerencial', texto: 'Faturamento, líquido da empresa, viagens do dia e ranking dos motoristas.' },
+      { icone: 'caminhao', cor: 'azul', titulo: 'Viagens e entregas', texto: 'Status de cada viagem, rota por estrada, chegada prevista e rotograma.', novo: true },
+      { icone: 'mapa', cor: 'verde', titulo: 'Mapa da frota', texto: 'Todos os caminhões no mapa, com a carga e a viagem de cada um.', novo: true },
+      { icone: 'dinheiro', cor: 'verde', titulo: 'Acerto do motorista', texto: 'Comissão, diárias e vales do período, com recibo em PDF.', novo: true },
+      { icone: 'bomba', cor: 'laranja', titulo: 'Abastecimentos', texto: 'Litros e valor de cada abastecimento, com preço médio do diesel por estado.' },
+      { icone: 'chave', cor: 'ambar', titulo: 'Manutenções', texto: 'Histórico e custo por veículo. Caminhão em oficina não sai em viagem.' },
+      { icone: 'alerta', cor: 'vermelho', titulo: 'Ocorrências', texto: 'Atrasos, avarias e problemas registrados na viagem e no veículo.' },
+      { icone: 'engate', cor: 'azul', titulo: 'Conjuntos', texto: 'Cavalo e carretas montados juntos e ligados ao motorista.' },
+      { icone: 'grafico', cor: 'roxo', titulo: 'Relatórios', texto: 'Desempenho do período, entregas por mês e km vazio, em PDF.' },
+      { icone: 'escudo', cor: 'vermelho', titulo: 'Vencimentos', texto: 'CNH, CRLV e seguro com aviso no painel antes de vencer.' },
+      { icone: 'ficha', cor: 'ambar', titulo: 'Ficha do motorista', texto: 'Documentos, viagens, comissão e acertos de cada motorista numa tela só.', novo: true },
+      { icone: 'usuarios', cor: 'roxo', titulo: 'Usuários e acessos', texto: 'Perfis de acesso e registro de quem entrou no sistema e quando.' },
+    ];
+    document.getElementById('lp-grade').innerHTML = RECURSOS.map(r => `
+      <div class="lp-recurso">
+        <span class="lp-icone lp-i-${r.cor}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONES[r.icone]}</svg></span>
+        <h3>${r.titulo}${r.novo ? ' <span class="lp-novo">NOVO</span>' : ''}</h3>
+        <p>${r.texto}</p>
+      </div>`).join('');
+
+    /* ---------- Miniaturas de mapa (rotas de exemplo, dados fictícios) ---------- */
+    const C = {
+      caxias: [-29.17, -51.18], vacaria: [-28.51, -50.93], lages: [-27.82, -50.33], mafra: [-26.11, -49.80],
+      curitiba: [-25.43, -49.27], registro: [-24.49, -47.84], saoPaulo: [-23.55, -46.63], guarulhos: [-23.46, -46.53],
+      portoAlegre: [-30.03, -51.23], osorio: [-29.89, -50.27], torres: [-29.33, -49.73], criciuma: [-28.68, -49.37],
+      floripa: [-27.60, -48.62], itajai: [-26.91, -48.66], joinville: [-26.30, -48.85],
+      rioVerde: [-17.79, -50.92], paranaiba: [-19.67, -51.19], prudente: [-22.12, -51.39], londrina: [-23.31, -51.16],
+      pontaGrossa: [-25.09, -50.16], paranagua: [-25.52, -48.51], guarapuava: [-25.39, -51.46],
+      cascavel: [-24.96, -53.46], maringa: [-23.42, -51.94], patoBranco: [-26.23, -52.67],
+      chapeco: [-27.10, -52.62], passoFundo: [-28.26, -52.41],
+    };
+    const AZUL = '#4F8EF7', LARANJA = '#F2803B', CINZA = '#8b95a8';
+
+    function criarMapa(id) {
+      const el = document.getElementById(id);
+      if (!el || typeof L === 'undefined') return null;
+      const mapa = L.map(el, {
+        zoomControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false,
+        boxZoom: false, keyboard: false, touchZoom: false, attributionControl: true, zoomSnap: 0.25,
+      });
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(mapa);
+      return mapa;
+    }
+    const icone = (classe, tam) => L.divIcon({ className: '', html: `<div class="${classe}"></div>`, iconSize: [tam, tam], iconAnchor: [tam / 2, tam / 2] });
+    const linha = (mapa, pontos, opcoes) => L.polyline(pontos, Object.assign({ weight: 4, opacity: 0.95, lineJoin: 'round' }, opcoes)).addTo(mapa);
+
+    function desenharHero() {
+      const mapa = criarMapa('mapa-hero');
+      if (!mapa) return;
+      const feito = [C.caxias, C.vacaria, C.lages, C.mafra, C.curitiba];
+      const falta = [C.curitiba, C.registro, C.saoPaulo, C.guarulhos];
+      linha(mapa, feito, { color: AZUL });
+      linha(mapa, falta, { color: CINZA, dashArray: '6 7', weight: 3 });
+      L.marker(C.caxias, { icon: icone('lp-ponto', 12) }).addTo(mapa);
+      L.marker(C.guarulhos, { icon: icone('lp-ponto', 12) }).addTo(mapa);
+      L.marker(C.curitiba, { icon: icone('lp-caminhao', 22) }).addTo(mapa);
+      mapa.fitBounds(L.latLngBounds([C.caxias, C.guarulhos]), { paddingTopLeft: [20, 20], paddingBottomRight: [20, 70] });
+    }
+
+    function desenharRota() {
+      const mapa = criarMapa('mapa-rota');
+      if (!mapa) return;
+      linha(mapa, [C.portoAlegre, C.osorio, C.torres, C.criciuma, C.floripa, C.itajai, C.joinville, C.curitiba], { color: CINZA, weight: 3, opacity: 0.7 });
+      linha(mapa, [C.portoAlegre, C.caxias, C.vacaria, C.lages, C.mafra, C.curitiba, C.registro, C.saoPaulo], { color: AZUL });
+      [C.portoAlegre, C.saoPaulo].forEach(p => L.marker(p, { icon: icone('lp-ponto', 12) }).addTo(mapa));
+      mapa.fitBounds(L.latLngBounds([C.portoAlegre, C.saoPaulo, C.floripa]), { padding: [18, 18] });
+    }
+
+    function desenharVazio() {
+      const mapa = criarMapa('mapa-vazio');
+      if (!mapa) return;
+      linha(mapa, [C.cascavel, C.guarapuava, C.pontaGrossa, C.curitiba, C.paranagua], { color: AZUL });
+      linha(mapa, [C.paranagua, C.curitiba, C.pontaGrossa, C.guarapuava, C.patoBranco, C.chapeco].map(([a, b]) => [a - 0.1, b]), { color: LARANJA, weight: 4, dashArray: '2 8', lineCap: 'round' });
+      linha(mapa, [C.chapeco, C.passoFundo, C.caxias, C.portoAlegre], { color: AZUL });
+      L.marker(C.cascavel, { icon: icone('lp-ponto', 12) }).addTo(mapa);
+      L.marker(C.paranagua, { icon: icone('lp-ponto vazio', 12) }).addTo(mapa);
+      L.marker(C.chapeco, { icon: icone('lp-ponto vazio', 12) }).addTo(mapa);
+      L.marker(C.portoAlegre, { icon: icone('lp-ponto', 12) }).addTo(mapa);
+      mapa.fitBounds(L.latLngBounds([C.cascavel, C.portoAlegre, C.paranagua]), { paddingTopLeft: [24, 44], paddingBottomRight: [24, 64] });
+    }
+
+    // Os mapas só nascem quando chegam perto da tela (poupa os tiles e o 1º carregamento).
+    const MAPAS = { 'mapa-hero': desenharHero, 'mapa-rota': desenharRota, 'mapa-vazio': desenharVazio };
+    if ('IntersectionObserver' in window) {
+      const obs = new IntersectionObserver(entradas => entradas.forEach(e => {
+        if (e.isIntersecting) { obs.unobserve(e.target); MAPAS[e.target.id](); }
+      }), { rootMargin: '200px' });
+      Object.keys(MAPAS).forEach(id => obs.observe(document.getElementById(id)));
+    } else {
+      Object.values(MAPAS).forEach(f => f());
+    }
   </script>
 </body>
 </html>
