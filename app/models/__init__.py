@@ -6,3 +6,4 @@ from app.models.ocorrencia import Ocorrencia
 from app.models.manutencao import Manutencao
 from app.models.conjunto import Conjunto
 from app.models.log_acesso import LogAcesso
+from app.models.acerto import Diaria, Adiantamento, Acerto

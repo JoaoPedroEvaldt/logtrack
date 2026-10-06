@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>LogTrack — Ocorrências</title>
+  <title>LogTrack — Acerto do motorista</title>
   <script>
     (function () {
       try {
@@ -14,6 +14,8 @@
     })();
   </script>
   <link rel="stylesheet" href="../css/style.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 56 66'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%232E75B6'/%3E%3Cstop offset='100%25' stop-color='%231E4D78'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M28 2C14.7 2 4 12.5 4 25.5 4 42 28 62 28 62S52 42 52 25.5C52 12.5 41.3 2 28 2Z' fill='url(%23g)'/%3E%3Cg fill='%23FFFFFF'%3E%3Crect x='10' y='18' width='6' height='9'/%3E%3Crect x='17' y='15' width='23' height='12' rx='1'/%3E%3Ccircle cx='14' cy='29' r='2.3'/%3E%3Ccircle cx='31' cy='29' r='2.3'/%3E%3Ccircle cx='38' cy='29' r='2.3'/%3E%3C/g%3E%3Ccircle cx='45' cy='9' r='7' fill='%2327AE60' opacity='0.25'/%3E%3Ccircle cx='45' cy='9' r='4' fill='%2327AE60'/%3E%3C/svg%3E" />
 </head>
 <body class="dashboard-page">
@@ -32,9 +34,9 @@
       <a class="menu-item" href="dashboard.html"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg></span> Dashboard</a>
       <a class="menu-item" href="entregas.html"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 9.4 7.5 4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></span> Entregas</a>
       <a class="menu-item" href="motoristas.html" data-staff-only><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span> Motoristas</a>
-      <a class="menu-item" href="acertos.html" data-staff-only><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg></span> Acertos</a>
+      <a class="menu-item active" href="acertos.html" data-staff-only><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg></span> Acertos</a>
       <a class="menu-item" href="veiculos.html" data-staff-only><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></span> Veículos</a>
-      <a class="menu-item active" href="ocorrencias.html" data-staff-only><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span> Ocorrências</a>
+      <a class="menu-item" href="ocorrencias.html" data-staff-only><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span> Ocorrências</a>
       <a class="menu-item" href="relatorios.html" data-staff-only><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="20" x2="6" y2="14"/><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/></svg></span> Relatórios</a>
       <a class="menu-item" href="deslocamento-vazio.html" data-staff-only><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15" stroke-dasharray="3 3"/><circle cx="18" cy="5" r="3"/></svg></span> Deslocamento Vazio</a>
       <a class="menu-item" href="conjuntos.html" data-staff-only><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span> Conjuntos</a>
@@ -54,8 +56,8 @@
   <main class="main-content">
     <div class="topbar">
       <div class="topbar-titulo">
-        <span class="topbar-categoria">Operação</span>
-        <h1>Ocorrências</h1>
+        <span class="topbar-categoria">Financeiro</span>
+        <h1>Acerto do motorista</h1>
       </div>
       <div class="topbar-acoes">
         <div class="topbar-busca">
@@ -75,54 +77,119 @@
       </div>
     </div>
 
-    <div class="toolbar" style="justify-content:flex-end;">
-      <button class="btn btn-primary" onclick="abrirModal()">+ Nova Ocorrência</button>
+    <section class="acerto-filtros">
+      <div class="form-group">
+        <label>Motorista</label>
+        <select id="acerto-motorista" onchange="aoTrocarMotorista()"><option value="">Selecione o motorista</option></select>
+      </div>
+      <div class="form-group">
+        <label>De</label>
+        <input type="date" id="acerto-inicio" onchange="calcularPrevia()" />
+      </div>
+      <div class="form-group">
+        <label>Até</label>
+        <input type="date" id="acerto-fim" onchange="calcularPrevia()" />
+      </div>
+      <p class="acerto-regra">Fechamento a cada 30 dias, na entrega do envelope: <strong>13% do frete</strong> + <strong>⅓ das diárias</strong> − <strong>adiantamentos</strong> (dias 5 e 15). Diesel por conta da empresa.</p>
+    </section>
+
+    <div id="acerto-vazio" class="table-container acerto-placeholder">
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" width="38" height="38" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg>
+        <div class="empty-titulo">Escolha um motorista para montar o acerto</div>
+        <div class="empty-sub">O período já vem sugerido: do dia seguinte ao último acerto até hoje.</div>
+      </div>
     </div>
 
-    <div class="ocorrencias-lista" id="lista-ocorrencias">
-      <div class="loading-state"><span class="spinner"></span> Carregando...</div>
+    <div class="acerto-grade" id="acerto-conteudo" hidden>
+      <aside class="acerto-recibo" id="acerto-recibo"></aside>
+
+      <div class="acerto-detalhes">
+        <div class="table-container">
+          <div class="table-header"><h2>Viagens concluídas</h2><span class="topbar-sub" id="acerto-viagens-sub"></span></div>
+          <table>
+            <thead><tr><th>#</th><th>Concluída</th><th>Rota</th><th>Frete</th><th>Comissão (13%)</th></tr></thead>
+            <tbody id="acerto-viagens"></tbody>
+          </table>
+        </div>
+
+        <div class="table-container">
+          <div class="table-header">
+            <h2>Diárias</h2>
+            <button class="btn btn-outline" onclick="abrirModalDiaria()">+ Lançar diária</button>
+          </div>
+          <table>
+            <thead><tr><th>Data</th><th>Entrega</th><th>Pago pelo cliente</th><th>Motorista ⅓</th><th>Caminhão ⅓</th><th>Empresa ⅓</th><th></th></tr></thead>
+            <tbody id="acerto-diarias"></tbody>
+          </table>
+        </div>
+
+        <div class="table-container">
+          <div class="table-header">
+            <h2>Adiantamentos</h2>
+            <button class="btn btn-outline" onclick="abrirModalAdiantamento()">+ Lançar adiantamento</button>
+          </div>
+          <table>
+            <thead><tr><th>Data</th><th>Descrição</th><th>Valor</th><th></th></tr></thead>
+            <tbody id="acerto-adiantamentos"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-container" style="margin-top:24px;">
+      <div class="table-header">
+        <h2>Acertos fechados</h2>
+        <span class="topbar-sub" id="historico-sub">Todos os motoristas</span>
+      </div>
+      <table>
+        <thead><tr><th>Nº</th><th>Motorista</th><th>Período</th><th>Viagens</th><th>Comissão</th><th>Diárias (motorista)</th><th>Adiantamentos</th><th>Saldo pago</th><th>Fechado em</th><th>Ações</th></tr></thead>
+        <tbody id="acertos-historico"><tr><td colspan="10" style="padding:0;"><div class="loading-state"><span class="spinner"></span> Carregando...</div></td></tr></tbody>
+      </table>
     </div>
   </main>
 
-  <div class="modal-overlay" id="modal">
-    <div class="modal" style="max-width:480px;">
+  <div class="modal-overlay" id="modal-diaria">
+    <div class="modal">
       <div class="modal-header">
-        <h2 id="modal-titulo">Nova Ocorrência</h2>
-        <button class="btn-fechar" onclick="fecharModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        <h2>Lançar diária</h2>
+        <button class="btn-fechar" onclick="fecharModais()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+      <p class="acerto-modal-ajuda">Estadia que o cliente paga quando o caminhão fica parado esperando. O valor é dividido em três partes iguais: motorista, caminhão e empresa.</p>
+      <div class="form-grid">
+        <div class="form-group" style="grid-column:1/-1;"><label>Entrega *</label><select id="diaria-entrega"></select></div>
+        <div class="form-group"><label>Data *</label><input type="date" id="diaria-data" /></div>
+        <div class="form-group"><label>Dias parado</label><input type="number" id="diaria-dias" min="1" max="60" placeholder="Ex.: 2" /></div>
+        <div class="form-group"><label>Valor pago pelo cliente (R$) *</label><input type="text" id="diaria-valor" inputmode="numeric" placeholder="0,00" /></div>
+        <div class="form-group"><label>Observação</label><input type="text" id="diaria-descricao" maxlength="200" placeholder="Ex.: aguardando descarga" /></div>
+      </div>
+      <div class="acerto-divisao" id="diaria-divisao"></div>
+      <div style="margin-top:20px;display:flex;gap:12px;justify-content:flex-end;">
+        <button class="btn btn-outline" onclick="fecharModais()">Cancelar</button>
+        <button class="btn btn-primary" onclick="salvarDiaria()">Lançar diária</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-adiantamento">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Lançar adiantamento</h2>
+        <button class="btn-fechar" onclick="fecharModais()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+      <div class="acerto-atalhos-data">
+        <span>Atalho:</span>
+        <button class="btn btn-outline" onclick="usarDiaDoMes(5)">Dia 5</button>
+        <button class="btn btn-outline" onclick="usarDiaDoMes(15)">Dia 15</button>
       </div>
       <div class="form-grid">
-        <div class="form-group">
-          <label>Veículo *</label>
-          <select id="veiculo-filtro" onchange="atualizarEntregasDoVeiculo()">
-            <option value="">Selecionar veículo</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Entrega *</label>
-          <select id="entrega-id" disabled>
-            <option value="">Selecione um veículo primeiro</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Tipo *</label>
-          <select id="tipo">
-            <option value="">Selecionar</option>
-            <option value="atraso">Atraso</option>
-            <option value="acidente">Acidente</option>
-            <option value="cliente_ausente">Cliente Ausente</option>
-            <option value="problema_mecanico">Problema Mecânico</option>
-            <option value="extravio">Extravio</option>
-            <option value="outro">Outro</option>
-          </select>
-        </div>
-        <div class="form-group" style="grid-column:span 2;">
-          <label>Descrição *</label>
-          <textarea id="descricao" rows="4" placeholder="Descreva a ocorrência..." style="resize:vertical;"></textarea>
-        </div>
+        <div class="form-group"><label>Data *</label><input type="date" id="adiantamento-data" /></div>
+        <div class="form-group"><label>Valor (R$) *</label><input type="text" id="adiantamento-valor" inputmode="numeric" placeholder="0,00" /></div>
+        <div class="form-group" style="grid-column:1/-1;"><label>Descrição</label><input type="text" id="adiantamento-descricao" maxlength="200" placeholder="Ex.: vale do dia 5" /></div>
       </div>
-      <div style="margin-top:24px;display:flex;gap:12px;justify-content:flex-end;">
-        <button class="btn btn-outline" onclick="fecharModal()">Cancelar</button>
-        <button class="btn btn-primary" onclick="salvarOcorrencia()">Salvar</button>
+      <div style="margin-top:20px;display:flex;gap:12px;justify-content:flex-end;">
+        <button class="btn btn-outline" onclick="fecharModais()">Cancelar</button>
+        <button class="btn btn-primary" onclick="salvarAdiantamento()">Lançar adiantamento</button>
       </div>
     </div>
   </div>
@@ -130,6 +197,6 @@
   <script src="../js/api.js"></script>
   <script src="../js/toasts.js"></script>
   <script src="../js/icons.js"></script>
-  <script src="../js/ocorrencias.js"></script>
+  <script src="../js/acertos.js"></script>
 </body>
 </html>

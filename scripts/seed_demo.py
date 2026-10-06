@@ -9,7 +9,9 @@ O que e criado (tudo inventado, nenhum dado real):
   - ~4 meses de historico de viagens por conjunto, encadeadas (o destino de
     uma e o ponto de partida da seguinte), com o deslocamento vazio entre
     elas, planejamento (km/tempo estimado), abastecimentos ao longo do caminho,
-    manutencoes e ocorrencias;
+    manutencoes, ocorrencias e diarias (estadia paga pelo cliente);
+  - acerto do motorista: vales dos dias 5 e 15 e um acerto fechado por mes
+    ja terminado; o mes corrente fica em aberto para fechar na tela;
   - o "agora": caminhoes em rota, um atrasado, um com ocorrencia aberta, um
     parado em manutencao e cargas aguardando saida.
 
@@ -58,7 +60,9 @@ from app.models import (  # noqa: F401 - registra todas as tabelas em Base.metad
     Conjunto, Entrega, LogAcesso, Manutencao, Motorista, Ocorrencia, Usuario, Veiculo,
 )
 from app.models.abastecimento import Abastecimento
+from app.models.acerto import Acerto, Adiantamento, Diaria
 from app.models.deslocamento_vazio import DeslocamentoVazio
+from app.routers.acertos import _pendencias, _totais
 
 DOMINIO_DEMO = "@logtrack.demo"
 EMAIL_ADMIN = "banca" + DOMINIO_DEMO
@@ -427,6 +431,15 @@ def simular_conjunto(db, idx, conjunto, motorista, cavalo, operador, agora, em_m
                               status="finalizada", finalizado_em=utc(chegada),
                               criado_em=utc(saida + timedelta(hours=estimado_h / 2))))
 
+        # Diaria: de vez em quando o caminhao fica parado no cliente e ele
+        # paga a estadia (dividida 1/3 motorista, caminhao e empresa).
+        if entrega.concluido_em and random.random() < 0.12:
+            dias = random.choice([1, 1, 2, 2, 3])
+            db.add(Diaria(entrega_id=entrega.id, data=(chegada + timedelta(days=dias)).date(), dias=dias,
+                          valor=dias * random.choice([1200, 1350, 1500]),
+                          descricao=random.choice(["Aguardando descarga no cliente", "Fila na doca de recebimento",
+                                                   "Cliente sem espaço no armazém"])))
+
         if not entrega.concluido_em:
             return entrega, km_odometro, resumo
 
@@ -472,10 +485,43 @@ def criar_manutencoes(db, cavalos, odometros, hoje, idx_parado):
     ))
 
 
+def criar_acertos(db, motoristas, hoje: date, admin) -> int:
+    """Vales dos dias 5 e 15 de cada mes e um acerto fechado por mes ja
+    terminado (no comeco do mes seguinte, na entrega do envelope). O mes
+    corrente fica em aberto, para a banca fechar o acerto na tela."""
+    db.flush()
+    fechados = 0
+    for motorista in motoristas[:8]:
+        valor_vale = random.choice([1500, 2000])
+        mes = INICIO_HISTORICO.replace(day=1)
+        while mes <= hoje:
+            for dia in (5, 15):
+                if mes.replace(day=dia) <= hoje:
+                    db.add(Adiantamento(motorista_id=motorista.id, data=mes.replace(day=dia),
+                                        valor=valor_vale, descricao=f"Vale do dia {dia}"))
+            prox = (mes + timedelta(days=32)).replace(day=1)
+            fim_mes = prox - timedelta(days=1)
+            if fim_mes < hoje:
+                db.flush()
+                viagens, diarias, adiantamentos = _pendencias(motorista.id, mes, fim_mes, db)
+                if viagens or diarias or adiantamentos:
+                    acerto = Acerto(motorista_id=motorista.id, periodo_inicio=mes, periodo_fim=fim_mes,
+                                    qtd_viagens=len(viagens), fechado_por_id=admin.id,
+                                    criado_em=utc(datetime.combine(prox + timedelta(days=random.randint(0, 3)), time(17, 30))),
+                                    **_totais(viagens, diarias, adiantamentos))
+                    db.add(acerto)
+                    db.flush()
+                    for item in [*viagens, *diarias, *adiantamentos]:
+                        item.acerto_id = acerto.id
+                    fechados += 1
+            mes = prox
+    return fechados
+
+
 def popular(db, senha: str) -> dict:
     agora = datetime.now().replace(second=0, microsecond=0)
     hoje = agora.date()
-    _, operador = criar_usuarios(db, senha)
+    admin, operador = criar_usuarios(db, senha)
     motoristas, cavalos, semis, conjuntos = criar_frota(db, hoje)
 
     idx_parado = 7
@@ -522,7 +568,8 @@ def popular(db, senha: str) -> dict:
         total += 1
 
     criar_manutencoes(db, cavalos, odometros, hoje, idx_parado)
-    return {"entregas": total, "em_andamento": len(ativas)}
+    acertos = criar_acertos(db, motoristas, hoje, admin)
+    return {"entregas": total, "em_andamento": len(ativas), "acertos": acertos}
 
 
 def main() -> None:
@@ -570,7 +617,8 @@ def main() -> None:
     if resumo is None:
         print("\nPronto: sistema zerado, so com os logins.")
     else:
-        print(f"\nPronto: {resumo['entregas']} entregas ({resumo['em_andamento']} em andamento agora).")
+        print(f"\nPronto: {resumo['entregas']} entregas ({resumo['em_andamento']} em andamento agora), "
+              f"{resumo['acertos']} acertos fechados.")
     print(f"Login administrador: {EMAIL_ADMIN} / {senha}")
     print(f"Login operador:      {EMAIL_OPERADOR} / {senha}")
 

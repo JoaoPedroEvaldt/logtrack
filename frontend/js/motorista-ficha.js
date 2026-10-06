@@ -70,8 +70,9 @@ async function carregarFicha() {
     window.location.href = 'motoristas.html';
     return;
   }
-  const [motorista, entregas, conjuntos, ocorrencias, veiculos] = await Promise.all([
-    get(`/motoristas/${motoristaId}`), get('/entregas'), get('/conjuntos'), get('/ocorrencias'), get('/veiculos')
+  const [motorista, entregas, conjuntos, ocorrencias, veiculos, acertos] = await Promise.all([
+    get(`/motoristas/${motoristaId}`), get('/entregas'), get('/conjuntos'), get('/ocorrencias'), get('/veiculos'),
+    get(`/acertos?motorista_id=${motoristaId}`)
   ]);
   if (!motorista || motorista.detail) {
     document.getElementById('ficha-perfil').innerHTML = estadoVazio(null, 'Motorista não encontrado', 'Volte para a lista de motoristas.', 'usuario');
@@ -94,6 +95,25 @@ async function carregarFicha() {
   preencherPeriodos();
   renderizarPeriodo();
   renderizarGrafico();
+  renderizarAcertos(acertos || []);
+}
+
+function renderizarAcertos(lista) {
+  const tbody = document.getElementById('ficha-acertos');
+  if (!lista.length) {
+    tbody.innerHTML = estadoVazio(7, 'Nenhum acerto fechado ainda', 'Use "Fazer acerto" para fechar o período.', 'dinheiro');
+    return;
+  }
+  tbody.innerHTML = lista.map(a => `
+    <tr>
+      <td><strong>${String(a.id).padStart(4, '0')}</strong></td>
+      <td>${formatarData(a.periodo_inicio)} a ${formatarData(a.periodo_fim)}</td>
+      <td>${a.qtd_viagens}</td>
+      <td>${reais(a.comissao)}</td>
+      <td>${reais(a.diarias_motorista)}</td>
+      <td>${reais(a.total_adiantamentos)}</td>
+      <td><strong>${reais(a.saldo)}</strong></td>
+    </tr>`).join('');
 }
 
 /* ===================== PERFIL ===================== */
@@ -134,6 +154,7 @@ function renderizarPerfil() {
       </div>
       <div class="ficha-acoes">
         <a class="btn btn-outline" href="entregas.html?motorista=${m.id}">${svgIcone('local', 14)} Ver rotograma</a>
+        <a class="btn btn-outline" href="acertos.html?motorista=${m.id}">${svgIcone('dinheiro', 14)} Fazer acerto</a>
         <a class="btn btn-outline" href="motoristas.html?editar=${m.id}">${svgIcone('editar', 14)} Editar</a>
         <button class="btn btn-primary" onclick="exportarFichaPDF()">${svgIcone('download', 14)} Ficha em PDF</button>
       </div>

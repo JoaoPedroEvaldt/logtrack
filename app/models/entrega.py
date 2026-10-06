@@ -34,6 +34,8 @@ class Entrega(Base):
     rota_via         = Column(JSON)
     distancia_km     = Column(Numeric(10, 1))
     tempo_estimado_h = Column(Numeric(7, 1))
+    # Acerto do motorista que pagou a comissão desta viagem (ver acerto.py).
+    acerto_id       = Column(Integer, ForeignKey("acertos.id", ondelete="SET NULL"))
     criado_em       = Column(DateTime, nullable=False, server_default=func.now())
     atualizado_em   = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
 

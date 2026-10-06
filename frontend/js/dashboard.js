@@ -202,7 +202,7 @@ function renderizarFaturamento(fat) {
   document.getElementById('fat-receita-var').innerHTML = badgeVariacao(fat.receita_bruta, anterior.receita_bruta, true);
   document.getElementById('fat-custos-var').innerHTML = badgeVariacao(custoTotal, anterior.custo_total, false);
   // Comissão sobe junto com o frete — variação neutra (só acompanha a receita).
-  document.getElementById('fat-comissao-var').textContent = '13% de cada frete entregue';
+  document.getElementById('fat-comissao-var').textContent = fat.receita_diarias ? `Inclui ${formatarMoeda(fat.receita_diarias / 3)} de diárias` : '13% de cada frete entregue';
   document.getElementById('fat-liquido-var').innerHTML = badgeVariacao(fat.faturamento_liquido, anterior.faturamento_liquido, true);
 
   const tbodyConjunto = document.getElementById('tabela-faturamento-conjunto');

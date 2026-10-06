@@ -1471,3 +1471,51 @@ a.link-ficha:hover { color: var(--accent-dark); text-decoration: underline; }
   .ficha-acoes { width: 100%; }
   .ficha-acoes .btn { flex: 1; justify-content: center; }
 }
+
+/* ===================== ACERTO DO MOTORISTA ===================== */
+.acerto-filtros { display: grid; grid-template-columns: minmax(220px, 1.4fr) minmax(150px, 0.8fr) minmax(150px, 0.8fr) minmax(0, 2fr); gap: 16px; align-items: end; background: var(--bg-card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px 24px; margin-bottom: 20px; }
+.acerto-filtros .form-group { margin: 0; }
+.acerto-regra { font-size: 12px; color: var(--text-light); line-height: 1.5; margin: 0; }
+.acerto-regra strong { color: var(--text); }
+.acerto-placeholder { padding: 12px 0; }
+.acerto-grade { display: grid; grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); gap: 20px; align-items: start; }
+.acerto-detalhes { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.acerto-recibo { background: var(--bg-card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 22px; position: sticky; top: 16px; border-top: 4px solid var(--accent); }
+.acerto-recibo-cab { border-bottom: 1px dashed var(--border); padding-bottom: 14px; margin-bottom: 6px; }
+.acerto-recibo-rotulo { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent-dark); font-weight: 700; }
+.acerto-recibo-cab h2 { font-size: 20px; color: var(--text); margin: 4px 0 2px; }
+.acerto-recibo-periodo { font-size: 13px; color: var(--text-light); }
+.acerto-linha { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.acerto-linha strong { display: block; font-size: 14px; color: var(--text); }
+.acerto-linha span { font-size: 12px; color: var(--text-light); }
+.acerto-linha b { font-size: 15px; white-space: nowrap; }
+.acerto-linha b.positivo { color: var(--secondary); }
+.acerto-linha b.negativo { color: var(--danger); }
+.acerto-saldo { display: flex; flex-direction: column; gap: 2px; margin-top: 14px; padding: 16px; border-radius: 10px; background: rgba(39,174,96,0.10); color: var(--text); }
+.acerto-saldo span { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.acerto-saldo strong { font-size: 30px; color: var(--secondary); letter-spacing: -0.02em; }
+.acerto-saldo.devedor { background: rgba(192,57,43,0.10); }
+.acerto-saldo.devedor strong { color: var(--danger); }
+.acerto-recibo textarea { width: 100%; resize: vertical; }
+.acerto-btn-fechar { width: 100%; justify-content: center; display: inline-flex; align-items: center; gap: 8px; padding: 12px; margin-top: 12px; font-size: 15px; }
+.acerto-btn-fechar:disabled { opacity: 0.5; cursor: not-allowed; }
+.acerto-nota { font-size: 11px; color: var(--text-light); margin-top: 10px; line-height: 1.5; }
+.acerto-mini { font-size: 11px; color: var(--text-light); }
+.acerto-btn-mini { font-size: 11px; padding: 4px 10px; display: inline-flex; align-items: center; gap: 4px; }
+.acerto-modal-ajuda { font-size: 13px; color: var(--text-light); margin: -4px 0 16px; line-height: 1.5; }
+.acerto-divisao { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
+.acerto-divisao div { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+.acerto-divisao span { display: block; font-size: 11px; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.04em; }
+.acerto-divisao strong { font-size: 15px; color: var(--text); }
+.acerto-atalhos-data { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; font-size: 13px; color: var(--text-light); }
+.acerto-atalhos-data .btn { padding: 4px 12px; font-size: 12px; }
+@media (max-width: 1100px) {
+  .acerto-filtros { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .acerto-regra { grid-column: 1 / -1; }
+  .acerto-grade { grid-template-columns: minmax(0, 1fr); }
+  .acerto-recibo { position: static; }
+}
+@media (max-width: 600px) {
+  .acerto-filtros { grid-template-columns: minmax(0, 1fr); padding: 16px; }
+  .acerto-divisao { grid-template-columns: minmax(0, 1fr); }
+}
