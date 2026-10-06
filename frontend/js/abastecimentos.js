@@ -1,7 +1,16 @@
 checarAuth();
 checarStaff();
 document.getElementById('usuario-perfil').textContent = localStorage.getItem('perfil') || '';
-aplicarMascaraMoeda(document.getElementById('litros'));
+/* Litros digitados como se escreve: "400" é 400 L (a máscara de dinheiro
+   transformava "400" em 4,00). Aceita vírgula ou ponto e até 2 casas. */
+const inputLitros = document.getElementById('litros');
+inputLitros.addEventListener('input', () => {
+  let v = inputLitros.value.replace(/\./g, ',').replace(/[^\d,]/g, '');
+  const virgula = v.indexOf(',');
+  if (virgula !== -1) v = v.slice(0, virgula + 1) + v.slice(virgula + 1).replace(/,/g, '').slice(0, 2);
+  const [inteiro, decimal] = v.split(',');
+  inputLitros.value = inteiro.slice(0, 5) + (decimal !== undefined ? ',' + decimal : '');
+});
 aplicarMascaraMoeda(document.getElementById('valor-total'));
 document.getElementById('litros').addEventListener('input', () => recalcularValorTotal());
 
@@ -290,7 +299,7 @@ function editarAbastecimento(id) {
   precoMedioEstado = null;
   descreverOrigemPreco();
   if (a.estado) atualizarPrecoDiesel();
-  document.getElementById('litros').value = numeroParaMoeda(a.litros);
+  inputLitros.value = parseFloat(a.litros).toLocaleString('pt-BR', { maximumFractionDigits: 2, useGrouping: false });
   document.getElementById('valor-total').value = numeroParaMoeda(a.valor_total);
   document.getElementById('posto').value = a.posto || '';
   document.getElementById('modal').classList.add('aberto');
