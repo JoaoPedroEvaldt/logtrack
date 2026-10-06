@@ -150,7 +150,7 @@ async function finalizarOcorrencia(id) {
   if (!(await confirmarAcao('Finalizar esta ocorrência? A entrega associada deixará de ficar marcada como "Ocorrência" caso não haja outra pendente.'))) return;
   const res = await put(`/ocorrencias/${id}/finalizar`, {});
   if (res && res.detail) {
-    toastErro('Erro: ' + res.detail);
+    toastErro('Erro: ' + extrairErro(res));
     return;
   }
   carregarOcorrencias();
@@ -173,7 +173,7 @@ async function salvarOcorrencia() {
     }
     const res = await put(`/ocorrencias/${ocorrenciaEditandoId}`, { tipo, descricao });
     if (res && res.detail) {
-      toastErro('Erro: ' + res.detail);
+      toastErro('Erro: ' + extrairErro(res));
       return;
     }
     fecharModal();
@@ -195,7 +195,7 @@ async function salvarOcorrencia() {
   const res = await post('/ocorrencias', dados);
 
   if (res.detail) {
-    toastErro('Erro: ' + res.detail);
+    toastErro('Erro: ' + extrairErro(res));
     return;
   }
 

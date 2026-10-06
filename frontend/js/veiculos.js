@@ -249,7 +249,7 @@ async function salvarVeiculo() {
   }
 
   if (res.detail) {
-    toastErro('Erro: ' + res.detail);
+    toastErro('Erro: ' + extrairErro(res));
     return;
   }
 

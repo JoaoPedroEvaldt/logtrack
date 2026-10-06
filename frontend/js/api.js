@@ -217,7 +217,8 @@ function extrairErro(res) {
   if (!res || !res.detail) return 'Erro desconhecido';
   if (typeof res.detail === 'string') return res.detail;
   if (Array.isArray(res.detail)) {
-    return res.detail.map(e => e.msg || JSON.stringify(e)).join('; ');
+    // O Pydantic prefixa os erros dos validadores com "Value error, " (em inglês).
+    return res.detail.map(e => (e.msg || JSON.stringify(e)).replace(/^Value error, /, '')).join('; ');
   }
   return 'Erro desconhecido';
 }

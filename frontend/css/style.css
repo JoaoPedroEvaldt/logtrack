@@ -330,7 +330,10 @@ html.dark body {
 }
 
 /* ===================== CONTEÚDO PRINCIPAL ===================== */
-.main-content { margin-left: 240px; flex: 1; padding: 24px; transition: margin 0.3s; }
+/* min-width: 0 — item flex não encolhe abaixo do conteúdo por padrão; sem
+   isso uma tabela larga esticava a página inteira no celular (rolagem
+   lateral e cartões cortados) em vez de rolar só dentro do .table-container. */
+.main-content { margin-left: 240px; flex: 1; min-width: 0; padding: 24px; transition: margin 0.3s; }
 
 /* ===================== TOPBAR ===================== */
 .topbar {
@@ -1035,7 +1038,7 @@ body.dark .planejamento-prazo.curto { color: #F1948A; }
 .relatorio-preview-nota svg { flex-shrink: 0; }
 
 @media (max-width: 900px) {
-  .relatorio-layout { grid-template-columns: 1fr; }
+  .relatorio-layout { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* ===================== FILTROS ===================== */
@@ -1420,3 +1423,7 @@ body.dark .rot-trecho-vazio strong { color: #F0A35E; }
 @media (max-width: 768px) {
   .rotograma-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* Selects de filtro com opções longas ("PLACA — MODELO ...") não podem
+   ficar mais largos que a tela do celular. */
+.main-content select { max-width: 100%; }

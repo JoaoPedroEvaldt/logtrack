@@ -863,7 +863,7 @@ async function salvarEntrega() {
     : await post('/entregas', dados);
 
   if (res && res.detail) {
-    toastErro('Erro: ' + res.detail);
+    toastErro('Erro: ' + extrairErro(res));
     return;
   }
 
