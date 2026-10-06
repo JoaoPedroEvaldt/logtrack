@@ -104,3 +104,24 @@ def test_entrega_continua_em_ocorrencia_se_sobrar_outra_aberta(client, admin, db
 
     resp_entrega = client.get(f"/entregas/{entrega.id}", headers=headers)
     assert resp_entrega.json()["status"] == "ocorrencia"
+
+
+def test_ocorrencia_em_entrega_ja_entregue_nao_muda_o_status(client, admin, db_session):
+    # Avaria percebida depois da descarga: a entrega continua "entregue" e,
+    # ao finalizar a ocorrência, não pode voltar para "em_rota".
+    entrega = criar_entrega_orm(db_session, status="entregue")
+    entrega.iniciado_em = entrega.criado_em
+    db_session.commit()
+    headers = auth_headers(client, admin.email)
+    ocorrencia = _criar_ocorrencia(client, headers, entrega.id)
+    assert client.get(f"/entregas/{entrega.id}", headers=headers).json()["status"] == "entregue"
+
+    client.put(f"/ocorrencias/{ocorrencia['id']}/finalizar", headers=headers)
+    assert client.get(f"/entregas/{entrega.id}", headers=headers).json()["status"] == "entregue"
+
+
+def test_ocorrencia_em_entrega_em_rota_marca_ocorrencia(client, admin, db_session):
+    entrega = criar_entrega_orm(db_session, status="em_rota")
+    headers = auth_headers(client, admin.email)
+    _criar_ocorrencia(client, headers, entrega.id)
+    assert client.get(f"/entregas/{entrega.id}", headers=headers).json()["status"] == "ocorrencia"

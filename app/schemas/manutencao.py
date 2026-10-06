@@ -11,9 +11,9 @@ def _validar_datas_coerentes(modelo):
     # Só compara os campos que vieram nesta requisição — num PUT parcial que só
     # manda um dos dois, a comparação contra o valor já salvo é feita pelo router.
     if modelo.data_fim is not None and modelo.data_manutencao is not None and modelo.data_fim < modelo.data_manutencao:
-        raise ValueError("data_fim não pode ser anterior a data_manutencao")
+        raise ValueError("A data de término não pode ser anterior à data da manutenção")
     if modelo.proxima_revisao is not None and modelo.data_manutencao is not None and modelo.proxima_revisao < modelo.data_manutencao:
-        raise ValueError("proxima_revisao não pode ser anterior a data_manutencao")
+        raise ValueError("A próxima revisão não pode ser anterior à data da manutenção")
     return modelo
 
 class ManutencaoCreate(BaseModel):

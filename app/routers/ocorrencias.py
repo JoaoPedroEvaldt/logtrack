@@ -37,7 +37,11 @@ def criar_ocorrencia(dados: OcorrenciaCreate, db: Session = Depends(get_db), atu
         tipo=dados.tipo,
         descricao=dados.descricao
     )
-    entrega.status = "ocorrencia"
+    # Entrega já concluída ou cancelada mantém o status: uma avaria percebida
+    # depois da descarga não pode fazer a viagem "voltar" — ao finalizar a
+    # ocorrência, _revalidar_status_entrega a devolveria como em_rota.
+    if entrega.status not in ("entregue", "cancelado"):
+        entrega.status = "ocorrencia"
     db.add(ocorrencia)
     db.commit()
     db.refresh(ocorrencia)

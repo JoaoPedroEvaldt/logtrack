@@ -1,7 +1,11 @@
-from fastapi import FastAPI
+import logging
+
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.exc import DataError, IntegrityError
 from app.routers import auth, usuarios, motoristas, veiculos, entregas, ocorrencias, dashboard, uploads
 from app.routers import conjunto as conjuntos_router
 from app.routers import manutencao as manutencoes
@@ -31,6 +35,32 @@ app.add_middleware(
 # Comprime respostas maiores (JSON das listas, JS/CSS do frontend e a base de
 # municípios em frontend/data) — no plano gratuito do Render isso pesa.
 app.add_middleware(GZipMiddleware, minimum_size=1024)
+
+# Regras do próprio banco (CHECKs da migração 0001) que a validação da API não
+# repete. Sem estes handlers, um valor fora da regra virava "Internal Server
+# Error" em texto puro — a tela não conseguia ler a resposta e ficava muda.
+MENSAGENS_RESTRICAO = {
+    "veiculos_ano_check": "Ano do veículo deve estar entre 1990 e o ano que vem.",
+    "veiculos_capacidade_kg_check": "Capacidade (kg) deve ser maior que zero.",
+    "entregas_peso_kg_check": "Peso (kg) deve ser maior que zero — deixe em branco se não souber.",
+}
+
+@app.exception_handler(IntegrityError)
+def erro_integridade(request: Request, exc: IntegrityError):
+    texto = str(exc.orig)
+    for restricao, mensagem in MENSAGENS_RESTRICAO.items():
+        if restricao in texto:
+            return JSONResponse(status_code=400, content={"detail": mensagem})
+    return JSONResponse(status_code=400, content={"detail": "Dados inválidos ou em conflito com outro cadastro. Confira os campos e tente de novo."})
+
+@app.exception_handler(DataError)
+def erro_dado(request: Request, exc: DataError):
+    return JSONResponse(status_code=400, content={"detail": "Algum campo passou do tamanho ou do valor máximo permitido. Confira os dados e tente de novo."})
+
+@app.exception_handler(Exception)
+def erro_inesperado(request: Request, exc: Exception):
+    logging.getLogger("logtrack").exception("Erro não tratado em %s %s", request.method, request.url.path)
+    return JSONResponse(status_code=500, content={"detail": "Erro interno no servidor. Tente de novo em instantes."})
 
 app.include_router(auth.router)
 app.include_router(uploads.router)

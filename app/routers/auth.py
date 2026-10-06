@@ -3,6 +3,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.usuario import Usuario
@@ -23,9 +24,12 @@ JANELA_BLOQUEIO_MINUTOS = 15
 def login(request: Request, form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     # Mesmo relogio do LogAcesso.criado_em (utcnow, gerado em Python) - se um
     # lado usasse hora local e o outro UTC, a janela ficaria 3h deslocada.
+    # Teclado de celular costuma pôr a 1ª letra em maiúscula — e-mail não
+    # diferencia maiúsculas, então a comparação também não.
+    email = form.username.strip().lower()
     limite = datetime.utcnow() - timedelta(minutes=JANELA_BLOQUEIO_MINUTOS)
     tentativas_recentes = db.query(LogAcesso).filter(
-        LogAcesso.email_tentado == form.username,
+        func.lower(LogAcesso.email_tentado) == email,
         LogAcesso.tentativa_ok.is_(False),
         LogAcesso.criado_em >= limite
     ).count()
@@ -35,7 +39,7 @@ def login(request: Request, form: OAuth2PasswordRequestForm = Depends(), db: Ses
             detail=f"Muitas tentativas de login com esse e-mail. Tente novamente em {JANELA_BLOQUEIO_MINUTOS} minutos."
         )
 
-    usuario = db.query(Usuario).filter(Usuario.email == form.username).first()
+    usuario = db.query(Usuario).filter(func.lower(Usuario.email) == email).first()
     senha_ok = bool(usuario and auth.verificar_senha(form.password, usuario.senha_hash))
     sucesso = senha_ok and usuario.ativo
 

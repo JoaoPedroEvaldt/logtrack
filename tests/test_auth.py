@@ -75,3 +75,17 @@ def test_endpoint_protegido_sem_token_retorna_401(client):
 def test_endpoint_protegido_com_token_invalido_retorna_401(client):
     resp = client.get("/motoristas/", headers={"Authorization": "Bearer token-invalido"})
     assert resp.status_code == 401
+
+
+def test_login_ignora_maiusculas_no_email(client, admin):
+    # Teclado de celular costuma pôr a 1ª letra em maiúscula.
+    resp = client.post("/auth/login", data={"username": " " + admin.email.upper(), "password": SENHA_PADRAO})
+    assert resp.status_code == 200
+
+
+def test_bloqueio_por_forca_bruta_vale_com_email_em_maiusculas(client, admin):
+    for _ in range(5):
+        client.post("/auth/login", data={"username": admin.email.upper(), "password": "senha_errada"})
+
+    resp = client.post("/auth/login", data={"username": admin.email, "password": SENHA_PADRAO})
+    assert resp.status_code == 429
