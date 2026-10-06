@@ -1,8 +1,3 @@
-databases:
-  - name: logtrack-db
-    plan: free
-    postgresMajorVersion: "16"
-
 services:
   - type: web
     name: logtrack
@@ -11,8 +6,8 @@ services:
     healthCheckPath: /health
     envVars:
       # Banco no Neon (free, não expira) desde 2026-10 — o valor fica só no
-      # painel do Render. O logtrack-db acima é o banco antigo, mantido até
-      # a migração ser confirmada.
+      # painel do Render. O Postgres antigo do Render (logtrack-db) saiu
+      # daqui; tirar do Blueprint não apaga o banco, isso é feito no painel.
       - key: DATABASE_URL
         sync: false
       - key: SECRET_KEY

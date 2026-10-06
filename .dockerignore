@@ -7,3 +7,7 @@ __pycache__/
 *.db
 .git/
 *.dump
+demo.env
+backups/
+uploads/
+scratch/
