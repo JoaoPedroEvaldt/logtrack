@@ -167,6 +167,10 @@ def atualizar_entrega(id: int, dados: EntregaUpdate, db: Session = Depends(get_d
 
     for campo, valor in atualizacoes.items():
         setattr(entrega, campo, valor)
+    # Frete corrigido numa viagem já paga num acerto: o acerto acompanha.
+    if entrega.acerto_id and "valor_frete" in atualizacoes:
+        from app.routers.acertos import recalcular_acerto
+        recalcular_acerto(entrega.acerto_id, db)
     db.commit()
     db.refresh(entrega)
     return entrega

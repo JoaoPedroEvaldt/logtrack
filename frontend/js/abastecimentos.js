@@ -5,13 +5,59 @@ aplicarMascaraMoeda(document.getElementById('litros'));
 aplicarMascaraMoeda(document.getElementById('valor-total'));
 document.getElementById('litros').addEventListener('input', () => recalcularValorTotal());
 
+/* Preço por litro com 3 casas (bomba de diesel: R$ 6,299). Vem com a média
+   do estado, mas o usuário pode digitar o preço que pagou de fato. */
+const inputPrecoLitro = document.getElementById('preco-litro');
+inputPrecoLitro.addEventListener('input', () => {
+  const digitos = inputPrecoLitro.value.replace(/\D/g, '').slice(0, 7);
+  inputPrecoLitro.value = digitos ? (parseInt(digitos, 10) / 1000).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) : '';
+  origemPreco = 'manual';
+  descreverOrigemPreco();
+  recalcularValorTotal();
+});
+
+// De onde veio o preço que está no campo: 'media' (API, média do estado),
+// 'manual' (digitado) ou 'registrado' (abastecimento já salvo, em edição).
+let origemPreco = null;
+let precoMedioEstado = null;
+
+function precoLitroDigitado() {
+  const v = inputPrecoLitro.value;
+  return v ? parseFloat(v.replace(/\./g, '').replace(',', '.')) || null : null;
+}
+
+function formatarPrecoLitro(preco) {
+  return preco.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+}
+
+function usarPrecoMedio() {
+  if (!precoMedioEstado) return;
+  inputPrecoLitro.value = formatarPrecoLitro(precoMedioEstado);
+  origemPreco = 'media';
+  descreverOrigemPreco();
+  recalcularValorTotal();
+}
+
+function descreverOrigemPreco() {
+  const info = document.getElementById('preco-diesel-info');
+  const uf = document.getElementById('estado').value;
+  const media = precoMedioEstado ? `R$ ${formatarPrecoLitro(precoMedioEstado)}` : null;
+  if (origemPreco === 'media') {
+    info.innerHTML = `Média do diesel em ${uf}. Pode alterar se pagou outro valor.`;
+  } else if (origemPreco === 'manual' || origemPreco === 'registrado') {
+    const texto = origemPreco === 'manual' ? 'Preço digitado manualmente.' : 'Preço registrado neste abastecimento.';
+    info.innerHTML = media ? `${texto} <button type="button" onclick="usarPrecoMedio()">Usar média de ${uf} (${media})</button>` : texto;
+  } else {
+    info.textContent = 'Escolha o estado para puxar a média, ou digite o preço pago';
+  }
+}
+
 let abastecimentos = [];
 let abastecimentoEditandoId = null;
 let conjuntosCarregados = [];
 
 const ESTADOS_UF = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
 let precosDieselPorUF = null;
-let precoDieselAtual = null;
 
 function preencherEstados() {
   const sel = document.getElementById('estado');
@@ -40,39 +86,41 @@ function parsePrecoDiesel(str) {
   return n || null;
 }
 
-async function atualizarPrecoDiesel(recalcular = true) {
+/* Ao escolher o estado: busca a média do diesel dele. Só preenche o campo de
+   preço se o usuário ainda não digitou um (ou se é um abastecimento novo) —
+   preço digitado à mão nunca é sobrescrito pela média. */
+async function atualizarPrecoDiesel() {
   const uf = document.getElementById('estado').value.toLowerCase();
   const infoEl = document.getElementById('preco-diesel-info');
-  precoDieselAtual = null;
-  if (!uf) { infoEl.value = ''; return; }
+  precoMedioEstado = null;
+  if (!uf) { descreverOrigemPreco(); return; }
 
-  infoEl.value = 'Buscando preço...';
+  infoEl.textContent = 'Buscando a média do diesel no estado...';
   const precos = await carregarPrecosDiesel();
-
-  const preco = precos ? parsePrecoDiesel(precos[uf]) : null;
+  precoMedioEstado = precos ? parsePrecoDiesel(precos[uf]) : null;
 
   // A API de terceiros nem sempre traz o preço de todos os estados (varia a cada
-  // coleta). Nesse caso não preenchemos automaticamente com nenhuma estimativa —
-  // deixamos precoDieselAtual em null pra forçar o preenchimento manual do valor
-  // total, evitando que um preço não conferido acabe salvo sem o usuário perceber.
-  if (!preco) {
+  // coleta). Nesse caso não preenche nenhuma estimativa: o usuário digita o preço.
+  if (!precoMedioEstado) {
     const precoNacional = precos ? parsePrecoDiesel(precos.br) : null;
-    infoEl.value = precoNacional
-      ? `Preço indisponível para ${uf.toUpperCase()} — informe o valor manualmente abaixo (referência nacional: R$ ${precoNacional.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / L)`
-      : 'Preço indisponível — informe o valor manualmente abaixo';
+    infoEl.textContent = precoNacional
+      ? `Média de ${uf.toUpperCase()} indisponível agora — digite o preço pago (referência nacional: R$ ${formatarPrecoLitro(precoNacional)}/L)`
+      : 'Média indisponível agora — digite o preço pago';
     return;
   }
 
-  precoDieselAtual = preco;
-  infoEl.value = `R$ ${preco.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / L`;
-  if (recalcular) recalcularValorTotal();
+  if (origemPreco === 'manual' || origemPreco === 'registrado') {
+    descreverOrigemPreco();
+    return;
+  }
+  usarPrecoMedio();
 }
 
 function recalcularValorTotal() {
-  if (!precoDieselAtual) return;
+  const preco = precoLitroDigitado();
   const litros = moedaParaNumero(document.getElementById('litros').value);
-  if (!litros) return;
-  document.getElementById('valor-total').value = numeroParaMoeda(litros * precoDieselAtual);
+  if (!preco || !litros) return;
+  document.getElementById('valor-total').value = numeroParaMoeda(litros * preco);
 }
 
 function definirPeriodoPadrao() {
@@ -159,7 +207,7 @@ function renderizar(lista) {
       <td>${parseFloat(a.litros).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} L</td>
       <td>${a.quilometragem != null ? a.quilometragem.toLocaleString('pt-BR') + ' km' : '—'}</td>
       <td>${escapeHtml(a.posto) || '—'}</td>
-      <td>R$ ${parseFloat(a.valor_total).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+      <td>R$ ${parseFloat(a.valor_total).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}${parseFloat(a.litros) ? `<br><small>R$ ${formatarPrecoLitro(parseFloat(a.valor_total) / parseFloat(a.litros))}/L</small>` : ''}</td>
       <td style="display:flex;gap:6px;">
         <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="editarAbastecimento(${a.id})">${svgIcone('editar', 12)} Editar</button>
         <button class="btn btn-danger" style="font-size:11px;padding:4px 10px;" onclick="excluirAbastecimento(${a.id})">${svgIcone('excluir', 12)} Excluir</button>
@@ -210,8 +258,10 @@ function abrirModal() {
   document.getElementById('data-abastecimento').value = '';
   document.getElementById('quilometragem').value = '';
   document.getElementById('estado').value = '';
-  document.getElementById('preco-diesel-info').value = '';
-  precoDieselAtual = null;
+  inputPrecoLitro.value = '';
+  origemPreco = null;
+  precoMedioEstado = null;
+  descreverOrigemPreco();
   document.getElementById('litros').value = '';
   document.getElementById('valor-total').value = '';
   document.getElementById('posto').value = '';
@@ -232,9 +282,14 @@ function editarAbastecimento(id) {
   document.getElementById('data-abastecimento').value = a.data_abastecimento;
   document.getElementById('quilometragem').value = a.quilometragem || '';
   document.getElementById('estado').value = a.estado || '';
-  document.getElementById('preco-diesel-info').value = '';
-  precoDieselAtual = null;
-  if (a.estado) atualizarPrecoDiesel(false);
+  // Preço que foi pago de fato (total / litros) — a média do estado aparece
+  // só como sugestão ("Usar média"), sem trocar o valor registrado.
+  const precoPago = parseFloat(a.litros) ? parseFloat(a.valor_total) / parseFloat(a.litros) : null;
+  inputPrecoLitro.value = precoPago ? formatarPrecoLitro(precoPago) : '';
+  origemPreco = precoPago ? 'registrado' : null;
+  precoMedioEstado = null;
+  descreverOrigemPreco();
+  if (a.estado) atualizarPrecoDiesel();
   document.getElementById('litros').value = numeroParaMoeda(a.litros);
   document.getElementById('valor-total').value = numeroParaMoeda(a.valor_total);
   document.getElementById('posto').value = a.posto || '';

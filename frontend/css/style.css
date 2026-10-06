@@ -1575,3 +1575,22 @@ a.link-ficha:hover { color: var(--accent-dark); text-decoration: underline; }
   .frota-mapa-wrap { height: 60vh; order: -1; }
   .frota-lateral { max-height: none; }
 }
+
+/* Texto de ajuda embaixo de um campo de formulário. */
+.ajuda-campo { display: block; font-size: 11px; color: var(--text-light); margin-top: 5px; line-height: 1.4; }
+.ajuda-campo button { background: none; border: none; padding: 0; color: var(--accent-dark); font: inherit; font-weight: 600; cursor: pointer; text-decoration: underline; }
+.acerto-acoes { white-space: nowrap; }
+.acerto-acoes .btn + .btn { margin-left: 4px; }
+.acerto-aviso { margin-top: 14px; padding: 10px 12px; border-radius: 8px; background: rgba(230,126,34,0.12); color: var(--text); font-size: 12px; line-height: 1.5; border-left: 3px solid var(--warning); }
+.modal.acerto-modal-detalhe { max-width: 900px; width: 94vw; max-height: 90vh; overflow-y: auto; }
+.acerto-modal-detalhe table { width: 100%; font-size: 13px; }
+.acerto-detalhe-resumo { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 8px; }
+.acerto-detalhe-resumo > div { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
+.acerto-detalhe-resumo span { font-size: 11px; color: var(--text-light); }
+.acerto-detalhe-resumo strong { font-size: 16px; color: var(--text); }
+.acerto-detalhe-resumo .acerto-saldo { margin-top: 0; padding: 10px 12px; }
+.acerto-detalhe-resumo .acerto-saldo strong { font-size: 20px; }
+.acerto-detalhe-sec { font-size: 14px; color: var(--text); margin: 18px 0 6px; }
+.acerto-detalhe-acoes { display: flex; gap: 8px; align-items: center; margin-top: 16px; flex-wrap: wrap; }
+.acerto-detalhe-acoes .btn { display: inline-flex; align-items: center; gap: 6px; }
+@media (max-width: 700px) { .acerto-detalhe-resumo { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

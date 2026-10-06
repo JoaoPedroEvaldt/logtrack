@@ -21,8 +21,8 @@ from app.models.usuario import Usuario
 from app.routers.auth import exigir_admin, exigir_staff
 from app.routers.dashboard import COMISSAO_MOTORISTA, FUSO_BRASILIA, hoje_brasilia, inicio_do_dia_utc
 from app.schemas.acerto import (
-    AcertoCreate, AcertoDetalhe, AcertoResponse, AdiantamentoCreate, AdiantamentoResponse,
-    DiariaCreate, DiariaResponse, PreviaAcerto, ViagemAcerto,
+    AcertoCreate, AcertoDetalhe, AcertoResponse, AcertoUpdate, AdiantamentoCreate, AdiantamentoResponse,
+    AdiantamentoUpdate, DiariaCreate, DiariaResponse, DiariaUpdate, PreviaAcerto, ViagemAcerto,
 )
 
 router = APIRouter(tags=["Acerto do motorista"])
@@ -129,6 +129,32 @@ def _totais(viagens, diarias, adiantamentos) -> dict:
     }
 
 
+def recalcular_acerto(acerto_id: int, db: Session) -> None:
+    """Refaz os totais de um acerto já fechado a partir do que está preso a
+    ele — usado quando um vale, uma diária ou o frete de uma viagem do acerto
+    é corrigido depois do fechamento. O recibo gerado de novo sai certo."""
+    acerto = db.query(Acerto).filter(Acerto.id == acerto_id).first()
+    if not acerto:
+        return
+    db.flush()
+    viagens = db.query(Entrega).filter(Entrega.acerto_id == acerto_id).all()
+    diarias = db.query(Diaria).filter(Diaria.acerto_id == acerto_id).all()
+    adiantamentos = db.query(Adiantamento).filter(Adiantamento.acerto_id == acerto_id).all()
+    for campo, valor in _totais(viagens, diarias, adiantamentos).items():
+        setattr(acerto, campo, valor)
+    acerto.qtd_viagens = len(viagens)
+
+
+def _pode_mexer(item, atual: Usuario, acao: str):
+    """Item ainda pendente: qualquer usuário da equipe. Item de um acerto já
+    fechado mexe num pagamento feito — só o administrador."""
+    if item.acerto_id and atual.perfil != "administrador":
+        raise HTTPException(
+            status_code=403,
+            detail=f"Este lançamento já está no acerto #{item.acerto_id}, que foi fechado. Só um administrador pode {acao}.",
+        )
+
+
 def _acerto_response(a: Acerto, classe=AcertoResponse, **extra):
     return classe(
         id=a.id, motorista_id=a.motorista_id, motorista=a.motorista.nome if a.motorista else None,
@@ -207,6 +233,18 @@ def buscar_acerto(id: int, db: Session = Depends(get_db), atual: Usuario = Depen
     )
 
 
+@router.put("/acertos/{id}", response_model=AcertoResponse)
+def atualizar_acerto(id: int, dados: AcertoUpdate, db: Session = Depends(get_db), atual: Usuario = Depends(exigir_admin)):
+    """Corrige a observação que sai no recibo."""
+    acerto = db.query(Acerto).filter(Acerto.id == id).first()
+    if not acerto:
+        raise HTTPException(status_code=404, detail="Acerto não encontrado")
+    acerto.observacao = (dados.observacao or "").strip() or None
+    db.commit()
+    db.refresh(acerto)
+    return _acerto_response(acerto)
+
+
 @router.delete("/acertos/{id}")
 def reabrir_acerto(id: int, db: Session = Depends(get_db), atual: Usuario = Depends(exigir_admin)):
     """Desfaz um fechamento lançado errado: tudo volta a ficar pendente."""
@@ -246,14 +284,33 @@ def criar_diaria(dados: DiariaCreate, db: Session = Depends(get_db), atual: Usua
     return _serializar_diaria(diaria)
 
 
+@router.put("/diarias/{id}", response_model=DiariaResponse)
+def atualizar_diaria(id: int, dados: DiariaUpdate, db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
+    diaria = db.query(Diaria).filter(Diaria.id == id).first()
+    if not diaria:
+        raise HTTPException(status_code=404, detail="Diária não encontrada")
+    _pode_mexer(diaria, atual, "corrigir")
+    for campo, valor in dados.model_dump(exclude_unset=True).items():
+        if campo in ("data", "valor") and valor is None:
+            continue  # obrigatórios: null não apaga
+        setattr(diaria, campo, valor)
+    if diaria.acerto_id:
+        recalcular_acerto(diaria.acerto_id, db)
+    db.commit()
+    db.refresh(diaria)
+    return _serializar_diaria(diaria)
+
+
 @router.delete("/diarias/{id}")
 def excluir_diaria(id: int, db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     diaria = db.query(Diaria).filter(Diaria.id == id).first()
     if not diaria:
         raise HTTPException(status_code=404, detail="Diária não encontrada")
-    if diaria.acerto_id:
-        raise HTTPException(status_code=400, detail=f"Esta diária já foi paga no acerto #{diaria.acerto_id}. Reabra o acerto para alterar.")
+    _pode_mexer(diaria, atual, "excluir")
+    acerto_id = diaria.acerto_id
     db.delete(diaria)
+    if acerto_id:
+        recalcular_acerto(acerto_id, db)
     db.commit()
     return {"message": "Diária excluída"}
 
@@ -278,13 +335,32 @@ def criar_adiantamento(dados: AdiantamentoCreate, db: Session = Depends(get_db),
     return adiantamento
 
 
+@router.put("/adiantamentos/{id}", response_model=AdiantamentoResponse)
+def atualizar_adiantamento(id: int, dados: AdiantamentoUpdate, db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
+    adiantamento = db.query(Adiantamento).filter(Adiantamento.id == id).first()
+    if not adiantamento:
+        raise HTTPException(status_code=404, detail="Adiantamento não encontrado")
+    _pode_mexer(adiantamento, atual, "corrigir")
+    for campo, valor in dados.model_dump(exclude_unset=True).items():
+        if campo in ("data", "valor") and valor is None:
+            continue  # obrigatórios: null não apaga
+        setattr(adiantamento, campo, valor)
+    if adiantamento.acerto_id:
+        recalcular_acerto(adiantamento.acerto_id, db)
+    db.commit()
+    db.refresh(adiantamento)
+    return adiantamento
+
+
 @router.delete("/adiantamentos/{id}")
 def excluir_adiantamento(id: int, db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     adiantamento = db.query(Adiantamento).filter(Adiantamento.id == id).first()
     if not adiantamento:
         raise HTTPException(status_code=404, detail="Adiantamento não encontrado")
-    if adiantamento.acerto_id:
-        raise HTTPException(status_code=400, detail=f"Este adiantamento já foi descontado no acerto #{adiantamento.acerto_id}. Reabra o acerto para alterar.")
+    _pode_mexer(adiantamento, atual, "excluir")
+    acerto_id = adiantamento.acerto_id
     db.delete(adiantamento)
+    if acerto_id:
+        recalcular_acerto(acerto_id, db)
     db.commit()
     return {"message": "Adiantamento excluído"}

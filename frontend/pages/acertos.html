@@ -150,10 +150,20 @@
     </div>
   </main>
 
+  <div class="modal-overlay" id="modal-acerto">
+    <div class="modal acerto-modal-detalhe">
+      <div class="modal-header">
+        <h2 id="acerto-detalhe-titulo">Acerto</h2>
+        <button class="btn-fechar" onclick="fecharDetalheAcerto()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+      <div id="acerto-detalhe-corpo"></div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="modal-diaria">
     <div class="modal">
       <div class="modal-header">
-        <h2>Lançar diária</h2>
+        <h2 id="diaria-titulo">Lançar diária</h2>
         <button class="btn-fechar" onclick="fecharModais()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       </div>
       <p class="acerto-modal-ajuda">Estadia que o cliente paga quando o caminhão fica parado esperando. O valor é dividido em três partes iguais: motorista, caminhão e empresa.</p>
@@ -165,9 +175,10 @@
         <div class="form-group"><label>Observação</label><input type="text" id="diaria-descricao" maxlength="200" placeholder="Ex.: aguardando descarga" /></div>
       </div>
       <div class="acerto-divisao" id="diaria-divisao"></div>
+      <p class="acerto-aviso" id="diaria-aviso" hidden></p>
       <div style="margin-top:20px;display:flex;gap:12px;justify-content:flex-end;">
         <button class="btn btn-outline" onclick="fecharModais()">Cancelar</button>
-        <button class="btn btn-primary" onclick="salvarDiaria()">Lançar diária</button>
+        <button class="btn btn-primary" id="diaria-salvar" onclick="salvarDiaria()">Lançar diária</button>
       </div>
     </div>
   </div>
@@ -175,10 +186,10 @@
   <div class="modal-overlay" id="modal-adiantamento">
     <div class="modal">
       <div class="modal-header">
-        <h2>Lançar adiantamento</h2>
+        <h2 id="adiantamento-titulo">Lançar adiantamento</h2>
         <button class="btn-fechar" onclick="fecharModais()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       </div>
-      <div class="acerto-atalhos-data">
+      <div class="acerto-atalhos-data" id="adiantamento-atalhos">
         <span>Atalho:</span>
         <button class="btn btn-outline" onclick="usarDiaDoMes(5)">Dia 5</button>
         <button class="btn btn-outline" onclick="usarDiaDoMes(15)">Dia 15</button>
@@ -188,9 +199,10 @@
         <div class="form-group"><label>Valor (R$) *</label><input type="text" id="adiantamento-valor" inputmode="numeric" placeholder="0,00" /></div>
         <div class="form-group" style="grid-column:1/-1;"><label>Descrição</label><input type="text" id="adiantamento-descricao" maxlength="200" placeholder="Ex.: vale do dia 5" /></div>
       </div>
+      <p class="acerto-aviso" id="adiantamento-aviso" hidden></p>
       <div style="margin-top:20px;display:flex;gap:12px;justify-content:flex-end;">
         <button class="btn btn-outline" onclick="fecharModais()">Cancelar</button>
-        <button class="btn btn-primary" onclick="salvarAdiantamento()">Lançar adiantamento</button>
+        <button class="btn btn-primary" id="adiantamento-salvar" onclick="salvarAdiantamento()">Lançar adiantamento</button>
       </div>
     </div>
   </div>

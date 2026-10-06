@@ -146,13 +146,14 @@ function renderizarViagens(p) {
     </tr>`).join('');
 }
 
-function renderizarDiarias(p) {
-  const tbody = document.getElementById('acerto-diarias');
-  if (!p.diarias.length) {
-    tbody.innerHTML = estadoVazio(7, 'Nenhuma diária no período', 'Use "Lançar diária" quando o cliente pagar estadia.', 'relogio');
-    return;
-  }
-  tbody.innerHTML = p.diarias.map(d => `
+/* Linhas das tabelas de diárias e vales — usadas na prévia (itens pendentes)
+   e na janela de um acerto fechado. editavel=false esconde os botões. */
+const diariasPorId = new Map();
+const adiantamentosPorId = new Map();
+
+function linhasDiarias(lista, editavel) {
+  lista.forEach(d => diariasPorId.set(d.id, d));
+  return lista.map(d => `
     <tr>
       <td>${formatarData(d.data)}${d.dias ? `<br><span class="acerto-mini">${d.dias} dia${d.dias === 1 ? '' : 's'}</span>` : ''}</td>
       <td>#${d.entrega_id} · ${escapeHtml(d.rota || '')}${d.descricao ? `<br><span class="acerto-mini">${escapeHtml(d.descricao)}</span>` : ''}</td>
@@ -160,23 +161,39 @@ function renderizarDiarias(p) {
       <td><strong>${reais(d.parte_motorista)}</strong></td>
       <td>${reais(d.parte_caminhao)}</td>
       <td>${reais(d.parte_empresa)}</td>
-      <td><button class="btn btn-danger acerto-btn-mini" onclick="excluirDiaria(${d.id})" title="Excluir">${svgIcone('excluir', 12)}</button></td>
+      <td class="acerto-acoes">${editavel ? `
+        <button class="btn btn-outline acerto-btn-mini" onclick="editarDiaria(${d.id})" title="Corrigir">${svgIcone('editar', 12)}</button>
+        <button class="btn btn-danger acerto-btn-mini" onclick="excluirDiaria(${d.id})" title="Excluir">${svgIcone('excluir', 12)}</button>` : ''}
+      </td>
     </tr>`).join('');
 }
 
-function renderizarAdiantamentos(p) {
-  const tbody = document.getElementById('acerto-adiantamentos');
-  if (!p.adiantamentos.length) {
-    tbody.innerHTML = estadoVazio(4, 'Nenhum adiantamento no período', 'Lance os vales dos dias 5 e 15.', 'dinheiro');
-    return;
-  }
-  tbody.innerHTML = p.adiantamentos.map(a => `
+function linhasAdiantamentos(lista, editavel) {
+  lista.forEach(a => adiantamentosPorId.set(a.id, a));
+  return lista.map(a => `
     <tr>
       <td>${formatarData(a.data)}</td>
       <td>${escapeHtml(a.descricao || '—')}</td>
       <td><strong>${reais(a.valor)}</strong></td>
-      <td><button class="btn btn-danger acerto-btn-mini" onclick="excluirAdiantamento(${a.id})" title="Excluir">${svgIcone('excluir', 12)}</button></td>
+      <td class="acerto-acoes">${editavel ? `
+        <button class="btn btn-outline acerto-btn-mini" onclick="editarAdiantamento(${a.id})" title="Corrigir">${svgIcone('editar', 12)}</button>
+        <button class="btn btn-danger acerto-btn-mini" onclick="excluirAdiantamento(${a.id})" title="Excluir">${svgIcone('excluir', 12)}</button>` : ''}
+      </td>
     </tr>`).join('');
+}
+
+function renderizarDiarias(p) {
+  const tbody = document.getElementById('acerto-diarias');
+  tbody.innerHTML = p.diarias.length
+    ? linhasDiarias(p.diarias, true)
+    : estadoVazio(7, 'Nenhuma diária no período', 'Use "Lançar diária" quando o cliente pagar estadia.', 'relogio');
+}
+
+function renderizarAdiantamentos(p) {
+  const tbody = document.getElementById('acerto-adiantamentos');
+  tbody.innerHTML = p.adiantamentos.length
+    ? linhasAdiantamentos(p.adiantamentos, true)
+    : estadoVazio(4, 'Nenhum adiantamento no período', 'Lance os vales dos dias 5 e 15.', 'dinheiro');
 }
 
 /* ===================== FECHAR / HISTÓRICO ===================== */
@@ -214,7 +231,7 @@ function renderizarHistorico(lista, motoristaId) {
     tbody.innerHTML = estadoVazio(10, 'Nenhum acerto fechado ainda', null, 'dinheiro');
     return;
   }
-  const admin = localStorage.getItem('perfil') === 'administrador';
+  const admin = ehAdmin();
   tbody.innerHTML = lista.map(a => `
     <tr>
       <td><strong>${String(a.id).padStart(4, '0')}</strong></td>
@@ -226,44 +243,159 @@ function renderizarHistorico(lista, motoristaId) {
       <td>${reais(a.total_adiantamentos)}</td>
       <td><strong>${reais(a.saldo)}</strong></td>
       <td>${formatarDataHoraUtc(a.criado_em)}</td>
-      <td style="display:flex;gap:6px;">
+      <td class="acerto-acoes">
+        <button class="btn btn-outline acerto-btn-mini" onclick="abrirDetalheAcerto(${a.id})">${svgIcone(admin ? 'editar' : 'info', 12)} ${admin ? 'Abrir / corrigir' : 'Abrir'}</button>
         <button class="btn btn-outline acerto-btn-mini" onclick="gerarRecibo(${a.id})">${svgIcone('download', 12)} Recibo</button>
-        ${admin ? `<button class="btn btn-danger acerto-btn-mini" onclick="reabrirAcerto(${a.id})" title="Desfazer o fechamento">Reabrir</button>` : ''}
       </td>
     </tr>`).join('');
 }
 
+function ehAdmin() {
+  return localStorage.getItem('perfil') === 'administrador';
+}
+
+/* Depois de qualquer lançamento/correção: atualiza a janela do acerto aberto
+   (se houver), a prévia do motorista escolhido e o histórico. */
+async function atualizarTudo() {
+  if (acertoAbertoId) await abrirDetalheAcerto(acertoAbertoId);
+  const id = motoristaSelecionado();
+  if (id) {
+    await calcularPrevia();
+    renderizarHistorico((await get(`/acertos?motorista_id=${id}`)) || [], id);
+  } else {
+    await carregarHistorico();
+  }
+}
+
 async function reabrirAcerto(id) {
-  if (!(await confirmarAcao(`Reabrir o acerto nº ${id}? As viagens, diárias e vales dele voltam a ficar pendentes.`))) return;
+  if (!(await confirmarAcao(`Reabrir o acerto nº ${id}? As viagens, diárias e vales dele voltam a ficar pendentes e o recibo deixa de valer.`))) return;
   const res = await del(`/acertos/${id}`);
   if (res && res.detail) {
     toastErro('Erro: ' + extrairErro(res));
     return;
   }
   toastSucesso('Acerto reaberto.');
+  fecharDetalheAcerto();
   if (motoristaSelecionado()) await aoTrocarMotorista(); else carregarHistorico();
 }
 
+/* ===================== ACERTO FECHADO: VER E CORRIGIR ===================== */
+let acertoAbertoId = null;
+
+async function abrirDetalheAcerto(id) {
+  const a = await get(`/acertos/${id}`);
+  if (!a || a.detail) { toastErro('Erro: ' + extrairErro(a)); return; }
+  acertoAbertoId = id;
+  const admin = ehAdmin();
+  const numero = String(a.id).padStart(4, '0');
+  document.getElementById('acerto-detalhe-titulo').textContent = `Acerto nº ${numero} — ${a.motorista || ''}`;
+  const devedor = a.saldo < 0;
+  document.getElementById('acerto-detalhe-corpo').innerHTML = `
+    <p class="acerto-modal-ajuda">
+      Período ${formatarData(a.periodo_inicio)} a ${formatarData(a.periodo_fim)} · fechado em ${formatarDataHoraUtc(a.criado_em)}${a.fechado_por ? ' por ' + escapeHtml(a.fechado_por) : ''}.
+      ${admin ? 'Corrija um vale ou uma diária lançados errado: o acerto é recalculado e o recibo sai atualizado.' : 'Só um administrador pode corrigir um acerto já fechado.'}
+    </p>
+    <div class="acerto-detalhe-resumo">
+      <div><span>Comissão (13% de ${reais(a.total_frete)})</span><strong>+ ${reais(a.comissao)}</strong></div>
+      <div><span>Diárias (⅓ de ${reais(a.total_diarias)})</span><strong>+ ${reais(a.diarias_motorista)}</strong></div>
+      <div><span>Adiantamentos</span><strong>− ${reais(a.total_adiantamentos)}</strong></div>
+      <div class="acerto-saldo ${devedor ? 'devedor' : ''}"><span>${devedor ? 'Saldo devedor' : 'Saldo pago'}</span><strong>${reais(Math.abs(a.saldo))}</strong></div>
+    </div>
+
+    <h3 class="acerto-detalhe-sec">Viagens (${a.viagens.length})</h3>
+    <table><thead><tr><th>#</th><th>Concluída</th><th>Rota</th><th>Frete</th><th>Comissão</th></tr></thead>
+      <tbody>${a.viagens.length ? a.viagens.map(v => `<tr><td>#${v.id}</td><td>${formatarData(v.data)}</td><td>${escapeHtml(v.origem)} → ${escapeHtml(v.destino)}</td><td>${reais(v.valor_frete)}</td><td>${reais(v.comissao)}</td></tr>`).join('') : estadoVazio(5, 'Nenhuma viagem', null, 'caminhao')}</tbody>
+    </table>
+    ${admin ? '<p class="acerto-nota">Frete errado? Corrija na tela de Entregas — este acerto acompanha.</p>' : ''}
+
+    <h3 class="acerto-detalhe-sec">Diárias (${a.diarias.length})</h3>
+    <table><thead><tr><th>Data</th><th>Entrega</th><th>Pago pelo cliente</th><th>Motorista ⅓</th><th>Caminhão ⅓</th><th>Empresa ⅓</th><th></th></tr></thead>
+      <tbody>${a.diarias.length ? linhasDiarias(a.diarias, admin) : estadoVazio(7, 'Nenhuma diária', null, 'relogio')}</tbody>
+    </table>
+
+    <h3 class="acerto-detalhe-sec">Adiantamentos (${a.adiantamentos.length})</h3>
+    <table><thead><tr><th>Data</th><th>Descrição</th><th>Valor</th><th></th></tr></thead>
+      <tbody>${a.adiantamentos.length ? linhasAdiantamentos(a.adiantamentos, admin) : estadoVazio(4, 'Nenhum adiantamento', null, 'dinheiro')}</tbody>
+    </table>
+
+    <div class="form-group" style="margin-top:16px;">
+      <label>Observação do recibo</label>
+      <textarea id="acerto-detalhe-obs" rows="2" maxlength="1000" ${admin ? '' : 'disabled'}>${escapeHtml(a.observacao || '')}</textarea>
+    </div>
+    <div class="acerto-detalhe-acoes">
+      ${admin ? `<button class="btn btn-danger" onclick="reabrirAcerto(${a.id})" title="Desfaz o fechamento inteiro">Reabrir acerto</button>` : ''}
+      <span style="flex:1;"></span>
+      ${admin ? `<button class="btn btn-outline" onclick="salvarObservacaoAcerto(${a.id})">Salvar observação</button>` : ''}
+      <button class="btn btn-primary" onclick="gerarRecibo(${a.id})">${svgIcone('download', 14)} Recibo em PDF</button>
+    </div>`;
+  document.getElementById('modal-acerto').classList.add('aberto');
+}
+
+function fecharDetalheAcerto() {
+  acertoAbertoId = null;
+  document.getElementById('modal-acerto').classList.remove('aberto');
+}
+
+async function salvarObservacaoAcerto(id) {
+  const res = await put(`/acertos/${id}`, { observacao: document.getElementById('acerto-detalhe-obs').value });
+  if (res && res.detail) { toastErro('Erro: ' + extrairErro(res)); return; }
+  toastSucesso('Observação salva.');
+}
+
 /* ===================== LANÇAMENTOS ===================== */
+let diariaEditando = null;
+let adiantamentoEditando = null;
+
 function fecharModais() {
   document.querySelectorAll('#modal-diaria, #modal-adiantamento').forEach(m => m.classList.remove('aberto'));
+}
+
+function avisoAcertoFechado(elId, item) {
+  const el = document.getElementById(elId);
+  el.hidden = !item || !item.acerto_id;
+  if (item && item.acerto_id) {
+    el.textContent = `Este lançamento está no acerto nº ${String(item.acerto_id).padStart(4, '0')}, já fechado. Ao salvar, o acerto é recalculado — gere o recibo de novo para o motorista assinar.`;
+  }
 }
 
 async function abrirModalDiaria() {
   const id = motoristaSelecionado();
   if (!id) return;
+  diariaEditando = null;
   const entregas = ((await get('/entregas')) || [])
     .filter(e => e.motorista_id === id && e.status !== 'cancelado')
     .sort((a, b) => new Date(b.previsao) - new Date(a.previsao))
     .slice(0, 40);
   const sel = document.getElementById('diaria-entrega');
+  sel.disabled = false;
   sel.innerHTML = entregas.length
     ? entregas.map(e => `<option value="${e.id}">#${e.id} — ${escapeHtml(e.origem)} → ${escapeHtml(e.destino)} (${(e.concluido_em ? dataUtc(e.concluido_em) : new Date(e.previsao)).toLocaleDateString('pt-BR')})</option>`).join('')
     : '<option value="">Nenhuma entrega deste motorista</option>';
+  document.getElementById('diaria-titulo').textContent = 'Lançar diária';
+  document.getElementById('diaria-salvar').textContent = 'Lançar diária';
   document.getElementById('diaria-data').value = dataLocalISO(new Date());
   document.getElementById('diaria-dias').value = '';
   document.getElementById('diaria-valor').value = '';
   document.getElementById('diaria-descricao').value = '';
+  avisoAcertoFechado('diaria-aviso', null);
+  atualizarDivisaoDiaria();
+  document.getElementById('modal-diaria').classList.add('aberto');
+}
+
+function editarDiaria(id) {
+  const d = diariasPorId.get(id);
+  if (!d) return;
+  diariaEditando = d;
+  const sel = document.getElementById('diaria-entrega');
+  sel.innerHTML = `<option value="${d.entrega_id}">#${d.entrega_id} — ${escapeHtml(d.rota || '')}</option>`;
+  sel.disabled = true;
+  document.getElementById('diaria-titulo').textContent = 'Corrigir diária';
+  document.getElementById('diaria-salvar').textContent = 'Salvar correção';
+  document.getElementById('diaria-data').value = d.data;
+  document.getElementById('diaria-dias').value = d.dias || '';
+  document.getElementById('diaria-valor').value = numeroParaMoeda(d.valor);
+  document.getElementById('diaria-descricao').value = d.descricao || '';
+  avisoAcertoFechado('diaria-aviso', d);
   atualizarDivisaoDiaria();
   document.getElementById('modal-diaria').classList.add('aberto');
 }
@@ -283,33 +415,56 @@ document.getElementById('diaria-valor').addEventListener('input', atualizarDivis
 async function salvarDiaria() {
   const dias = parseInt(document.getElementById('diaria-dias').value, 10);
   const dados = {
-    entrega_id: parseInt(document.getElementById('diaria-entrega').value, 10),
     data: document.getElementById('diaria-data').value,
     dias: dias > 0 ? dias : null,
     valor: moedaParaNumero(document.getElementById('diaria-valor').value),
     descricao: document.getElementById('diaria-descricao').value.trim() || null,
   };
-  if (!dados.entrega_id || !dados.data || !dados.valor) {
+  const entregaId = parseInt(document.getElementById('diaria-entrega').value, 10);
+  if (!entregaId || !dados.data || !dados.valor) {
     toastAviso('Preencha entrega, data e valor.');
     return;
   }
-  const res = await post('/diarias', dados);
+  const res = diariaEditando
+    ? await put(`/diarias/${diariaEditando.id}`, dados)
+    : await post('/diarias', { entrega_id: entregaId, ...dados });
   if (res && res.detail) {
     toastErro('Erro: ' + extrairErro(res));
     return;
   }
+  const corrigiuFechado = diariaEditando && diariaEditando.acerto_id;
   fecharModais();
-  toastSucesso('Diária lançada.');
-  if (dados.data > document.getElementById('acerto-fim').value) {
+  toastSucesso(diariaEditando ? (corrigiuFechado ? 'Diária corrigida e acerto recalculado.' : 'Diária corrigida.') : 'Diária lançada.');
+  if (!diariaEditando && dados.data > document.getElementById('acerto-fim').value) {
     toastAviso('A data da diária é depois do fim do período — ela vai entrar no próximo acerto.');
   }
-  calcularPrevia();
+  diariaEditando = null;
+  atualizarTudo();
 }
 
 function abrirModalAdiantamento() {
   if (!motoristaSelecionado()) return;
+  adiantamentoEditando = null;
+  document.getElementById('adiantamento-titulo').textContent = 'Lançar adiantamento';
+  document.getElementById('adiantamento-salvar').textContent = 'Lançar adiantamento';
+  document.getElementById('adiantamento-atalhos').hidden = false;
   usarDiaDoMes(new Date().getDate() >= 15 ? 15 : 5);
   document.getElementById('adiantamento-valor').value = '';
+  avisoAcertoFechado('adiantamento-aviso', null);
+  document.getElementById('modal-adiantamento').classList.add('aberto');
+}
+
+function editarAdiantamento(id) {
+  const a = adiantamentosPorId.get(id);
+  if (!a) return;
+  adiantamentoEditando = a;
+  document.getElementById('adiantamento-titulo').textContent = 'Corrigir adiantamento';
+  document.getElementById('adiantamento-salvar').textContent = 'Salvar correção';
+  document.getElementById('adiantamento-atalhos').hidden = true;
+  document.getElementById('adiantamento-data').value = a.data;
+  document.getElementById('adiantamento-valor').value = numeroParaMoeda(a.valor);
+  document.getElementById('adiantamento-descricao').value = a.descricao || '';
+  avisoAcertoFechado('adiantamento-aviso', a);
   document.getElementById('modal-adiantamento').classList.add('aberto');
 }
 
@@ -323,7 +478,6 @@ function usarDiaDoMes(dia) {
 
 async function salvarAdiantamento() {
   const dados = {
-    motorista_id: motoristaSelecionado(),
     data: document.getElementById('adiantamento-data').value,
     valor: moedaParaNumero(document.getElementById('adiantamento-valor').value),
     descricao: document.getElementById('adiantamento-descricao').value.trim() || null,
@@ -332,31 +486,39 @@ async function salvarAdiantamento() {
     toastAviso('Preencha data e valor.');
     return;
   }
-  const res = await post('/adiantamentos', dados);
+  const res = adiantamentoEditando
+    ? await put(`/adiantamentos/${adiantamentoEditando.id}`, dados)
+    : await post('/adiantamentos', { motorista_id: motoristaSelecionado(), ...dados });
   if (res && res.detail) {
     toastErro('Erro: ' + extrairErro(res));
     return;
   }
+  const corrigiuFechado = adiantamentoEditando && adiantamentoEditando.acerto_id;
   fecharModais();
-  toastSucesso('Adiantamento lançado.');
-  if (dados.data > document.getElementById('acerto-fim').value) {
+  toastSucesso(adiantamentoEditando ? (corrigiuFechado ? 'Adiantamento corrigido e acerto recalculado.' : 'Adiantamento corrigido.') : 'Adiantamento lançado.');
+  if (!adiantamentoEditando && dados.data > document.getElementById('acerto-fim').value) {
     toastAviso('A data do vale é depois do fim do período — ele vai entrar no próximo acerto.');
   }
-  calcularPrevia();
+  adiantamentoEditando = null;
+  atualizarTudo();
 }
 
 async function excluirDiaria(id) {
-  if (!(await confirmarAcao('Excluir esta diária?'))) return;
+  const d = diariasPorId.get(id);
+  const extra = d && d.acerto_id ? ' Ela está num acerto fechado, que será recalculado.' : '';
+  if (!(await confirmarAcao('Excluir esta diária?' + extra))) return;
   const res = await del(`/diarias/${id}`);
   if (res && res.detail) { toastErro('Erro: ' + extrairErro(res)); return; }
-  calcularPrevia();
+  atualizarTudo();
 }
 
 async function excluirAdiantamento(id) {
-  if (!(await confirmarAcao('Excluir este adiantamento?'))) return;
+  const a = adiantamentosPorId.get(id);
+  const extra = a && a.acerto_id ? ' Ele está num acerto fechado, que será recalculado.' : '';
+  if (!(await confirmarAcao('Excluir este adiantamento?' + extra))) return;
   const res = await del(`/adiantamentos/${id}`);
   if (res && res.detail) { toastErro('Erro: ' + extrairErro(res)); return; }
-  calcularPrevia();
+  atualizarTudo();
 }
 
 /* ===================== VALOR POR EXTENSO (recibo) ===================== */

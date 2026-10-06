@@ -94,23 +94,57 @@ def test_viagem_concluida_depois_do_fechamento_entra_no_proximo_acerto(client, d
     assert p["comissao"] == pytest.approx(1300)
 
 
-def test_nao_exclui_item_ja_acertado_mas_admin_pode_reabrir(client, db_session, admin, operador):
+def test_so_admin_mexe_em_item_de_acerto_fechado_e_so_admin_reabre(client, db_session, admin, operador):
     motorista, _, headers = _cenario(client, db_session, admin)
     acerto = client.post("/acertos", headers=headers, json={
         "motorista_id": motorista.id, "periodo_inicio": str(INICIO), "periodo_fim": str(HOJE)}).json()
     diaria_id = client.get("/diarias", headers=headers, params={"motorista_id": motorista.id}).json()[0]["id"]
     adiantamento_id = client.get("/adiantamentos", headers=headers, params={"motorista_id": motorista.id}).json()[0]["id"]
 
-    assert client.delete(f"/diarias/{diaria_id}", headers=headers).status_code == 400
-    assert client.delete(f"/adiantamentos/{adiantamento_id}", headers=headers).status_code == 400
-
     headers_operador = auth_headers(client, operador.email)
+    assert client.delete(f"/diarias/{diaria_id}", headers=headers_operador).status_code == 403
+    assert client.put(f"/adiantamentos/{adiantamento_id}", headers=headers_operador, json={"valor": 1}).status_code == 403
     assert client.delete(f"/acertos/{acerto['id']}", headers=headers_operador).status_code == 403
 
     assert client.delete(f"/acertos/{acerto['id']}", headers=headers).status_code == 200
     p = _previa(client, headers, motorista.id)
     assert p["saldo"] == pytest.approx(860)
-    assert client.delete(f"/diarias/{diaria_id}", headers=headers).status_code == 200
+    # Pendente de novo: o operador já pode mexer.
+    assert client.delete(f"/diarias/{diaria_id}", headers=headers_operador).status_code == 200
+
+
+def test_corrigir_vale_diaria_e_frete_depois_de_fechar_recalcula_o_acerto(client, db_session, admin):
+    motorista, entrega, headers = _cenario(client, db_session, admin)
+    acerto = client.post("/acertos", headers=headers, json={
+        "motorista_id": motorista.id, "periodo_inicio": str(INICIO), "periodo_fim": str(HOJE),
+        "observacao": "vale lançado errado"}).json()
+    assert acerto["saldo"] == pytest.approx(860)
+    vale = client.get("/adiantamentos", headers=headers, params={"motorista_id": motorista.id}).json()[0]
+    diaria = client.get("/diarias", headers=headers, params={"motorista_id": motorista.id}).json()[0]
+
+    # Vale era de R$ 1.000, não R$ 1.500: saldo sobe R$ 500.
+    r = client.put(f"/adiantamentos/{vale['id']}", headers=headers, json={"valor": 1000})
+    assert r.status_code == 200, r.text
+    assert client.get(f"/acertos/{acerto['id']}", headers=headers).json()["saldo"] == pytest.approx(1360)
+
+    # Diária era R$ 3.300: parte do motorista vai a R$ 1.100.
+    client.put(f"/diarias/{diaria['id']}", headers=headers, json={"valor": 3300})
+    a = client.get(f"/acertos/{acerto['id']}", headers=headers).json()
+    assert a["diarias_motorista"] == pytest.approx(1100)
+    assert a["saldo"] == pytest.approx(1460)
+
+    # Frete corrigido na tela de Entregas: comissão do acerto acompanha.
+    client.put(f"/entregas/{entrega.id}", headers=headers, json={"valor_frete": 20000})
+    a = client.get(f"/acertos/{acerto['id']}", headers=headers).json()
+    assert a["comissao"] == pytest.approx(2600)
+    assert a["saldo"] == pytest.approx(2600 + 1100 - 2500)
+
+    # Excluir um vale do acerto fechado (admin) também recalcula.
+    client.delete(f"/adiantamentos/{vale['id']}", headers=headers)
+    assert client.get(f"/acertos/{acerto['id']}", headers=headers).json()["total_adiantamentos"] == pytest.approx(1500)
+
+    r = client.put(f"/acertos/{acerto['id']}", headers=headers, json={"observacao": "corrigido"})
+    assert r.json()["observacao"] == "corrigido"
 
 
 def test_nao_fecha_acerto_com_data_futura_nem_vazio(client, db_session, admin):

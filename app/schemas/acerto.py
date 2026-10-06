@@ -11,6 +11,23 @@ class DiariaCreate(BaseModel):
     descricao: Optional[str] = Field(default=None, max_length=200)
 
 
+class DiariaUpdate(BaseModel):
+    data: Optional[date] = None
+    dias: Optional[int] = Field(default=None, gt=0, le=60)
+    valor: Optional[float] = Field(default=None, gt=0, le=1_000_000)
+    descricao: Optional[str] = Field(default=None, max_length=200)
+
+
+class AdiantamentoUpdate(BaseModel):
+    data: Optional[date] = None
+    valor: Optional[float] = Field(default=None, gt=0, le=1_000_000)
+    descricao: Optional[str] = Field(default=None, max_length=200)
+
+
+class AcertoUpdate(BaseModel):
+    observacao: Optional[str] = Field(default=None, max_length=1000)
+
+
 class DiariaResponse(BaseModel):
     id: int
     entrega_id: int
