@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from app.database import get_db
 from app.models.entrega import Entrega
 from app.models.manutencao import Manutencao
@@ -87,13 +87,38 @@ def _travar_viagem_acertada(entrega: Entrega, atual: Usuario, status_novo=None, 
             detail=f"Esta viagem já foi paga no acerto #{entrega.acerto_id}. Só um administrador pode corrigir o frete.",
         )
 
+def _utc_sem_fuso(momento: datetime) -> datetime:
+    # Mesmo relógio de iniciado_em/concluido_em gravados pelo status (utcnow).
+    return momento.astimezone(timezone.utc).replace(tzinfo=None) if momento.tzinfo else momento
+
+def _validar_viagem_realizada(dados: EntregaCreate):
+    """Viagem lançada depois de feita: grava direto como entregue, com as
+    datas reais, para cair no mês certo do acerto, dos relatórios e do vazio."""
+    if dados.iniciado_em is None or dados.concluido_em is None:
+        raise HTTPException(status_code=400, detail="Viagem já realizada precisa da data de saída e da data de entrega.")
+    if not dados.motorista_id or not dados.veiculo_id:
+        raise HTTPException(status_code=400, detail="Viagem já realizada precisa do motorista e do veículo que fizeram a viagem.")
+    dados.iniciado_em = _utc_sem_fuso(dados.iniciado_em)
+    dados.concluido_em = _utc_sem_fuso(dados.concluido_em)
+    if dados.concluido_em < dados.iniciado_em:
+        raise HTTPException(status_code=400, detail="A entrega não pode ser antes da saída.")
+    if dados.concluido_em > datetime.utcnow() + timedelta(minutes=5):
+        raise HTTPException(status_code=400, detail="Viagem já realizada não pode ter entrega no futuro.")
+
 @router.post("/", response_model=EntregaResponse, include_in_schema=False)
 @router.post("", response_model=EntregaResponse)
 def criar_entrega(dados: EntregaCreate, db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     _validar_motorista_e_veiculo_existem(dados.motorista_id, dados.veiculo_id, db)
-    _validar_motorista_veiculo_livres(dados.motorista_id, dados.veiculo_id, db)
-    _validar_veiculo_sem_manutencao(dados.veiculo_id, db)
+    realizada = dados.iniciado_em is not None or dados.concluido_em is not None
+    if realizada:
+        _validar_viagem_realizada(dados)
+    else:
+        # Livre/sem manutenção só importa para uma viagem que ainda vai sair.
+        _validar_motorista_veiculo_livres(dados.motorista_id, dados.veiculo_id, db)
+        _validar_veiculo_sem_manutencao(dados.veiculo_id, db)
     entrega = Entrega(**dados.model_dump())
+    if realizada:
+        entrega.status = "entregue"
     db.add(entrega)
     db.commit()
     db.refresh(entrega)

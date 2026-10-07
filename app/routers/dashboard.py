@@ -92,9 +92,12 @@ def resumo(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)
         "motoristas_disponiveis": motoristas_disponiveis
     }
 
+DIAS_VIAGEM_ESQUECIDA = 2  # dias depois da previsão de entrega para avisar
+
 @router.get("/vencimentos")
 def vencimentos(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
-    """CNH de motoristas e CRLV/seguro de veículos vencidos ou vencendo nos próximos 30 dias."""
+    """CNH de motoristas e CRLV/seguro de veículos vencidos ou vencendo nos
+    próximos 30 dias, e viagens esquecidas abertas (ver DIAS_VIAGEM_ESQUECIDA)."""
     hoje = hoje_brasilia()
     limite = hoje + timedelta(days=30)
     alertas = []
@@ -125,6 +128,22 @@ def vencimentos(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_s
                 "referencia": v.placa,
                 "validade": str(v.seguro_validade),
                 "vencido": v.seguro_validade < hoje
+            })
+
+    # Viagem que ninguém fechou: continua "em rota" dias depois da previsão de
+    # entrega e prende o motorista e o caminhão (não aparecem livres para uma
+    # nova entrega). Ex.: uma viagem de teste ficou aberta de julho a outubro.
+    limite_viagem = hoje - timedelta(days=DIAS_VIAGEM_ESQUECIDA)
+    abertas = db.query(Entrega).filter(Entrega.status.in_(["em_rota", "atrasado", "ocorrencia"])).all()
+    nomes = {m.id: m.nome for m in db.query(Motorista).all()}
+    for e in abertas:
+        if e.previsao and e.previsao.date() < limite_viagem:
+            motorista = nomes.get(e.motorista_id, "sem motorista")
+            alertas.append({
+                "tipo": "viagem",
+                "referencia": f"Entrega #{e.id} — {e.cliente} ({motorista})",
+                "validade": str(e.previsao.date()),
+                "vencido": True,
             })
 
     alertas.sort(key=lambda a: a["validade"])

@@ -1613,3 +1613,7 @@ a.link-ficha:hover { color: var(--accent-dark); text-decoration: underline; }
 
 /* Aviso enquanto a tela calcula o km vazio das viagens antigas. */
 .vazio-calculando { margin: 0 0 16px; padding: 10px 14px; border-radius: 10px; background: rgba(242,169,59,0.12); border-left: 3px solid var(--accent); font-size: 13px; color: var(--text); }
+
+/* Nova entrega: caixa para lançar uma viagem antiga com as datas reais. */
+.viagem-realizada { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 10px; background: rgba(242,169,59,0.10); border: 1px dashed rgba(242,169,59,0.55); font-size: 13px; color: var(--text); cursor: pointer; }
+.viagem-realizada input { width: auto; margin-top: 2px; }

@@ -28,17 +28,40 @@ function calcularEmRota(excluirEntregaId) {
   mapaVeiculosEmRota = {};
   entregas.forEach(e => {
     if (e.status !== 'em_rota' || e.id === excluirEntregaId) return;
-    if (e.motorista_id) mapaMotoristasEmRota[e.motorista_id] = e.cliente;
-    if (e.veiculo_id) mapaVeiculosEmRota[e.veiculo_id] = e.cliente;
+    // "desde dd/mm" deixa óbvia uma viagem esquecida aberta há semanas.
+    const desde = e.iniciado_em ? `, desde ${dataUtc(e.iniciado_em).toLocaleDateString('pt-BR').slice(0, 5)}` : '';
+    if (e.motorista_id) mapaMotoristasEmRota[e.motorista_id] = e.cliente + desde;
+    if (e.veiculo_id) mapaVeiculosEmRota[e.veiculo_id] = e.cliente + desde;
   });
+}
+
+/* Viagem já realizada (lançada depois de feita): grava direto como entregue,
+   com as datas reais. Motorista/caminhão em viagem ou oficina HOJE não
+   impedem lançar uma viagem do passado. */
+function viagemRealizada() {
+  return document.getElementById('viagem-realizada').checked;
+}
+
+function alternarViagemRealizada() {
+  const realizada = viagemRealizada();
+  document.getElementById('label-saida').textContent = realizada ? 'Saída (data real) *' : 'Saída prevista';
+  document.getElementById('label-previsao').textContent = realizada ? 'Entrega (data real) *' : 'Previsão de entrega *';
+  preencherOpcoesVeiculo(veiculosCompletos);
+  atualizarDisponibilidadeMotoristas();
 }
 
 function atualizarDisponibilidadeMotoristas() {
   const sel = document.getElementById('motorista-id');
+  const realizada = viagemRealizada();
   [...sel.options].forEach(opt => {
     if (!opt.value) return;
     const m = motoristasCompletos.find(m => String(m.id) === opt.value);
     const nomeBase = m ? (m.nome || `Motorista #${m.id}`) : opt.textContent;
+    if (realizada) {
+      opt.textContent = nomeBase;
+      opt.disabled = false;
+      return;
+    }
     const emRota = mapaMotoristasEmRota[opt.value];
     /* Mesmo que o motorista esteja livre, o veículo do conjunto dele pode não estar —
        e como o vínculo trava a escolha de veículo, selecioná-lo levaria a um erro ao salvar. */
@@ -111,8 +134,9 @@ function preencherOpcoesVeiculo(lista) {
   lista.forEach(v => {
     const opt = document.createElement('option');
     opt.value = v.id;
-    const emRota = mapaVeiculosEmRota[v.id];
-    const emManutencao = mapaVeiculosEmManutencao[v.id];
+    const realizada = viagemRealizada();
+    const emRota = !realizada && mapaVeiculosEmRota[v.id];
+    const emManutencao = !realizada && mapaVeiculosEmManutencao[v.id];
     if (emRota) {
       opt.textContent = `${v.placa} — ${v.modelo} (em rota — ${emRota})`;
       opt.disabled = true;
@@ -284,6 +308,9 @@ function limparFiltros() {
 function abrirModal(id) {
   entregaEditandoId = id || null;
   calcularEmRota(entregaEditandoId);
+  document.getElementById('viagem-realizada').checked = false;
+  document.getElementById('bloco-realizada').hidden = !!entregaEditandoId;
+  alternarViagemRealizada();
 
   document.getElementById('cliente').value = '';
   document.getElementById('origem').value = '';
@@ -817,6 +844,19 @@ async function salvarEntrega() {
   if (!dados.cliente || !dados.origem || !dados.destino || !dados.previsao) {
     toastAviso('Preencha todos os campos obrigatórios!');
     return;
+  }
+  if (!entregaEditandoId && viagemRealizada()) {
+    if (!dados.saida_prevista || !dados.motorista_id || !dados.veiculo_id) {
+      toastAviso('Viagem já realizada: informe a saída, a entrega, o motorista e o veículo.');
+      return;
+    }
+    if (dados.previsao < dados.saida_prevista) {
+      toastAviso('A entrega não pode ser antes da saída.');
+      return;
+    }
+    // Hora local digitada -> UTC, o mesmo relógio da saída/conclusão gravadas pelo status.
+    dados.iniciado_em = new Date(dados.saida_prevista).toISOString();
+    dados.concluido_em = new Date(dados.previsao).toISOString();
   }
 
   const res = entregaEditandoId

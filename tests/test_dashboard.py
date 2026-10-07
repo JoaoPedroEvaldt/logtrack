@@ -240,3 +240,25 @@ def test_liquido_da_empresa_desconta_comissao_e_abastecimento(client, db_session
     assert desempenho[0]["faturamento"] == 22000
     assert desempenho[0]["comissao"] == pytest.approx(2860)
     assert desempenho[0]["motorista_id"] == motorista.id  # link pra ficha do motorista
+
+
+
+def test_viagem_esquecida_aberta_vira_alerta(client, admin, db_session):
+    """Uma viagem de teste ficou "em rota" de julho a outubro e prendia o
+    motorista e o caminhão sem ninguém perceber: agora ela aparece nos alertas."""
+    from datetime import datetime, timedelta
+    from tests.conftest import criar_entrega_orm, criar_motorista_orm
+    motorista = criar_motorista_orm(db_session, nome="Joao Pedro")
+    esquecida = criar_entrega_orm(db_session, motorista_id=motorista.id, status="em_rota")
+    esquecida.previsao = datetime.now() - timedelta(days=10)
+    no_prazo = criar_entrega_orm(db_session, status="em_rota")
+    no_prazo.previsao = datetime.now() - timedelta(days=1)   # atrasou só um pouco: ainda sem alerta
+    entregue = criar_entrega_orm(db_session, status="entregue")
+    entregue.previsao = datetime.now() - timedelta(days=30)
+    db_session.commit()
+
+    alertas = client.get("/dashboard/vencimentos", headers=auth_headers(client, admin.email)).json()
+    viagens = [a for a in alertas if a["tipo"] == "viagem"]
+    assert len(viagens) == 1
+    assert viagens[0]["referencia"].startswith(f"Entrega #{esquecida.id}")
+    assert "Joao Pedro" in viagens[0]["referencia"] and viagens[0]["vencido"] is True

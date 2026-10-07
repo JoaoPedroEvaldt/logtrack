@@ -28,6 +28,10 @@ class EntregaCreate(BaseModel):
     rota_via: Optional[List[PontoVia]] = Field(default=None, max_length=10)
     distancia_km: Optional[float] = None
     tempo_estimado_h: Optional[float] = None
+    # Viagem já realizada, lançada depois: as datas reais de saída e entrega
+    # (sem elas, saída e conclusão seriam gravadas com a hora do clique).
+    iniciado_em: Optional[datetime] = None
+    concluido_em: Optional[datetime] = None
 
     _validar_peso_kg = field_validator("peso_kg")(_nao_negativo)
     _validar_valor_frete = field_validator("valor_frete")(_nao_negativo)

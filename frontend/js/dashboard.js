@@ -121,7 +121,7 @@ function renderizarTabela(entregas, conjuntos) {
   }).join('');
 }
 
-const TIPO_LABEL_VENCIMENTO = { cnh: 'CNH', crlv: 'CRLV', seguro: 'Seguro' };
+const TIPO_LABEL_VENCIMENTO = { cnh: 'CNH', crlv: 'CRLV', seguro: 'Seguro', viagem: 'Viagem aberta' };
 
 /* Classifica cada alerta por urgência (dias até o vencimento) e devolve o selo
    correspondente — vermelho já vencido, laranja vence em até 7 dias, azul o resto
@@ -132,6 +132,7 @@ function situacaoVencimento(item) {
   const validade = new Date(item.validade + 'T00:00:00');
   const dias = Math.round((validade - hoje) / 86400000);
 
+  if (item.tipo === 'viagem') return { badge: 'badge-ocorrencia', texto: `Previsão era ${formatarData(item.validade)} — ainda em viagem?` };
   if (item.vencido) return { badge: 'badge-ocorrencia', texto: `Vencido há ${Math.abs(dias)} dia${Math.abs(dias) === 1 ? '' : 's'}` };
   if (dias <= 7) return { badge: 'badge-atrasado', texto: dias === 0 ? 'Vence hoje' : `Vence em ${dias} dia${dias === 1 ? '' : 's'}` };
   return { badge: 'badge-em_rota', texto: `Vence em ${dias} dias` };

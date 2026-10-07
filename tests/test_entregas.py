@@ -337,3 +337,50 @@ def test_planejamento_rejeita_valores_invalidos(client, admin):
     ):
         resp = client.post("/entregas/", headers=headers, json={**_payload(), **extra})
         assert resp.status_code == 422, (extra, resp.text)
+
+
+
+def _payload_realizada(motorista_id, veiculo_id, saida, entrega):
+    return {"cliente": "Cliente Antigo", "origem": "Caxias do Sul - RS", "destino": "Guarulhos - SP",
+            "valor_frete": 10000, "motorista_id": motorista_id, "veiculo_id": veiculo_id,
+            "previsao": entrega, "iniciado_em": saida, "concluido_em": entrega}
+
+
+def test_viagem_ja_realizada_grava_entregue_com_as_datas_reais(client, admin, db_session):
+    from app.routers.dashboard import hoje_brasilia
+    motorista = criar_motorista_orm(db_session)
+    veiculo = criar_veiculo_orm(db_session)
+    # Motorista e caminhão estão numa viagem AGORA: lançar uma viagem passada não pode ser barrado por isso.
+    criar_entrega_orm(db_session, motorista_id=motorista.id, veiculo_id=veiculo.id, status="em_rota")
+    headers = auth_headers(client, admin.email)
+
+    r = client.post("/entregas", headers=headers, json=_payload_realizada(
+        motorista.id, veiculo.id, "2026-08-10T09:00:00.000Z", "2026-08-12T18:30:00.000Z"))
+    assert r.status_code == 200, r.text
+    e = r.json()
+    assert e["status"] == "entregue"
+    assert e["iniciado_em"].startswith("2026-08-10T09:00")
+    assert e["concluido_em"].startswith("2026-08-12T18:30")
+
+    # Cai no acerto de agosto, não no mês em que foi lançada.
+    p = client.get("/acertos/previa", headers=headers, params={
+        "motorista_id": motorista.id, "periodo_inicio": "2026-08-01", "periodo_fim": "2026-08-31"}).json()
+    assert [v["id"] for v in p["viagens"]] == [e["id"]]
+    assert str(hoje_brasilia()) >= "2026-08-31"
+
+
+def test_viagem_ja_realizada_valida_datas_e_veiculo(client, admin, db_session):
+    motorista = criar_motorista_orm(db_session)
+    veiculo = criar_veiculo_orm(db_session)
+    headers = auth_headers(client, admin.email)
+    casos = [
+        (_payload_realizada(motorista.id, veiculo.id, "2026-08-12T10:00:00Z", "2026-08-10T10:00:00Z"), "antes da saída"),
+        (_payload_realizada(motorista.id, veiculo.id, "2026-08-10T10:00:00Z", "2099-01-01T10:00:00Z"), "futuro"),
+        (_payload_realizada(motorista.id, None, "2026-08-10T10:00:00Z", "2026-08-12T10:00:00Z"), "veículo"),
+        ({**_payload_realizada(motorista.id, veiculo.id, "2026-08-10T10:00:00Z", None), "previsao": "2026-08-12T10:00:00Z"},
+         "saída e da data de entrega"),
+    ]
+    for payload, trecho in casos:
+        r = client.post("/entregas", headers=headers, json=payload)
+        assert r.status_code == 400, (trecho, r.text)
+        assert trecho in r.json()["detail"]

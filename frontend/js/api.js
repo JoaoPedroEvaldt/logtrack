@@ -312,7 +312,7 @@ function renderizarTopbar() {
    que já existe. Motorista não vê nada aqui: os endpoints usados (vencimentos,
    ocorrências) são staff-only, e chamar get() sem essa checagem faria a página
    redirecionar sozinha pro dashboard por causa do tratamento de 403 em get(). */
-const TIPO_LABEL_NOTIFICACAO = { cnh: 'CNH', crlv: 'CRLV', seguro: 'Seguro' };
+const TIPO_LABEL_NOTIFICACAO = { cnh: 'CNH', crlv: 'CRLV', seguro: 'Seguro', viagem: 'Viagem aberta' };
 
 function fecharNotificacoes(e) {
   const dropdown = document.getElementById('notificacoes-dropdown');
@@ -342,7 +342,8 @@ async function carregarNotificacoes() {
   const itens = [
     ...listaVencimentos.map(v => ({
       titulo: `${TIPO_LABEL_NOTIFICACAO[v.tipo] || v.tipo} — ${v.referencia}`,
-      sub: v.vencido ? `Vencido em ${formatarData(v.validade)}` : `Vence em ${formatarData(v.validade)}`,
+      sub: v.tipo === 'viagem' ? `Previsão era ${formatarData(v.validade)} — feche ou cancele`
+        : v.vencido ? `Vencido em ${formatarData(v.validade)}` : `Vence em ${formatarData(v.validade)}`,
       classe: v.vencido ? 'badge-ocorrencia' : 'badge-atrasado',
     })),
     ...ocorrenciasRecentes.map(o => ({
