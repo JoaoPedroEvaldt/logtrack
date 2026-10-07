@@ -96,6 +96,25 @@ async function carregarFicha() {
   renderizarPeriodo();
   renderizarGrafico();
   renderizarAcertos(acertos || []);
+  estimarKmDasViagensAntigas();
+}
+
+/* Km de uma viagem: o planejado no cadastro ou, nas viagens lançadas antes do
+   planejamento de rota existir (sem distancia_km), a rota pela estrada — como
+   fazem o rotograma e a tela de deslocamento vazio. */
+function kmDaViagem(e) {
+  if (e.distancia_km != null) return parseFloat(e.distancia_km);
+  return e.kmEstimado != null ? e.kmEstimado : null;
+}
+
+async function estimarKmDasViagensAntigas() {
+  const faltam = ficha.entregas.filter(e => e.status === 'entregue' && e.distancia_km == null);
+  if (!faltam.length) return;
+  for (const e of faltam) {
+    const rota = await obterRotaRodoviaria(e.origem, e.destino, Array.isArray(e.rota_via) ? e.rota_via : []);
+    if (rota) e.kmEstimado = Math.round(rota.distanceKm);
+  }
+  renderizarPeriodo();
 }
 
 function renderizarAcertos(lista) {
@@ -189,7 +208,7 @@ function resumoDoPeriodo(periodo) {
     .sort((a, b) => dataDaViagem(b) - dataDaViagem(a));
   const concluidas = doPeriodo.filter(e => e.status === 'entregue');
   const frete = concluidas.reduce((s, e) => s + (parseFloat(e.valor_frete) || 0), 0);
-  const km = concluidas.reduce((s, e) => s + (parseFloat(e.distancia_km) || 0), 0);
+  const km = concluidas.reduce((s, e) => s + (kmDaViagem(e) || 0), 0);
   const pontuais = concluidas.filter(noPrazo).length;
   const ocorrencias = ficha.ocorrencias.filter(o => periodo === 'tudo' || chaveMes(dataUtc(o.criado_em)) === periodo);
   return {
@@ -271,7 +290,7 @@ function renderizarViagens(r, nomePeriodo) {
         <td>${dataDaViagem(e).toLocaleDateString('pt-BR')}${concluida && !noPrazo(e) ? ` <span title="Concluída depois da previsão" style="color:var(--warning);">${svgIcone('relogio', 12)}</span>` : ''}</td>
         <td>${escapeHtml(e.origem)} → ${escapeHtml(e.destino)}</td>
         <td>${v ? escapeHtml(v.placa) : '—'}</td>
-        <td>${e.distancia_km ? formatarKm(parseFloat(e.distancia_km)) : '—'}</td>
+        <td>${kmDaViagem(e) != null ? (e.distancia_km == null ? '≈ ' : '') + formatarKm(kmDaViagem(e)) : '—'}</td>
         <td>${reais(frete)}</td>
         <td>${concluida ? reais(frete * COMISSAO_MOTORISTA) : '<span style="color:var(--text-light);">ao concluir</span>'}</td>
         <td>${badgeStatus(e.status)}</td>
