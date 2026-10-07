@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
+from app.models.entrega import Entrega
 from app.models.motorista import Motorista
 from app.models.usuario import Usuario
 from app.schemas.motorista import MotoristaCreate, MotoristaUpdate, MotoristaResponse
 from app.routers.auth import exigir_admin, exigir_staff
+from app.routers.entregas import filtro_em_viagem
 from app import auth
 from typing import List
 
@@ -109,6 +111,12 @@ def deletar_motorista(id: int, db: Session = Depends(get_db), atual: Usuario = D
     motorista = db.query(Motorista).filter(Motorista.id == id).first()
     if not motorista:
         raise HTTPException(status_code=404, detail="Motorista não encontrado")
+    viagem = db.query(Entrega).filter(Entrega.motorista_id == id, *filtro_em_viagem()).first()
+    if viagem:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Motorista está em viagem na entrega #{viagem.id} ({viagem.cliente}). Finalize a viagem antes de desativá-lo.",
+        )
     motorista.status = "inativo"
     db.commit()
     return {"message": "Motorista desativado com sucesso"}

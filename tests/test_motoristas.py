@@ -112,3 +112,14 @@ def test_apenas_admin_pode_deletar_motorista(client, admin, operador, db_session
     headers_admin = auth_headers(client, admin.email)
     resp = client.delete(f"/motoristas/{m.id}", headers=headers_admin)
     assert resp.status_code == 200
+
+
+def test_nao_desativa_motorista_em_viagem(client, admin, db_session):
+    from tests.conftest import criar_entrega_orm
+    motorista = criar_motorista_orm(db_session)
+    entrega = criar_entrega_orm(db_session, motorista_id=motorista.id, status="em_rota")
+    headers = auth_headers(client, admin.email)
+
+    resp = client.delete(f"/motoristas/{motorista.id}", headers=headers)
+    assert resp.status_code == 400
+    assert f"#{entrega.id}" in resp.json()["detail"]
