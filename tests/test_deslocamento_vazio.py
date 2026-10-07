@@ -169,3 +169,27 @@ def test_trocar_cidade_da_viagem_zera_o_km_vazio_que_dependia_dela(client, admin
     # Destino de B trocado: o vazio da viagem seguinte (que parte dali) também.
     client.put(f"/entregas/{b.id}", headers=headers, json={"destino": "Porto Alegre - RS"})
     assert km(c.id) is None
+
+
+def test_trocar_veiculo_da_viagem_refaz_os_vazios_pelo_caminhao_certo(client, admin, db_session):
+    """Viagem lançada no caminhão errado: o vazio que chega nela e o que sai
+    dela eram da cronologia do outro caminhão. Saem, e o sincronizar refaz."""
+    t0 = datetime(2026, 9, 1, 8)
+    certo = criar_veiculo_orm(db_session, placa="EEE5E55")
+    errado = criar_veiculo_orm(db_session, placa="FFF6F66")
+    x = _viagem(db_session, certo.id, t0, t0 + timedelta(days=1))
+    a = _viagem(db_session, errado.id, t0, t0 + timedelta(days=2))
+    b = _viagem(db_session, errado.id, t0 + timedelta(days=3), t0 + timedelta(days=5))
+    c = _viagem(db_session, errado.id, t0 + timedelta(days=6), t0 + timedelta(days=8))
+    db_session.add_all([DeslocamentoVazio(entrega_id=b.id, entrega_anterior_id=a.id, km_vazio=500),
+                        DeslocamentoVazio(entrega_id=c.id, entrega_anterior_id=b.id, km_vazio=300)])
+    db_session.commit()
+    headers = auth_headers(client, admin.email)
+
+    assert client.put(f"/entregas/{b.id}", headers=headers, json={"veiculo_id": certo.id}).status_code == 200
+    db_session.expire_all()
+    assert db_session.query(DeslocamentoVazio).count() == 0
+
+    client.post("/deslocamentos-vazios/sincronizar", headers=headers)
+    vinculos = {d.entrega_id: d.entrega_anterior_id for d in db_session.query(DeslocamentoVazio).all()}
+    assert vinculos == {b.id: x.id, c.id: a.id}

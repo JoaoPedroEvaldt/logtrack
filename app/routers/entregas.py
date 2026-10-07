@@ -234,6 +234,13 @@ def atualizar_entrega(id: int, dados: EntregaUpdate, db: Session = Depends(get_d
     if "destino" in atualizacoes and atualizacoes["destino"] != entrega.destino:
         db.query(DeslocamentoVazio).filter(DeslocamentoVazio.entrega_anterior_id == entrega.id).update(
             {"km_vazio": None}, synchronize_session=False)
+    # Veículo trocado: os vazios eram da cronologia do caminhão errado. Saem
+    # os dois (o que chega e o que sai desta) e o sincronizar refaz o vínculo
+    # pelo caminhão certo.
+    if "veiculo_id" in atualizacoes and atualizacoes["veiculo_id"] != entrega.veiculo_id:
+        db.query(DeslocamentoVazio).filter(
+            (DeslocamentoVazio.entrega_id == entrega.id) | (DeslocamentoVazio.entrega_anterior_id == entrega.id)
+        ).delete(synchronize_session=False)
 
     for campo, valor in atualizacoes.items():
         setattr(entrega, campo, valor)

@@ -875,8 +875,27 @@ async function salvarEntrega() {
     return;
   }
 
+  const idSalvo = entregaEditandoId || (res && res.id);
   fecharModal();
-  carregarEntregas();
+  await carregarEntregas();
+  refazerKmVazioDaViagem(idSalvo);
+}
+
+/* Depois de salvar uma viagem, refaz na hora os vazios ligados a ela: o que
+   chega nela (destino da anterior -> origem desta) e o que sai dela (destino
+   desta -> origem da seguinte). Trocar a cidade zera esse km no backend e,
+   antes, ele só voltava quando alguém abria a tela de deslocamento vazio —
+   nesse meio-tempo os relatórios somavam sem o trecho. O sincronizar liga a
+   "viagem já realizada" recém-lançada à anterior do mesmo veículo. */
+async function refazerKmVazioDaViagem(entregaId) {
+  if (!entregaId) return;
+  try {
+    await post('/deslocamentos-vazios/sincronizar', {});
+    const deslocamentos = await get('/deslocamentos-vazios') || [];
+    const pendentes = deslocamentos.filter(dv => dv.km_vazio == null && dv.entrega_anterior_id
+      && (dv.entrega_id === entregaId || dv.entrega_anterior_id === entregaId));
+    for (const dv of pendentes) await calcularESalvarKmVazio(dv.entrega_id, dv.entrega_anterior_id);
+  } catch (e) { /* métrica secundária — a tela de deslocamento vazio completa depois */ }
 }
 
 async function confirmarStatus() {
