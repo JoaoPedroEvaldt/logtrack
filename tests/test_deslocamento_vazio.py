@@ -193,3 +193,19 @@ def test_trocar_veiculo_da_viagem_refaz_os_vazios_pelo_caminhao_certo(client, ad
     client.post("/deslocamentos-vazios/sincronizar", headers=headers)
     vinculos = {d.entrega_id: d.entrega_anterior_id for d in db_session.query(DeslocamentoVazio).all()}
     assert vinculos == {b.id: x.id, c.id: a.id}
+
+
+def test_voltar_de_ocorrencia_para_em_rota_mantem_saida_e_vazio(client, admin, db_session):
+    """Ocorrência resolvida não é viagem nova: a saída real e o vazio ficam."""
+    t0 = datetime(2026, 9, 1, 8)
+    cav = criar_veiculo_orm(db_session, placa="GGG7G77")
+    a = _viagem(db_session, cav.id, t0, t0 + timedelta(days=2))
+    b = _viagem(db_session, cav.id, t0 + timedelta(days=3), None, status="ocorrencia")
+    db_session.add(DeslocamentoVazio(entrega_id=b.id, entrega_anterior_id=a.id, km_vazio=250))
+    db_session.commit()
+
+    r = client.put(f"/entregas/{b.id}/status", headers=auth_headers(client, admin.email), params={"status": "em_rota"})
+    assert r.status_code == 200, r.text
+    db_session.expire_all()
+    assert db_session.get(type(b), b.id).iniciado_em == t0 + timedelta(days=3)
+    assert float(db_session.query(DeslocamentoVazio).filter_by(entrega_id=b.id).one().km_vazio) == 250

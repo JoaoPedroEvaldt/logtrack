@@ -179,7 +179,13 @@ def atualizar_status(id: int, status: str, db: Session = Depends(get_db), atual:
     status_anterior = entrega.status
     entrega.status = status
     entrega_anterior_id = None
-    if status == "em_rota":
+    # Voltar de atrasada/ocorrência para em rota é a mesma viagem seguindo:
+    # mantém a saída real e o vazio já calculado.
+    continua_viagem = status == "em_rota" and status_anterior in STATUS_EM_VIAGEM and entrega.iniciado_em is not None
+    if continua_viagem:
+        dv = db.query(DeslocamentoVazio).filter(DeslocamentoVazio.entrega_id == entrega.id).first()
+        entrega_anterior_id = dv.entrega_anterior_id if dv and dv.km_vazio is None else None
+    elif status == "em_rota":
         entrega.iniciado_em = datetime.utcnow()
         # Deslocamento vazio vive numa tabela própria (ver DeslocamentoVazio) —
         # nunca como coluna em Entrega, pra não ter risco de um cálculo de
