@@ -215,6 +215,16 @@ def atualizar_entrega(id: int, dados: EntregaUpdate, db: Session = Depends(get_d
         _validar_motorista_veiculo_livres(motorista_id, veiculo_id, db, excluir_id=entrega.id)
         _validar_veiculo_sem_manutencao(veiculo_id, db)
 
+    # Cidade trocada: o km vazio que dependia dela fica velho (ex.: origem
+    # Osório -> Betim mantinha o vazio Extrema -> Osório). Zera para a tela de
+    # deslocamento vazio calcular de novo pela estrada.
+    if "origem" in atualizacoes and atualizacoes["origem"] != entrega.origem:
+        db.query(DeslocamentoVazio).filter(DeslocamentoVazio.entrega_id == entrega.id).update(
+            {"km_vazio": None}, synchronize_session=False)
+    if "destino" in atualizacoes and atualizacoes["destino"] != entrega.destino:
+        db.query(DeslocamentoVazio).filter(DeslocamentoVazio.entrega_anterior_id == entrega.id).update(
+            {"km_vazio": None}, synchronize_session=False)
+
     for campo, valor in atualizacoes.items():
         setattr(entrega, campo, valor)
     # Frete corrigido numa viagem já paga num acerto: o acerto acompanha.

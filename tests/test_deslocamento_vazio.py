@@ -140,3 +140,32 @@ def test_sincronizar_nao_conta_o_mesmo_vazio_duas_vezes_em_viagens_sobrepostas(c
     vinculos = {d.entrega_id: d.entrega_anterior_id for d in db_session.query(DeslocamentoVazio).all()}
     assert vinculos == {primeira.id: base.id}
     assert sobreposta.id not in vinculos
+
+
+
+def test_trocar_cidade_da_viagem_zera_o_km_vazio_que_dependia_dela(client, admin, db_session):
+    """Origem da entrega trocada de Osório para Betim mantinha o vazio velho
+    (Extrema -> Osório, 1.128 km) em vez de Extrema -> Betim."""
+    t0 = datetime(2026, 9, 1, 8)
+    cav = criar_veiculo_orm(db_session, placa="DDD4D44")
+    a = _viagem(db_session, cav.id, t0, t0 + timedelta(days=2))
+    b = _viagem(db_session, cav.id, t0 + timedelta(days=3), t0 + timedelta(days=5))
+    c = _viagem(db_session, cav.id, t0 + timedelta(days=6), t0 + timedelta(days=8))
+    db_session.add_all([DeslocamentoVazio(entrega_id=b.id, entrega_anterior_id=a.id, km_vazio=1128),
+                        DeslocamentoVazio(entrega_id=c.id, entrega_anterior_id=b.id, km_vazio=300)])
+    db_session.commit()
+    headers = auth_headers(client, admin.email)
+
+    def km(entrega_id):
+        db_session.expire_all()
+        return db_session.query(DeslocamentoVazio).filter_by(entrega_id=entrega_id).one().km_vazio
+
+    # Mudar só o cliente não mexe em nada.
+    client.put(f"/entregas/{b.id}", headers=headers, json={"cliente": "Tial"})
+    assert float(km(b.id)) == 1128 and float(km(c.id)) == 300
+    # Origem de B trocada: o vazio que chega em B volta a ser calculado.
+    assert client.put(f"/entregas/{b.id}", headers=headers, json={"origem": "Betim - MG"}).status_code == 200
+    assert km(b.id) is None and float(km(c.id)) == 300
+    # Destino de B trocado: o vazio da viagem seguinte (que parte dali) também.
+    client.put(f"/entregas/{b.id}", headers=headers, json={"destino": "Porto Alegre - RS"})
+    assert km(c.id) is None
