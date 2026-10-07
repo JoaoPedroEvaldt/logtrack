@@ -262,3 +262,23 @@ def test_viagem_esquecida_aberta_vira_alerta(client, admin, db_session):
     assert len(viagens) == 1
     assert viagens[0]["referencia"].startswith(f"Entrega #{esquecida.id}")
     assert "Joao Pedro" in viagens[0]["referencia"] and viagens[0]["vencido"] is True
+
+
+
+def test_carreta_engatada_em_cavalo_em_viagem_nao_conta_como_disponivel(client, admin, db_session):
+    """A entrega guarda só o cavalo: o painel dizia "5 de 11 disponíveis"
+    quando os 5 eram as carretas engatadas nos cavalos em viagem."""
+    from app.models.conjunto import Conjunto
+    from tests.conftest import criar_entrega_orm, criar_veiculo_orm
+    cavalo = criar_veiculo_orm(db_session, placa="CAV1A11", tipo="cavalo")
+    carreta = criar_veiculo_orm(db_session, placa="SEM1A11", tipo="semirreboque")
+    solta = criar_veiculo_orm(db_session, placa="SEM2B22", tipo="semirreboque")
+    db_session.add(Conjunto(nome="FH + Facchini", cavalo_id=cavalo.id, semirreboque1_id=carreta.id))
+    db_session.commit()
+    headers = auth_headers(client, admin.email)
+    antes = client.get("/dashboard/resumo", headers=headers).json()["veiculos_disponiveis"]
+    assert antes == 3
+
+    criar_entrega_orm(db_session, veiculo_id=cavalo.id, status="em_rota")
+    depois = client.get("/dashboard/resumo", headers=headers).json()["veiculos_disponiveis"]
+    assert depois == 1  # só a carreta solta

@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
 from app.database import get_db
@@ -24,26 +25,35 @@ def _validar_motorista_e_veiculo_existem(motorista_id, veiculo_id, db: Session):
     if veiculo_id and not db.query(Veiculo).filter(Veiculo.id == veiculo_id).first():
         raise HTTPException(status_code=404, detail="Veículo não encontrado")
 
+# Em viagem = saiu e ainda não terminou: atrasada ou com ocorrência o caminhão
+# continua na estrada (o mapa da frota já tratava assim).
+STATUS_EM_VIAGEM = ("em_rota", "atrasado", "ocorrencia")
+
+def filtro_em_viagem():
+    # "Atrasado"/"ocorrência" marcados antes de sair (sem iniciado_em) não prendem ninguém.
+    return (or_(Entrega.status == "em_rota",
+                and_(Entrega.status.in_(STATUS_EM_VIAGEM), Entrega.iniciado_em.isnot(None))),)
+
 def _validar_motorista_veiculo_livres(motorista_id, veiculo_id, db: Session, excluir_id: int = None):
     if motorista_id:
-        query = db.query(Entrega).filter(Entrega.motorista_id == motorista_id, Entrega.status == "em_rota")
+        query = db.query(Entrega).filter(Entrega.motorista_id == motorista_id, *filtro_em_viagem())
         if excluir_id:
             query = query.filter(Entrega.id != excluir_id)
         conflito = query.first()
         if conflito:
             raise HTTPException(
                 status_code=400,
-                detail=f'Motorista já está em rota na entrega #{conflito.id} ({conflito.cliente}). Finalize aquela entrega antes de iniciar outra.'
+                detail=f'Motorista já está em viagem na entrega #{conflito.id} ({conflito.cliente}). Finalize aquela entrega antes de iniciar outra.'
             )
     if veiculo_id:
-        query = db.query(Entrega).filter(Entrega.veiculo_id == veiculo_id, Entrega.status == "em_rota")
+        query = db.query(Entrega).filter(Entrega.veiculo_id == veiculo_id, *filtro_em_viagem())
         if excluir_id:
             query = query.filter(Entrega.id != excluir_id)
         conflito = query.first()
         if conflito:
             raise HTTPException(
                 status_code=400,
-                detail=f'Veículo já está em rota na entrega #{conflito.id} ({conflito.cliente}). Finalize aquela entrega antes de iniciar outra.'
+                detail=f'Veículo já está em viagem na entrega #{conflito.id} ({conflito.cliente}). Finalize aquela entrega antes de iniciar outra.'
             )
 
 def _buscar_entrega_anterior(veiculo_id, excluir_id: int, db: Session):

@@ -39,7 +39,7 @@ def test_bloqueia_motorista_ja_em_rota(client, admin, db_session):
     headers = auth_headers(client, admin.email)
     resp = client.post("/entregas/", headers=headers, json=_payload(motorista_id=motorista.id))
     assert resp.status_code == 400
-    assert "em rota" in resp.json()["detail"]
+    assert "em viagem" in resp.json()["detail"]
 
 
 def test_bloqueia_veiculo_ja_em_rota(client, admin, db_session):
@@ -48,7 +48,7 @@ def test_bloqueia_veiculo_ja_em_rota(client, admin, db_session):
     headers = auth_headers(client, admin.email)
     resp = client.post("/entregas/", headers=headers, json=_payload(veiculo_id=veiculo.id))
     assert resp.status_code == 400
-    assert "em rota" in resp.json()["detail"]
+    assert "em viagem" in resp.json()["detail"]
 
 
 def test_bloqueia_veiculo_em_manutencao(client, admin, db_session):
@@ -384,3 +384,26 @@ def test_viagem_ja_realizada_valida_datas_e_veiculo(client, admin, db_session):
         r = client.post("/entregas", headers=headers, json=payload)
         assert r.status_code == 400, (trecho, r.text)
         assert trecho in r.json()["detail"]
+
+
+
+def test_viagem_atrasada_ou_com_ocorrencia_ainda_prende_motorista_e_caminhao(client, admin, db_session):
+    """Atrasada ou com ocorrência o caminhão segue na estrada: antes só "em rota"
+    contava e ele aparecia livre para outra entrega."""
+    from datetime import datetime
+    motorista = criar_motorista_orm(db_session)
+    veiculo = criar_veiculo_orm(db_session)
+    na_estrada = criar_entrega_orm(db_session, motorista_id=motorista.id, veiculo_id=veiculo.id, status="atrasado")
+    na_estrada.iniciado_em = datetime(2026, 10, 1, 8)
+    db_session.commit()
+    nova = criar_entrega_orm(db_session, motorista_id=motorista.id, veiculo_id=veiculo.id, status="aguardando")
+    headers = auth_headers(client, admin.email)
+
+    r = client.put(f"/entregas/{nova.id}/status", headers=headers, params={"status": "em_rota"})
+    assert r.status_code == 400 and "em viagem" in r.json()["detail"]
+
+    # Marcada "atrasada" sem nunca ter saído (sem iniciado_em) não prende ninguém.
+    na_estrada.iniciado_em = None
+    db_session.commit()
+    r = client.put(f"/entregas/{nova.id}/status", headers=headers, params={"status": "em_rota"})
+    assert r.status_code == 200, r.text

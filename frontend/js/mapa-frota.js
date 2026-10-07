@@ -14,7 +14,7 @@ document.getElementById('usuario-perfil').textContent = localStorage.getItem('pe
 
 const COR_ESTADO = { viagem: '#2E75B6', alerta: '#E67E22', disponivel: '#27AE60', manutencao: '#8E99AD' };
 const ROTULO_ESTADO = { viagem: 'Em viagem', alerta: 'Atenção', disponivel: 'Disponível', manutencao: 'Em manutenção' };
-const STATUS_EM_VIAGEM = ['em_rota', 'atrasado', 'ocorrencia'];
+// STATUS_EM_VIAGEM / emViagem() vêm do api.js (mesma regra no sistema todo).
 const ATUALIZAR_A_CADA_MS = 60 * 1000;
 
 let mapaFrota = null;
@@ -55,7 +55,7 @@ async function montarCaminhoes(veiculos, entregas, conjuntos, manutencoes, nomeM
   for (const v of cavalos) {
     const conjunto = conjuntos.find(c => c.cavalo_id === v.id) || null;
     const doVeiculo = entregas.filter(e => e.veiculo_id === v.id && e.status !== 'cancelado');
-    const viagem = doVeiculo.find(e => STATUS_EM_VIAGEM.includes(e.status) && e.iniciado_em) || null;
+    const viagem = doVeiculo.find(e => STATUS_EM_VIAGEM.includes(e.status) && e.iniciado_em) || null; // só viagem que já saiu tem posição
     const ultima = doVeiculo.filter(e => e.status === 'entregue' && e.concluido_em)
       .sort((a, b) => dataUtc(b.concluido_em) - dataUtc(a.concluido_em))[0] || null;
     const proxima = doVeiculo.filter(e => e.status === 'aguardando')

@@ -27,11 +27,15 @@ function calcularEmRota(excluirEntregaId) {
   mapaMotoristasEmRota = {};
   mapaVeiculosEmRota = {};
   entregas.forEach(e => {
-    if (e.status !== 'em_rota' || e.id === excluirEntregaId) return;
+    if (!emViagem(e) || e.id === excluirEntregaId) return;
     // "desde dd/mm" deixa óbvia uma viagem esquecida aberta há semanas.
     const desde = e.iniciado_em ? `, desde ${dataUtc(e.iniciado_em).toLocaleDateString('pt-BR').slice(0, 5)}` : '';
     if (e.motorista_id) mapaMotoristasEmRota[e.motorista_id] = e.cliente + desde;
-    if (e.veiculo_id) mapaVeiculosEmRota[e.veiculo_id] = e.cliente + desde;
+  });
+  // Cavalo e as carretas engatadas nele (conjunto ativo) ficam ocupados juntos.
+  veiculosEmViagem(entregas, conjuntosAtivos, excluirEntregaId).forEach((e, veiculoId) => {
+    const desde = e.iniciado_em ? `, desde ${dataUtc(e.iniciado_em).toLocaleDateString('pt-BR').slice(0, 5)}` : '';
+    mapaVeiculosEmRota[veiculoId] = e.cliente + desde;
   });
 }
 
@@ -153,8 +157,11 @@ function preencherOpcoesVeiculo(lista) {
   }
 }
 
+let conjuntosAtivos = [];
+
 async function carregarConjuntosMotoristas() {
   const conjuntos = await get('/conjuntos') || [];
+  conjuntosAtivos = conjuntos;
   mapaConjuntoPorMotorista = {};
   conjuntos.forEach(c => {
     if (c.motorista_id && c.cavalo_id) {

@@ -720,6 +720,28 @@ function pontoNaLinha(coordenadas, frac) {
 
    `vias` (opcional) são pontos de passagem obrigatórios [{lat, lon}, ...] —
    o OSRM sempre devolve a rota mais rápida que passa por eles, na ordem. */
+/* Em viagem = saiu e ainda não terminou: atrasada ou com ocorrência o
+   caminhão continua na estrada (mesma regra do servidor e do mapa da frota). */
+const STATUS_EM_VIAGEM = ['em_rota', 'atrasado', 'ocorrencia'];
+function emViagem(e) {
+  return e.status === 'em_rota' || (STATUS_EM_VIAGEM.includes(e.status) && !!e.iniciado_em);
+}
+
+/* Veículos em viagem agora: o da entrega (o cavalo) e as carretas engatadas
+   nele pelo conjunto ativo — a entrega só guarda o cavalo, mas a carreta
+   viaja junto e também não está disponível. Devolve Map veiculoId -> entrega. */
+function veiculosEmViagem(entregas, conjuntos, excluirEntregaId) {
+  const mapa = new Map();
+  (entregas || []).forEach(e => {
+    if (!emViagem(e) || !e.veiculo_id || e.id === excluirEntregaId) return;
+    mapa.set(e.veiculo_id, e);
+    (conjuntos || []).filter(c => c.cavalo_id === e.veiculo_id).forEach(c => {
+      [c.semirreboque1_id, c.semirreboque2_id].forEach(id => { if (id) mapa.set(id, e); });
+    });
+  });
+  return mapa;
+}
+
 async function obterRotaRodoviaria(cidadeA, cidadeB, vias = []) {
   const normA = normalizarBusca(cidadeA);
   const normB = normalizarBusca(cidadeB);

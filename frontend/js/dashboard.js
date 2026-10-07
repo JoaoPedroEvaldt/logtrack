@@ -305,8 +305,9 @@ async function carregarPainel() {
 
     /* "Disponível" no cadastro só vira "em rota" quando existe uma entrega em_rota
        usando aquele motorista/veículo agora — o campo status sozinho não reflete isso. */
-    const motoristasEmRota = new Set(listaEntregas.filter(e => e.status === 'em_rota' && e.motorista_id).map(e => e.motorista_id));
-    const veiculosEmRota = new Set(listaEntregas.filter(e => e.status === 'em_rota' && e.veiculo_id).map(e => e.veiculo_id));
+    const motoristasEmRota = new Set(listaEntregas.filter(e => emViagem(e) && e.motorista_id).map(e => e.motorista_id));
+    // Cavalo em viagem leva junto a carreta engatada (conjunto): as duas ocupadas.
+    const veiculosEmRota = new Set(veiculosEmViagem(listaEntregas, conjuntos).keys());
     const motoristasDisp = listaMotoristas.filter(m => m.status === 'disponivel' && !motoristasEmRota.has(m.id)).length;
     const veiculosDisp = listaVeiculos.filter(v => v.status === 'disponivel' && !veiculosEmRota.has(v.id)).length;
 

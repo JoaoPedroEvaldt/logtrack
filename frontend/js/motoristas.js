@@ -35,7 +35,7 @@ async function carregarMotoristas() {
   const [motoristas, entregas] = await Promise.all([get('/motoristas'), get('/entregas')]);
   motoristasCarregados = motoristas || [];
   entregasAtivasPorMotorista = new Set(
-    (entregas || []).filter(e => e.status === 'em_rota' && e.motorista_id).map(e => e.motorista_id)
+    (entregas || []).filter(e => emViagem(e) && e.motorista_id).map(e => e.motorista_id)
   );
   filtrarMotoristas();
 

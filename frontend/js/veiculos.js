@@ -46,9 +46,9 @@ function statusEfetivoVeiculo(v) {
 }
 
 async function carregarVeiculos() {
-  const [veiculos, entregas, manutencoes] = await Promise.all([get('/veiculos'), get('/entregas'), get('/manutencoes')]);
+  const [veiculos, entregas, manutencoes, conjuntos] = await Promise.all([get('/veiculos'), get('/entregas'), get('/manutencoes'), get('/conjuntos')]);
   veiculosCarregados = veiculos || [];
-  veiculosEmRota = new Set((entregas || []).filter(e => e.status === 'em_rota' && e.veiculo_id).map(e => e.veiculo_id));
+  veiculosEmRota = new Set(veiculosEmViagem(entregas, conjuntos).keys());
   veiculosEmManutencao = new Set((manutencoes || []).filter(m => m.status !== 'concluida').map(m => m.veiculo_id));
   filtrarVeiculos();
 }

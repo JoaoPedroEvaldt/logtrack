@@ -138,9 +138,9 @@ function renderizarAcertos(lista) {
 /* ===================== PERFIL ===================== */
 function renderizarPerfil() {
   const { motorista: m, conjunto, entregas } = ficha;
-  const emViagem = entregas.some(e => e.status === 'em_rota');
-  const statusTexto = m.status === 'inativo' ? 'Inativo' : (emViagem ? 'Em viagem' : 'Disponível');
-  const statusBadge = m.status === 'inativo' ? 'cancelado' : (emViagem ? 'em_rota' : 'entregue');
+  const estaEmViagem = entregas.some(emViagem);
+  const statusTexto = m.status === 'inativo' ? 'Inativo' : (estaEmViagem ? 'Em viagem' : 'Disponível');
+  const statusBadge = m.status === 'inativo' ? 'cancelado' : (estaEmViagem ? 'em_rota' : 'entregue');
 
   const dias = diasParaVencer(m.cnh_validade);
   const cnhBadge = dias < 0

@@ -15,6 +15,7 @@ from app.models.manutencao import Manutencao
 from app.models.abastecimento import Abastecimento
 from app.models.acerto import Diaria
 from app.routers.auth import exigir_staff
+from app.routers.entregas import filtro_em_viagem
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
@@ -69,14 +70,18 @@ def resumo(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)
     ocorrencias_abertas = db.query(Ocorrencia).filter(Ocorrencia.status == "aberta").count()
 
     motoristas_em_rota = [m for (m,) in db.query(Entrega.motorista_id).filter(
-        Entrega.status == "em_rota", Entrega.motorista_id.isnot(None)
+        *filtro_em_viagem(), Entrega.motorista_id.isnot(None)
     ).distinct()]
-    veiculos_em_rota = [v for (v,) in db.query(Entrega.veiculo_id).filter(
-        Entrega.status == "em_rota", Entrega.veiculo_id.isnot(None)
-    ).distinct()]
+    veiculos_em_rota = {v for (v,) in db.query(Entrega.veiculo_id).filter(
+        *filtro_em_viagem(), Entrega.veiculo_id.isnot(None)
+    ).distinct()}
+    # A entrega guarda só o cavalo; a carreta engatada nele (conjunto ativo)
+    # viaja junto e também não está disponível.
+    for c in db.query(Conjunto).filter(Conjunto.status == "ativo", Conjunto.cavalo_id.in_(veiculos_em_rota)):
+        veiculos_em_rota.update(v for v in (c.semirreboque1_id, c.semirreboque2_id) if v)
 
     veiculos_disponiveis = db.query(Veiculo).filter(
-        Veiculo.status == "disponivel", ~Veiculo.id.in_(veiculos_em_rota)
+        Veiculo.status == "disponivel", ~Veiculo.id.in_(list(veiculos_em_rota))
     ).count()
     motoristas_disponiveis = db.query(Motorista).filter(
         Motorista.status == "disponivel", ~Motorista.id.in_(motoristas_em_rota)
