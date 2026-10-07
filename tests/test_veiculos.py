@@ -251,3 +251,27 @@ def test_foto_do_veiculo_exige_autenticacao(client, admin, db_session):
 
     com_token = client.get(foto_path, params={"token": headers["Authorization"].split(" ")[1]})
     assert com_token.status_code == 200
+
+
+def test_nao_troca_tipo_de_veiculo_que_esta_em_conjunto(client, admin, db_session):
+    cavalo = criar_veiculo_orm(db_session, placa="CAV2A22", tipo="cavalo")
+    semi = criar_veiculo_orm(db_session, placa="SEM2I22", tipo="semirreboque")
+    headers = auth_headers(client, admin.email)
+    client.post("/conjuntos/", headers=headers, json={"nome": "C", "cavalo_id": cavalo.id, "semirreboque1_id": semi.id})
+
+    resp = client.put(f"/veiculos/{semi.id}", headers=headers, json={"tipo": "cavalo"})
+    assert resp.status_code == 400
+    assert "conjunto" in resp.json()["detail"]
+    # Mudar outro campo segue liberado.
+    assert client.put(f"/veiculos/{semi.id}", headers=headers, json={"modelo": "LS"}).status_code == 200
+
+
+def test_nao_desativa_veiculo_em_viagem(client, admin, db_session):
+    from tests.conftest import criar_entrega_orm
+    cavalo = criar_veiculo_orm(db_session, placa="CAV3A33", tipo="cavalo")
+    entrega = criar_entrega_orm(db_session, veiculo_id=cavalo.id, status="em_rota")
+    headers = auth_headers(client, admin.email)
+
+    resp = client.delete(f"/veiculos/{cavalo.id}", headers=headers)
+    assert resp.status_code == 400
+    assert f"#{entrega.id}" in resp.json()["detail"]

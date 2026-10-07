@@ -4,12 +4,20 @@ from app.database import get_db
 from app.models.veiculo import Veiculo
 from app.models.usuario import Usuario
 from app.models.conjunto import Conjunto
+from app.models.entrega import Entrega
+from app.routers.entregas import filtro_em_viagem
 from app.schemas.veiculo import VeiculoCreate, VeiculoUpdate, VeiculoResponse
 from app.routers.auth import exigir_admin, exigir_staff
 from app.services.upload_foto import apagar_foto, salvar_foto
 from typing import List
 
 router = APIRouter(prefix="/veiculos", tags=["Veículos"])
+
+def _conjunto_ativo_do_veiculo(veiculo_id: int, db: Session):
+    return db.query(Conjunto).filter(
+        Conjunto.status == "ativo",
+        (Conjunto.cavalo_id == veiculo_id) | (Conjunto.semirreboque1_id == veiculo_id) | (Conjunto.semirreboque2_id == veiculo_id),
+    ).first()
 
 @router.post("/", response_model=VeiculoResponse, include_in_schema=False)
 @router.post("", response_model=VeiculoResponse)
@@ -41,6 +49,15 @@ def atualizar_veiculo(id: int, dados: VeiculoUpdate, db: Session = Depends(get_d
         raise HTTPException(status_code=404, detail="Veículo não encontrado")
     if dados.placa and db.query(Veiculo).filter(Veiculo.placa == dados.placa, Veiculo.id != id).first():
         raise HTTPException(status_code=400, detail="Placa já cadastrada para outro veículo")
+    # Cavalo virando semirreboque (ou o contrário) dentro de um conjunto ativo
+    # deixaria uma carreta na posição de cavalo.
+    if dados.tipo and dados.tipo != veiculo.tipo:
+        conjunto = _conjunto_ativo_do_veiculo(id, db)
+        if conjunto:
+            raise HTTPException(
+                status_code=400,
+                detail=f'Veículo está no conjunto "{conjunto.nome}". Tire-o do conjunto antes de trocar o tipo.',
+            )
     # exclude_unset (não exclude_none): o formulário manda subtipo/eixos/tipo_eixo
     # explicitamente como null ao trocar o tipo do veículo — exclude_none descartaria
     # esse null e deixaria o valor antigo preso, sem erro nenhum pro usuário.
@@ -55,6 +72,12 @@ def deletar_veiculo(id: int, db: Session = Depends(get_db), atual: Usuario = Dep
     veiculo = db.query(Veiculo).filter(Veiculo.id == id).first()
     if not veiculo:
         raise HTTPException(status_code=404, detail="Veículo não encontrado")
+    viagem = db.query(Entrega).filter(Entrega.veiculo_id == id, *filtro_em_viagem()).first()
+    if viagem:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Veículo está em viagem na entrega #{viagem.id} ({viagem.cliente}). Finalize a viagem antes de desativá-lo.",
+        )
     veiculo.status = "inativo"
 
     # Um veículo desativado some da listagem (/veiculos filtra status != "inativo"),
