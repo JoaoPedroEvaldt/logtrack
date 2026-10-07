@@ -492,10 +492,37 @@ function renderizarDicas(trechos) {
 }
 
 /* ---------------------------------------------------------------- início */
+/* Km vazio ainda não calculado (viagem antiga recém-ligada, ou rota que falhou
+   na hora de entrar em rota): calcula pela estrada, do destino da viagem
+   anterior até a origem desta, e grava — igual a calcularESalvarKmVazio. */
+async function calcularKmPendentes() {
+  const pendentes = deslocamentos.filter(dv => dv.km_vazio == null && dv.entrega_anterior_id);
+  if (!pendentes.length) return;
+  const aviso = document.getElementById('vazio-calculando');
+  if (aviso) { aviso.hidden = false; aviso.textContent = `Calculando o km vazio de ${pendentes.length} viagem(ns) antiga(s)...`; }
+  for (const dv of pendentes) {
+    const entrega = entregas.find(e => e.id === dv.entrega_id);
+    const anterior = entregas.find(e => e.id === dv.entrega_anterior_id);
+    if (!entrega || !anterior) continue;
+    const rota = await obterRotaRodoviaria(anterior.destino, entrega.origem);
+    if (rota == null) continue;
+    const km = Math.round(rota.distanceKm * 10) / 10;
+    try {
+      const res = await put(`/deslocamentos-vazios/${dv.entrega_id}`, { km_vazio: km });
+      if (res && !res.detail) dv.km_vazio = km;
+    } catch (e) { /* fica para a próxima abertura da tela */ }
+  }
+  if (aviso) aviso.hidden = true;
+}
+
 async function iniciar() {
   let consumo = CONSUMO_PADRAO_KM_L;
   try { consumo = parseFloat(localStorage.getItem('vazio_consumo_km_l')) || CONSUMO_PADRAO_KM_L; } catch (e) { /* padrão */ }
   document.getElementById('consumo-km-l').value = consumo;
+
+  // Viagens antigas (lançadas antes do vazio existir) ganham o vínculo com a
+  // viagem anterior do mesmo veículo; o km de cada uma é calculado logo abaixo.
+  try { await post('/deslocamentos-vazios/sincronizar', {}); } catch (e) { /* segue com o que já existe */ }
 
   [entregas, veiculos, motoristas, abastecimentos, deslocamentos] = await Promise.all([
     get('/entregas'), get('/veiculos'), get('/motoristas'), get('/abastecimentos'), get('/deslocamentos-vazios'),
@@ -504,6 +531,8 @@ async function iniciar() {
   const litros = abastecimentos.reduce((s, a) => s + (parseFloat(a.litros) || 0), 0);
   const valor = abastecimentos.reduce((s, a) => s + (parseFloat(a.valor_total) || 0), 0);
   precoDieselMedio = litros > 0 ? valor / litros : null;
+
+  await calcularKmPendentes();
 
   const sel = document.getElementById('filtro-veiculo');
   const comVazio = new Set(deslocamentos.map(dv => (entregas.find(e => e.id === dv.entrega_id) || {}).veiculo_id));

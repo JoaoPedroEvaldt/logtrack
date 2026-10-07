@@ -3,6 +3,9 @@ Cobre o router deslocamento_vazio.py que a suíte de test_entregas.py não
 exercitava: listagem (com filtro por perfil) e as validações do PUT que não
 dependem de iniciar uma rota (km negativo, entrega inexistente, acesso negado).
 """
+from datetime import datetime, timedelta
+
+from app.models.deslocamento_vazio import DeslocamentoVazio
 from app.models.motorista import Motorista
 from tests.conftest import (
     auth_headers,
@@ -77,3 +80,63 @@ def test_motorista_nao_pode_atualizar_km_vazio_de_entrega_alheia(client, db_sess
     headers_motorista = auth_headers(client, motorista_usuario.email)
     resp = client.put(f"/deslocamentos-vazios/{entrega_do_outro.id}", headers=headers_motorista, json={"km_vazio": 10})
     assert resp.status_code == 403
+
+
+def _viagem(db_session, veiculo_id, inicio, fim=None, status="entregue"):
+    e = criar_entrega_orm(db_session, veiculo_id=veiculo_id, status=status)
+    e.iniciado_em = inicio
+    e.concluido_em = fim
+    db_session.commit()
+    return e
+
+
+def test_sincronizar_liga_viagens_antigas_a_anterior_do_mesmo_veiculo(client, admin, operador, db_session):
+    """Viagens lançadas antes de existir a tabela ficavam sem vazio (a tela
+    mostrava um trecho só). A sincronização refaz o vínculo pela cronologia."""
+    t0 = datetime(2026, 8, 1, 8)
+    cav1 = criar_veiculo_orm(db_session, placa="AAA1A11")
+    cav2 = criar_veiculo_orm(db_session, placa="BBB2B22")
+    v1 = _viagem(db_session, cav1.id, t0, t0 + timedelta(days=2))
+    v2 = _viagem(db_session, cav1.id, t0 + timedelta(days=3), t0 + timedelta(days=5))
+    v3 = _viagem(db_session, cav1.id, t0 + timedelta(days=6), None, status="em_rota")
+    w1 = _viagem(db_session, cav2.id, t0 + timedelta(days=1), t0 + timedelta(days=4))
+    w2 = _viagem(db_session, cav2.id, t0 + timedelta(days=4, hours=1), t0 + timedelta(days=6))
+    cancelada = _viagem(db_session, cav2.id, t0 + timedelta(days=7), None, status="cancelado")
+    # Vínculo já gravado quando a viagem entrou em rota: não pode ser mexido.
+    db_session.add(DeslocamentoVazio(entrega_id=v2.id, entrega_anterior_id=v1.id, km_vazio=120))
+    db_session.commit()
+
+    r = client.post("/deslocamentos-vazios/sincronizar", headers=auth_headers(client, operador.email))
+    assert r.status_code == 200, r.text
+    assert r.json()["criados"] == 2  # v3 e w2
+
+    vinculos = {d.entrega_id: d for d in db_session.query(DeslocamentoVazio).all()}
+    assert vinculos[v3.id].entrega_anterior_id == v2.id and vinculos[v3.id].km_vazio is None
+    assert vinculos[w2.id].entrega_anterior_id == w1.id
+    assert float(vinculos[v2.id].km_vazio) == 120          # o que já existia ficou igual
+    assert v1.id not in vinculos and w1.id not in vinculos  # primeira viagem de cada caminhão
+    assert cancelada.id not in vinculos
+
+    # Rodar de novo não duplica nada.
+    r = client.post("/deslocamentos-vazios/sincronizar", headers=auth_headers(client, admin.email))
+    assert r.json()["criados"] == 0
+
+
+def test_motorista_nao_sincroniza_deslocamentos(client, motorista_usuario):
+    r = client.post("/deslocamentos-vazios/sincronizar", headers=auth_headers(client, motorista_usuario.email))
+    assert r.status_code == 403
+
+
+def test_sincronizar_nao_conta_o_mesmo_vazio_duas_vezes_em_viagens_sobrepostas(client, admin, db_session):
+    t0 = datetime(2026, 8, 1, 8)
+    cav = criar_veiculo_orm(db_session, placa="CCC3C33")
+    base = _viagem(db_session, cav.id, t0, t0 + timedelta(days=1))
+    # Lançadas depois do fato: as duas começam depois de "base" e se sobrepõem.
+    primeira = _viagem(db_session, cav.id, t0 + timedelta(days=2), t0 + timedelta(days=5))
+    sobreposta = _viagem(db_session, cav.id, t0 + timedelta(days=3), t0 + timedelta(days=4))
+
+    r = client.post("/deslocamentos-vazios/sincronizar", headers=auth_headers(client, admin.email))
+    assert r.json()["criados"] == 1
+    vinculos = {d.entrega_id: d.entrega_anterior_id for d in db_session.query(DeslocamentoVazio).all()}
+    assert vinculos == {primeira.id: base.id}
+    assert sobreposta.id not in vinculos

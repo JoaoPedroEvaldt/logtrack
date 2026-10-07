@@ -1610,3 +1610,6 @@ a.link-ficha:hover { color: var(--accent-dark); text-decoration: underline; }
 .acerto-detalhe-acoes { display: flex; gap: 8px; align-items: center; margin-top: 16px; flex-wrap: wrap; }
 .acerto-detalhe-acoes .btn { display: inline-flex; align-items: center; gap: 6px; }
 @media (max-width: 700px) { .acerto-detalhe-resumo { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Aviso enquanto a tela calcula o km vazio das viagens antigas. */
+.vazio-calculando { margin: 0 0 16px; padding: 10px 14px; border-radius: 10px; background: rgba(242,169,59,0.12); border-left: 3px solid var(--accent); font-size: 13px; color: var(--text); }
