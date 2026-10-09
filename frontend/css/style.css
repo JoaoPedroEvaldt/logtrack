@@ -1535,7 +1535,7 @@ a.link-ficha:hover { color: var(--accent-dark); text-decoration: underline; }
 }
 
 /* ===================== MAPA DA FROTA ===================== */
-.frota-resumo { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+.frota-resumo { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
 .frota-kpi { background: var(--bg-card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px 18px; display: flex; align-items: baseline; gap: 10px; border-left: 4px solid var(--cor); }
 .frota-kpi strong { font-size: 26px; color: var(--text); }
 .frota-kpi span { font-size: 13px; color: var(--text-light); }
@@ -1552,6 +1552,7 @@ a.link-ficha:hover { color: var(--accent-dark); text-decoration: underline; }
 .frota-item-texto strong { font-size: 13px; }
 .frota-item-texto > span { font-size: 12px; color: var(--text-light); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .frota-item-estado { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--cor); white-space: nowrap; }
+.frota-btn-entregue { padding: 5px 10px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
 .frota-barra { display: block; height: 5px; border-radius: 3px; background: var(--border); overflow: hidden; }
 .frota-barra i { display: block; height: 100%; background: var(--cor, #2E75B6); border-radius: 3px; }
 .frota-barra-grande { height: 8px; margin: 14px 0 6px; }

@@ -12,8 +12,8 @@ checarAuth();
 checarStaff();
 document.getElementById('usuario-perfil').textContent = localStorage.getItem('perfil') || '';
 
-const COR_ESTADO = { viagem: '#2E75B6', alerta: '#E67E22', disponivel: '#27AE60', manutencao: '#8E99AD' };
-const ROTULO_ESTADO = { viagem: 'Em viagem', alerta: 'Atenção', disponivel: 'Disponível', manutencao: 'Em manutenção' };
+const COR_ESTADO = { viagem: '#2E75B6', destino: '#8E44AD', alerta: '#E67E22', disponivel: '#27AE60', manutencao: '#8E99AD' };
+const ROTULO_ESTADO = { viagem: 'Em viagem', destino: 'No destino', alerta: 'Atenção', disponivel: 'Disponível', manutencao: 'Em manutenção' };
 // STATUS_EM_VIAGEM / emViagem() vêm do api.js (mesma regra no sistema todo).
 const ATUALIZAR_A_CADA_MS = 60 * 1000;
 
@@ -75,10 +75,7 @@ async function montarCaminhoes(veiculos, entregas, conjuntos, manutencoes, nomeM
       estado: 'disponivel', posicao: null, cidade: null, rota: null, frac: 0, chegada: null, fonte: 'estimativa',
     };
 
-    if (viagem) {
-      const atrasado = viagem.status !== 'em_rota' || new Date() > new Date(viagem.previsao);
-      c.estado = atrasado ? 'alerta' : 'viagem';
-    } else {
+    if (!viagem) {
       c.estado = manutencao ? 'manutencao' : 'disponivel';
       c.cidade = ultima ? ultima.destino : (proxima ? proxima.origem : null);
     }
@@ -89,8 +86,22 @@ async function montarCaminhoes(veiculos, entregas, conjuntos, manutencoes, nomeM
   // cidade que não se acha no mapa, ou o serviço de rotas fora do ar, deixa
   // só aquele sem posição — nunca a tela inteira presa em "carregando".
   await Promise.all(lista.map(c => comLimiteDeTempo(localizar(c), 20000).catch(() => {})));
-  const ordem = { alerta: 0, viagem: 1, disponivel: 2, manutencao: 3 };
+  lista.filter(c => c.viagem).forEach(definirEstadoViagem);
+  const ordem = { destino: 0, alerta: 1, viagem: 2, disponivel: 3, manutencao: 4 };
   return lista.sort((a, b) => ordem[a.estado] - ordem[b.estado] || a.veiculo.placa.localeCompare(b.veiculo.placa));
+}
+
+/* Depende da chegada estimada (calculada em localizar), por isso vem depois.
+   Pela estimativa já chegou: "No destino", esperando alguém confirmar a
+   entrega — não é atraso, a previsão do cliente costuma ser essa mesma
+   chegada. Laranja só com ocorrência/atraso marcado, ou passou da previsão
+   ainda no meio do caminho. */
+function definirEstadoViagem(c) {
+  const agora = new Date();
+  if (c.viagem.status !== 'em_rota') c.estado = 'alerta';
+  else if (c.chegada && agora >= c.chegada) c.estado = 'destino';
+  else if (agora > new Date(c.viagem.previsao)) c.estado = 'alerta';
+  else c.estado = 'viagem';
 }
 
 function comLimiteDeTempo(promessa, ms) {
@@ -269,7 +280,8 @@ function selecionar(id, enquadrar = true) {
 function textoSituacao(c) {
   if (c.viagem) {
     const pct = Math.round(c.frac * 100);
-    const extra = c.viagem.status === 'ocorrencia' ? ' · ocorrência aberta' : (c.estado === 'alerta' ? ' · atrasado' : '');
+    const extra = c.viagem.status === 'ocorrencia' ? ' · ocorrência aberta'
+      : (c.estado === 'alerta' ? ' · atrasado' : (c.estado === 'destino' ? ' · confirmar entrega' : ''));
     return `${pct}% do trajeto · ${escapeHtml(c.viagem.origem)} → ${escapeHtml(c.viagem.destino)}${extra}`;
   }
   if (c.manutencao) return `Parado em manutenção (${escapeHtml(c.manutencao.tipo)})${c.cidade ? ' · ' + escapeHtml(c.cidade) : ''}`;
@@ -285,6 +297,7 @@ function renderizarResumo() {
     </div>`;
   document.getElementById('frota-resumo').innerHTML =
     card('viagem', conta('viagem'), 'em viagem') +
+    card('destino', conta('destino'), 'no destino') +
     card('alerta', conta('alerta'), 'atrasado / ocorrência') +
     card('disponivel', conta('disponivel'), 'disponíveis') +
     card('manutencao', conta('manutencao'), 'em manutenção');
@@ -300,16 +313,20 @@ function renderizarLista() {
     el.innerHTML = estadoVazio(null, 'Nenhum cavalo mecânico cadastrado', 'Cadastre os caminhões na tela de Veículos.', 'caminhao');
     return;
   }
+  // div (não <button>): o item tem o botão "Entregue" dentro, e botão dentro de botão não vale.
   el.innerHTML = caminhoes.map(c => `
-    <button class="frota-item" onclick="selecionar(${c.id})" style="--cor:${COR_ESTADO[c.estado]}">
+    <div class="frota-item" role="button" tabindex="0" onclick="selecionar(${c.id})"
+         onkeydown="if (event.key === 'Enter') selecionar(${c.id})" style="--cor:${COR_ESTADO[c.estado]}">
       <span class="frota-item-icone">${svgIcone('caminhao', 18)}</span>
       <span class="frota-item-texto">
         <strong>${escapeHtml(c.veiculo.placa)}${c.motorista ? ` · ${escapeHtml(c.motorista)}` : ''}</strong>
         <span>${textoSituacao(c)}</span>
         ${c.viagem ? `<span class="frota-barra"><i style="width:${Math.round(c.frac * 100)}%"></i></span>` : ''}
       </span>
-      <span class="frota-item-estado">${ROTULO_ESTADO[c.estado]}</span>
-    </button>`).join('');
+      ${c.estado === 'destino'
+        ? `<button class="btn btn-primary frota-btn-entregue" onclick="event.stopPropagation(); encerrarViagem(${c.id})">${svgIcone('check', 13)} Entregue</button>`
+        : `<span class="frota-item-estado">${ROTULO_ESTADO[c.estado]}</span>`}
+    </div>`).join('');
 }
 
 function htmlDetalhe(c) {
@@ -357,15 +374,35 @@ function htmlDetalhe(c) {
     ${linha('Motorista', motoristaLink)}
     ${viagemHtml}
     <div class="frota-det-acoes">
+      ${c.viagem ? `<button class="btn btn-primary" onclick="encerrarViagem(${c.id})">${svgIcone('check', 14)} Confirmar entrega</button>` : ''}
       ${c.motoristaId ? `<a class="btn btn-outline" href="entregas.html?motorista=${c.motoristaId}">${svgIcone('local', 14)} Rotograma</a>` : ''}
       ${c.motoristaId ? `<a class="btn btn-outline" href="motorista-ficha.html?id=${c.motoristaId}">${svgIcone('usuario', 14)} Ficha</a>` : ''}
     </div>
     <p class="frota-det-nota">${c.fonte === 'rastreador' ? 'Posição informada pelo rastreador.' : 'Posição estimada: ponto da rota proporcional ao tempo desde a saída (não considera trânsito nem paradas fora do plano).'}</p>`;
 }
 
+/* ===================== ENCERRAR VIAGEM ===================== */
+/* Mesmo PUT /status que a tela de Entregas usa ao escolher "Entregue": a data
+   de entrega fica a de agora. O caminhão vira "Disponível" na cidade de destino. */
+async function encerrarViagem(id) {
+  const c = caminhoes.find(x => x.id === id);
+  if (!c || !c.viagem) return;
+  const e = c.viagem;
+  const ok = await confirmarAcao(
+    `Confirmar a entrega #${e.id} (${e.origem} → ${e.destino}) do ${c.veiculo.placa}? A data de entrega fica a de agora.`,
+    { titulo: 'Encerrar viagem', textoConfirmar: 'Confirmar entrega', perigo: false });
+  if (!ok) return;
+  const res = await put(`/entregas/${e.id}/status?status=entregue`, {});
+  if (res.detail) { toastErro('Erro: ' + extrairErro(res)); return; }
+  toastSucesso(`Entrega #${e.id} concluída — ${c.veiculo.placa} disponível em ${e.destino}.`);
+  await carregarComAviso();
+}
+
 /* ===================== ATUALIZAÇÃO ===================== */
 function avancarPosicoes() {
   caminhoes.forEach(atualizarFracao);
+  caminhoes.filter(c => c.viagem).forEach(definirEstadoViagem);
+  renderizarResumo();
   renderizarLista();
   if (selecionadoId) selecionar(selecionadoId, false); else desenharCaminhoes();
 }
