@@ -209,3 +209,21 @@ def test_voltar_de_ocorrencia_para_em_rota_mantem_saida_e_vazio(client, admin, d
     db_session.expire_all()
     assert db_session.get(type(b), b.id).iniciado_em == t0 + timedelta(days=3)
     assert float(db_session.query(DeslocamentoVazio).filter_by(entrega_id=b.id).one().km_vazio) == 250
+
+
+def test_reabrir_entrega_encerrada_por_engano_mantem_saida_e_vazio(client, admin, db_session):
+    """Entregue -> em rota é desfazer: saída real e vazio ficam, a data de entrega some."""
+    t0 = datetime(2026, 9, 1, 8)
+    cav = criar_veiculo_orm(db_session, placa="HHH8H88")
+    a = _viagem(db_session, cav.id, t0, t0 + timedelta(days=2))
+    b = _viagem(db_session, cav.id, t0 + timedelta(days=3), t0 + timedelta(days=4))
+    db_session.add(DeslocamentoVazio(entrega_id=b.id, entrega_anterior_id=a.id, km_vazio=180))
+    db_session.commit()
+
+    r = client.put(f"/entregas/{b.id}/status", headers=auth_headers(client, admin.email), params={"status": "em_rota"})
+    assert r.status_code == 200, r.text
+    db_session.expire_all()
+    reaberta = db_session.get(type(b), b.id)
+    assert reaberta.iniciado_em == t0 + timedelta(days=3)
+    assert reaberta.concluido_em is None
+    assert float(db_session.query(DeslocamentoVazio).filter_by(entrega_id=b.id).one().km_vazio) == 180

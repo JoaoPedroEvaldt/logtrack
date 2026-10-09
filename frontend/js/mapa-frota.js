@@ -375,6 +375,7 @@ function htmlDetalhe(c) {
     ${viagemHtml}
     <div class="frota-det-acoes">
       ${c.viagem ? `<button class="btn btn-primary" onclick="encerrarViagem(${c.id})">${svgIcone('check', 14)} Confirmar entrega</button>` : ''}
+      ${podeReabrir(c) ? `<button class="btn btn-outline" onclick="reabrirViagem(${c.id})">↺ Reabrir viagem #${c.ultima.id}</button>` : ''}
       ${c.motoristaId ? `<a class="btn btn-outline" href="entregas.html?motorista=${c.motoristaId}">${svgIcone('local', 14)} Rotograma</a>` : ''}
       ${c.motoristaId ? `<a class="btn btn-outline" href="motorista-ficha.html?id=${c.motoristaId}">${svgIcone('usuario', 14)} Ficha</a>` : ''}
     </div>
@@ -394,7 +395,31 @@ async function encerrarViagem(id) {
   if (!ok) return;
   const res = await put(`/entregas/${e.id}/status?status=entregue`, {});
   if (res.detail) { toastErro('Erro: ' + extrairErro(res)); return; }
-  toastSucesso(`Entrega #${e.id} concluída — ${c.veiculo.placa} disponível em ${e.destino}.`);
+  toastSucesso(`Entrega #${e.id} concluída — ${c.veiculo.placa} disponível em ${e.destino}. Foi engano? Clique no caminhão e use "Reabrir viagem".`, 7000);
+  await carregarComAviso();
+}
+
+/* Encerrou sem querer: a última entrega (dos últimos 2 dias) volta para em
+   rota. O backend mantém a saída real, então o caminhão volta pro ponto do
+   trajeto onde estava. Mais antiga que isso, só pela tela de Entregas. */
+const REABRIR_ATE_MS = 2 * 24 * 3600 * 1000;
+
+function podeReabrir(c) {
+  return !c.viagem && c.ultima && c.ultima.iniciado_em
+    && Date.now() - dataUtc(c.ultima.concluido_em).getTime() < REABRIR_ATE_MS;
+}
+
+async function reabrirViagem(id) {
+  const c = caminhoes.find(x => x.id === id);
+  if (!c || !podeReabrir(c)) return;
+  const e = c.ultima;
+  const ok = await confirmarAcao(
+    `Reabrir a entrega #${e.id} (${e.origem} → ${e.destino})? Ela volta para "Em rota" com a saída de ${dataUtc(e.iniciado_em).toLocaleString('pt-BR', FMT_CURTO)} e a data de entrega é apagada.`,
+    { titulo: 'Reabrir viagem', textoConfirmar: 'Reabrir', perigo: false });
+  if (!ok) return;
+  const res = await put(`/entregas/${e.id}/status?status=em_rota`, {});
+  if (res.detail) { toastErro('Erro: ' + extrairErro(res)); return; }
+  toastSucesso(`Entrega #${e.id} reaberta — ${c.veiculo.placa} de volta em viagem.`);
   await carregarComAviso();
 }
 

@@ -180,8 +180,13 @@ def atualizar_status(id: int, status: str, db: Session = Depends(get_db), atual:
     entrega.status = status
     entrega_anterior_id = None
     # Voltar de atrasada/ocorrência para em rota é a mesma viagem seguindo:
-    # mantém a saída real e o vazio já calculado.
-    continua_viagem = status == "em_rota" and status_anterior in STATUS_EM_VIAGEM and entrega.iniciado_em is not None
+    # mantém a saída real e o vazio já calculado. De entregue para em rota
+    # também: é desfazer uma entrega encerrada por engano (carga entregue não
+    # sai de novo), então o caminhão volta pro ponto do trajeto onde estava.
+    continua_viagem = (status == "em_rota" and entrega.iniciado_em is not None
+                       and status_anterior in (*STATUS_EM_VIAGEM, "entregue"))
+    if status_anterior == "entregue" and status != "entregue":
+        entrega.concluido_em = None
     if continua_viagem:
         dv = db.query(DeslocamentoVazio).filter(DeslocamentoVazio.entrega_id == entrega.id).first()
         entrega_anterior_id = dv.entrega_anterior_id if dv and dv.km_vazio is None else None
