@@ -4,6 +4,7 @@ from sqlalchemy import Date, func
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql.functions import FunctionElement
 from datetime import date, datetime, time, timedelta
+from decimal import Decimal, ROUND_HALF_UP
 from app.database import get_db
 from app.models.entrega import Entrega
 from app.models.veiculo import Veiculo
@@ -27,8 +28,19 @@ FUSO_BRASILIA = timedelta(hours=-3)
 # Comissão do motorista: 13% do frete de cada entrega concluída, sem descontar
 # abastecimento — vai somando frete a frete. Para a empresa ela é custo.
 COMISSAO_MOTORISTA = 0.13
-# Diária (estadia paga pelo cliente): 1/3 motorista, 1/3 caminhão, 1/3 empresa.
-PARTE_MOTORISTA_DIARIA = 1 / 3
+# Diária (estadia paga pelo cliente): 1/3 motorista (ver parte_motorista_diaria), 1/3 caminhão, 1/3 empresa.
+
+def _centavos(v) -> Decimal:
+    return Decimal(str(v or 0)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+def comissao_frete(valor) -> float:
+    """13% do frete arredondado ao centavo por viagem — igual ao acerto, para os
+    as duas telas fecharem no centavo."""
+    return float((_centavos(valor) * Decimal(str(COMISSAO_MOTORISTA))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+def parte_motorista_diaria(valor) -> float:
+    """1/3 da diária por lançamento, igual a dividir_diaria() do acerto."""
+    return float((_centavos(valor) / 3).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
 def hoje_brasilia() -> date:
     return (datetime.utcnow() + FUSO_BRASILIA).date()
@@ -224,7 +236,7 @@ def _totais_periodo(db: Session, inicio: date, fim: date):
     custo_manutencao = sum(float(m.custo or 0) for m in manutencoes)
     custo_abastecimento = sum(float(a.valor_total or 0) for a in abastecimentos)
     # Pago aos motoristas: 13% do frete + a parte deles (1/3) nas diárias.
-    comissao = receita_fretes * COMISSAO_MOTORISTA + receita_diarias * PARTE_MOTORISTA_DIARIA
+    comissao = sum(comissao_frete(e.valor_frete) for e in entregas) + sum(parte_motorista_diaria(d.valor) for d in diarias)
     return entregas, manutencoes, abastecimentos, receita_bruta, custo_manutencao, custo_abastecimento, comissao, diarias
 
 @router.get("/faturamento")
@@ -251,7 +263,9 @@ def faturamento(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_s
         _totais_periodo(db, inicio_mes_anterior, fim_mes_anterior_comparavel)
 
     conjuntos = db.query(Conjunto).filter(Conjunto.status != "inativo").all()
-    motoristas = {m.id: m.nome for m in db.query(Motorista).filter(Motorista.status != "inativo").all()}
+    # Todos os motoristas (inclusive inativos): quem trabalhou no mês e foi
+    # desativado depois ainda tem movimento a mostrar.
+    motoristas = {m.id: m.nome for m in db.query(Motorista).all()}
     placas_veiculos = {v.id: v.placa for v in db.query(Veiculo).all()}
 
     def placas_do_conjunto(c):
@@ -261,96 +275,83 @@ def faturamento(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_s
             placas_veiculos.get(c.semirreboque2_id),
         )))
 
-    def veiculos_do_conjunto(c):
-        return {c.cavalo_id, c.semirreboque1_id, c.semirreboque2_id} - {None}
+    mapa_veiculos = {c.id: {c.cavalo_id, c.semirreboque1_id, c.semirreboque2_id} - {None} for c in conjuntos}
+    todos_veic_ids = set().union(*mapa_veiculos.values()) if mapa_veiculos else set()
 
-    def conjunto_da_entrega(e, mapa_veiculos):
-        for c in conjuntos:
-            if e.motorista_id and c.motorista_id == e.motorista_id:
-                return c
-            if e.veiculo_id and e.veiculo_id in mapa_veiculos[c.id]:
-                return c
+    def conjunto_da_entrega(e):
+        """O veículo manda: o caminhão que rodou pertence a um conjunto, mesmo
+        com um motorista reserva no volante. Só sem veículo conhecido vale o
+        motorista fixo. Assim cada entrega cai em UM conjunto, sem depender da
+        ordem da lista."""
+        if e.veiculo_id:
+            for c in conjuntos:
+                if e.veiculo_id in mapa_veiculos[c.id]:
+                    return c
+        if e.motorista_id:
+            for c in conjuntos:
+                if c.motorista_id == e.motorista_id:
+                    return c
         return None
 
-    mapa_veiculos = {c.id: veiculos_do_conjunto(c) for c in conjuntos}
+    conjunto_por_entrega = {e.id: conjunto_da_entrega(e) for e in entregas}
+    conjunto_por_diaria = {d.id: conjunto_da_entrega(d.entrega) for d in diarias}
 
-    conjunto_por_entrega = {e.id: conjunto_da_entrega(e, mapa_veiculos) for e in entregas}
-    conjunto_por_diaria = {d.id: conjunto_da_entrega(d.entrega, mapa_veiculos) for d in diarias}
+    def linha(receita_fretes, comissao_fretes, receita_diarias, comissao_diarias, abastecimento, manutencao, **ident):
+        receita = receita_fretes + receita_diarias
+        comissao = comissao_fretes + comissao_diarias
+        return {
+            **ident,
+            "receita": receita,
+            "abastecimento": abastecimento,
+            "manutencao": manutencao,
+            "comissao": comissao,
+            "liquido": receita - abastecimento - manutencao - comissao,
+        }
 
-    def diarias_do(conjunto_id=None, motorista_id=None):
-        """Diárias do conjunto — ou, sem conjunto_id, as do motorista que não
-        caem em conjunto nenhum (linha "Sem conjunto")."""
-        if conjunto_id is not None:
-            return sum(float(d.valor) for d in diarias
-                       if conjunto_por_diaria[d.id] and conjunto_por_diaria[d.id].id == conjunto_id)
-        return sum(float(d.valor) for d in diarias
-                   if conjunto_por_diaria[d.id] is None and d.entrega.motorista_id == motorista_id)
+    def soma_entregas(lista):
+        return sum(float(e.valor_frete or 0) for e in lista), sum(comissao_frete(e.valor_frete) for e in lista)
 
-    # Uma linha por conjunto (veículo + motorista fixo): receita das entregas
-    # daquele conjunto, custo de abastecimento/manutenção dos veículos dele, e
-    # comissão do motorista sobre essa receita. É o "quanto esse caminhão deu
-    # de lucro pra transportadora", já considerando quem dirige ele.
+    def soma_diarias(lista):
+        return sum(float(d.valor) for d in lista), sum(parte_motorista_diaria(d.valor) for d in lista)
+
+    # Uma linha por conjunto: receita das entregas do conjunto, abastecimento e
+    # manutenção dos veículos dele, e a comissão paga sobre essa receita (a de
+    # quem dirigiu de fato). Mostra o "quanto esse caminhão deu de lucro".
     por_conjunto = []
     for c in conjuntos:
         veic_ids = mapa_veiculos[c.id]
-        receita = sum(
-            float(e.valor_frete or 0) for e in entregas
-            if conjunto_por_entrega[e.id] and conjunto_por_entrega[e.id].id == c.id
-        )
-        receita_diarias = diarias_do(conjunto_id=c.id)
+        ents = [e for e in entregas if conjunto_por_entrega[e.id] is c]
+        dias = [d for d in diarias if conjunto_por_diaria[d.id] is c]
         abastecimento = sum(float(a.valor_total or 0) for a in abastecimentos if a.veiculo_id in veic_ids)
         manutencao = sum(float(m.custo or 0) for m in manutencoes if m.veiculo_id in veic_ids)
-        comissao = receita * COMISSAO_MOTORISTA + receita_diarias * PARTE_MOTORISTA_DIARIA
-        receita += receita_diarias
-        if receita or abastecimento or manutencao:
-            por_conjunto.append({
-                "conjunto_id": c.id,
-                "conjunto": c.nome,
-                "placas": placas_do_conjunto(c),
-                "motorista_id": c.motorista_id,
-                "motorista": motoristas.get(c.motorista_id),
-                "receita": receita,
-                "abastecimento": abastecimento,
-                "manutencao": manutencao,
-                "comissao": comissao,
-                "liquido": receita - abastecimento - manutencao - comissao
-            })
+        if ents or dias or abastecimento or manutencao:
+            por_conjunto.append(linha(
+                *soma_entregas(ents), *soma_diarias(dias), abastecimento, manutencao,
+                conjunto_id=c.id, conjunto=c.nome, placas=placas_do_conjunto(c),
+                motorista_id=c.motorista_id, motorista=motoristas.get(c.motorista_id),
+            ))
 
-    # Movimento que não pertence a nenhum conjunto: entrega feita por motorista/veículo
-    # fora de qualquer conjunto cadastrado, ou abastecimento de um veículo avulso.
-    # Sem isso esse faturamento e custo simplesmente desapareceriam do relatório.
-    todos_veic_ids = set().union(*mapa_veiculos.values()) if mapa_veiculos else set()
-    motoristas_com_movimento = {e.motorista_id for e in entregas if e.motorista_id} | \
-                                {a.motorista_id for a in abastecimentos if a.motorista_id} | \
-                                {d.entrega.motorista_id for d in diarias if d.entrega.motorista_id}
-    for mid in motoristas_com_movimento:
-        nome = motoristas.get(mid)
-        if not nome:
-            continue
-        receita = sum(
-            float(e.valor_frete or 0) for e in entregas
-            if e.motorista_id == mid and conjunto_por_entrega[e.id] is None
-        )
-        abastecimento = sum(
-            float(a.valor_total or 0) for a in abastecimentos
-            if a.motorista_id == mid and a.veiculo_id not in todos_veic_ids
-        )
-        receita_diarias = diarias_do(motorista_id=mid)
-        if receita or abastecimento or receita_diarias:
-            comissao = receita * COMISSAO_MOTORISTA + receita_diarias * PARTE_MOTORISTA_DIARIA
-            receita += receita_diarias
-            por_conjunto.append({
-                "conjunto_id": None,
-                "conjunto": "Sem conjunto",
-                "placas": "",
-                "motorista_id": mid,
-                "motorista": nome,
-                "receita": receita,
-                "abastecimento": abastecimento,
-                "manutencao": 0,
-                "comissao": comissao,
-                "liquido": receita - abastecimento - comissao
-            })
+    # Tudo que não caiu em nenhum conjunto (motorista avulso, veículo fora de
+    # conjunto, conjunto inativo, manutenção sem motorista) vira linha "Sem
+    # conjunto", por motorista — assim a soma da tabela fecha com os cards.
+    def sem_conjunto(mid):
+        ents = [e for e in entregas if conjunto_por_entrega[e.id] is None and e.motorista_id == mid]
+        dias = [d for d in diarias if conjunto_por_diaria[d.id] is None and d.entrega.motorista_id == mid]
+        abast = sum(float(a.valor_total or 0) for a in abastecimentos
+                    if a.veiculo_id not in todos_veic_ids and a.motorista_id == mid)
+        manut = sum(float(m.custo or 0) for m in manutencoes
+                    if m.veiculo_id not in todos_veic_ids) if mid is None else 0
+        return ents, dias, abast, manut
+
+    chaves = {e.motorista_id for e in entregas if conjunto_por_entrega[e.id] is None} |              {d.entrega.motorista_id for d in diarias if conjunto_por_diaria[d.id] is None} |              {a.motorista_id for a in abastecimentos if a.veiculo_id not in todos_veic_ids} |              ({None} if any(m.veiculo_id not in todos_veic_ids for m in manutencoes) else set())
+    for mid in chaves:
+        ents, dias, abast, manut = sem_conjunto(mid)
+        if ents or dias or abast or manut:
+            por_conjunto.append(linha(
+                *soma_entregas(ents), *soma_diarias(dias), abast, manut,
+                conjunto_id=None, conjunto="Sem conjunto", placas="",
+                motorista_id=mid, motorista=motoristas.get(mid),
+            ))
 
     por_conjunto.sort(key=lambda x: x["liquido"], reverse=True)
 

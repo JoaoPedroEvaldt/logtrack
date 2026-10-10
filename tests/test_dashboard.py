@@ -282,3 +282,47 @@ def test_carreta_engatada_em_cavalo_em_viagem_nao_conta_como_disponivel(client, 
     criar_entrega_orm(db_session, veiculo_id=cavalo.id, status="em_rota")
     depois = client.get("/dashboard/resumo", headers=headers).json()["veiculos_disponiveis"]
     assert depois == 1  # só a carreta solta
+
+
+def test_faturamento_por_conjunto_veiculo_manda_e_nada_some(client, db_session, admin):
+    """Motorista reserva num caminhão de conjunto: a entrega fica no conjunto do
+    CAMINHÃO (não no do motorista). Entrega sem conjunto e abastecimento de
+    veículo avulso entram na linha "Sem conjunto" — a soma da tabela fecha com
+    os cards."""
+    from app.models.abastecimento import Abastecimento
+    from app.models.conjunto import Conjunto
+
+    titular = criar_motorista_orm(db_session, nome="Titular")
+    reserva = criar_motorista_orm(db_session, nome="Reserva", cpf=CPF_VALIDO_2, cnh_numero="98765432100")
+    outro = criar_motorista_orm(db_session, nome="Fixo B", cpf="39053344705", cnh_numero="11111111111")
+    cavalo_a = criar_veiculo_orm(db_session, placa="AAA1A11")
+    cavalo_b = criar_veiculo_orm(db_session, placa="BBB2B22")
+    avulso = criar_veiculo_orm(db_session, placa="CCC3C33")
+    # B vem primeiro na lista: o motorista fixo de B não pode "roubar" a entrega.
+    db_session.add_all([
+        Conjunto(nome="Conj B", motorista_id=outro.id, cavalo_id=cavalo_b.id),
+        Conjunto(nome="Conj A", motorista_id=titular.id, cavalo_id=cavalo_a.id),
+    ])
+    db_session.commit()
+
+    def entregue(motorista, veiculo, frete):
+        e = criar_entrega_orm(db_session, motorista_id=motorista.id if motorista else None,
+                              veiculo_id=veiculo.id if veiculo else None, status="entregue")
+        e.valor_frete = frete
+        e.concluido_em = datetime.utcnow()
+        db_session.commit()
+
+    entregue(outro, cavalo_a, 1000)   # motorista de B dirigindo o caminhão de A → conjunto A
+    entregue(None, None, 500)         # sem motorista nem veículo → Sem conjunto
+    db_session.add(Abastecimento(veiculo_id=avulso.id, data_abastecimento=_hoje_no_mes_atual(),
+                                 litros=10, valor_total=200))
+    db_session.commit()
+
+    dados = client.get("/dashboard/faturamento", headers=auth_headers(client, "admin@teste.com")).json()
+    linhas = {l["conjunto"]: l for l in dados["por_conjunto"]}
+    assert linhas["Conj A"]["receita"] == 1000
+    assert linhas["Conj A"]["comissao"] == 130
+    assert "Conj B" not in linhas
+    assert sum(l["receita"] for l in dados["por_conjunto"]) == dados["receita_bruta"] == 1500
+    assert sum(l["abastecimento"] for l in dados["por_conjunto"]) == dados["custo_abastecimento"] == 200
+    assert sum(l["liquido"] for l in dados["por_conjunto"]) == pytest.approx(dados["faturamento_liquido"])
