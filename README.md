@@ -21,7 +21,7 @@ Transportadoras pequenas costumam controlar entregas, motoristas e veículos por
 - **Entregas com planejamento de viagem** — ao informar origem e destino, o sistema calcula a melhor rota e o tempo de viagem do caminhão (limite de 90 km/h, paradas da Lei do Motorista, abastecimentos e postos fiscais nas divisas) e sugere a previsão de entrega; a rota pode ser alterada com pontos de passagem ou rotas alternativas.
 - **Deslocamento vazio** — página didática que mostra, trecho a trecho, quanto cada caminhão rodou sem carga entre uma entrega e a próxima, com custo estimado em diesel, mapa das viagens e sugestões para reduzir.
 - **Relatórios e Dashboard** — indicadores de desempenho por período, faturamento do mês, ranking de motoristas, exportação em PDF.
-- **Usuários e Perfis** — administrador, operador e motorista, cada um com acesso restrito ao que precisa (ex.: motorista só vê Dashboard e as próprias entregas).
+- **Usuários e Perfis** — administrador, operador e motorista, cada um com acesso restrito ao que precisa (ex.: motorista só vê Dashboard e as próprias entregas). O perfil de motorista é opcional: na operação da transportadora quem lança e acompanha as viagens é a equipe do escritório, e o motorista não precisa de login.
 
 ## Arquitetura
 

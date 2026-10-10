@@ -1,6 +1,13 @@
-from pydantic import ConfigDict, BaseModel
+from pydantic import ConfigDict, BaseModel, field_validator
 from datetime import date, datetime
 from typing import Optional
+
+def _validar_ano(v: Optional[int]) -> Optional[int]:
+    """Mesma regra do CHECK do banco (1990 até o ano que vem), para o erro sair
+    claro também fora do Postgres."""
+    if v is not None and not 1990 <= v <= date.today().year + 1:
+        raise ValueError(f"Ano do veículo deve estar entre 1990 e {date.today().year + 1}.")
+    return v
 
 class VeiculoCreate(BaseModel):
     placa: str
@@ -16,6 +23,8 @@ class VeiculoCreate(BaseModel):
     crlv_validade: Optional[date] = None
     seguro_validade: Optional[date] = None
 
+    _ano = field_validator("ano")(_validar_ano)
+
 class VeiculoUpdate(BaseModel):
     placa: Optional[str] = None
     modelo: Optional[str] = None
@@ -30,6 +39,8 @@ class VeiculoUpdate(BaseModel):
     status: Optional[str] = None
     crlv_validade: Optional[date] = None
     seguro_validade: Optional[date] = None
+
+    _ano = field_validator("ano")(_validar_ano)
 
 class VeiculoResponse(BaseModel):
     id: int

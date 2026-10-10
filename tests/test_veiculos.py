@@ -29,6 +29,21 @@ def test_admin_cria_veiculo(client, admin):
     assert resp.json()["placa"] == "ABC1D23"
 
 
+@pytest.mark.parametrize("ano", [1989, 2100])
+def test_ano_fora_do_intervalo_retorna_422_com_mensagem(client, admin, ano):
+    headers = auth_headers(client, admin.email)
+    resp = client.post("/veiculos/", headers=headers, json={**_payload(), "ano": ano})
+    assert resp.status_code == 422
+    assert "Ano do veículo deve estar entre 1990" in resp.text
+
+
+def test_ano_fora_do_intervalo_na_edicao(client, admin, db_session):
+    veiculo = criar_veiculo_orm(db_session)
+    headers = auth_headers(client, admin.email)
+    resp = client.put(f"/veiculos/{veiculo.id}", headers=headers, json={"ano": 1980})
+    assert resp.status_code == 422
+
+
 def test_operador_nao_pode_criar_veiculo(client, operador):
     headers = auth_headers(client, operador.email)
     resp = client.post("/veiculos/", headers=headers, json=_payload())
