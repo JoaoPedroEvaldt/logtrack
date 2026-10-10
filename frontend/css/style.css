@@ -1000,6 +1000,7 @@ body.dark .planejamento-prazo.curto { color: #F1948A; }
 /* ===================== CHARTS ===================== */
 .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 24px; }
 .chart-card { background: var(--bg-card); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); transition: background 0.3s; }
+.chart-area { position: relative; height: 280px; }
 .chart-card h3 { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 16px; }
 
 /* ===================== RELATÓRIOS (PAINEL + PRÉVIA) ===================== */

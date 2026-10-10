@@ -45,6 +45,7 @@ function renderizarGraficoMensal(entregas) {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
     }
@@ -83,6 +84,7 @@ function renderizarGraficoStatus(entregas) {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       cutout: '68%',
       plugins: { legend: { position: 'bottom' } }
     },
