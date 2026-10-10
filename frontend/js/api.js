@@ -822,9 +822,9 @@ function formatarDuracao(segundos) {
 }
 
 /* O tempo de direção "puro" que o OSRM devolve não é o tempo real de viagem —
-   a Lei do Motorista (Lei 13.103/2015, art. 235-C da CLT) obriga: parada de
-   30min a cada 5h30 de direção contínua, e descanso de 11h consecutivas a
-   cada 8h de direção acumulada no dia. Simula esses limites pra estimar
+   a Lei do Motorista (Lei 13.103/2015: art. 67-C do CTB e arts. 235-C/235-D da
+   CLT) obriga: parada de 30min a cada 5h30 de direção contínua, e descanso de
+   11h a cada 8h de direção acumulada no dia (simplificação para estimativa). Simula esses limites pra estimar
    quanto tempo de relógio a viagem realmente leva. É só uma estimativa de
    planejamento — não substitui o cronotacógrafo/registro real do motorista. */
 const LEI_MOTORISTA = {
