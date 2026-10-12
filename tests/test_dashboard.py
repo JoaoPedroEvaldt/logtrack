@@ -344,6 +344,7 @@ def test_faturamento_periodo_personalizado_conta_entregas_e_valida_datas(client,
     assert dados["comissao"] == 390
     assert dados["faturamento_liquido"] == 2610
     assert sum(l["entregas"] for l in dados["por_conjunto"]) == 2
+    assert len(dados["por_entrega"]) == 2 and dados["por_entrega"][0]["valor_frete"] == 2000
 
     res = client.get("/dashboard/faturamento?inicio=2026-09-30&fim=2026-09-01", headers=headers)
     assert res.status_code == 400

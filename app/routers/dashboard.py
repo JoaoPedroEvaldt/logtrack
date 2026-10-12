@@ -380,6 +380,21 @@ def faturamento(inicio: date | None = None, fim: date | None = None,
         "receita_diarias": sum(float(d.valor) for d in diarias),
         "faturamento_liquido": receita_bruta - custo_manutencao - custo_abastecimento - comissao_total,
         "por_conjunto": por_conjunto,
+        "por_entrega": [
+            {
+                "id": e.id,
+                "concluido_em": e.concluido_em.isoformat() if e.concluido_em else None,
+                "cliente": e.cliente,
+                "origem": e.origem,
+                "destino": e.destino,
+                "motorista": motoristas.get(e.motorista_id),
+                "conjunto": conjunto_por_entrega[e.id].nome if conjunto_por_entrega[e.id] else None,
+                "placas": placas_do_conjunto(conjunto_por_entrega[e.id]) if conjunto_por_entrega[e.id] else "",
+                "valor_frete": float(e.valor_frete or 0),
+                "comissao": comissao_frete(e.valor_frete),
+            }
+            for e in sorted(entregas, key=lambda e: e.concluido_em or datetime.min, reverse=True)
+        ],
         "mes_anterior": {
             "receita_bruta": receita_bruta_ant,
             "custo_total": custo_manutencao_ant + custo_abastecimento_ant,

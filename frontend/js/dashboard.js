@@ -229,6 +229,21 @@ function renderizarFaturamento(fat) {
       </tr>
     `).join('');
   }
+
+  const tbodyEntregas = document.getElementById('tabela-faturamento-entregas');
+  tbodyEntregas.innerHTML = fat.por_entrega.length === 0
+    ? estadoVazio(7, 'Nenhuma entrega concluída no período', null, 'vazio')
+    : fat.por_entrega.map(e => `
+      <tr>
+        <td>${e.concluido_em ? dataUtc(e.concluido_em).toLocaleDateString('pt-BR') : '—'}</td>
+        <td>${escapeHtml(e.cliente)}</td>
+        <td>${escapeHtml(e.origem)} → ${escapeHtml(e.destino)}</td>
+        <td>${e.motorista ? escapeHtml(e.motorista) : '—'}</td>
+        <td>${e.conjunto ? escapeHtml(e.conjunto) : '—'}</td>
+        <td>${formatarMoeda(e.valor_frete)}</td>
+        <td>${formatarMoeda(e.comissao)}</td>
+      </tr>
+    `).join('');
 }
 
 function isoData(d) {
