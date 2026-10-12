@@ -254,7 +254,7 @@ function configurarFiltroPeriodo() {
     let i, f = hoje;
     if (p === 'mes') i = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
     else if (p === 'mes-passado') { i = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1); f = new Date(hoje.getFullYear(), hoje.getMonth(), 0); }
-    else if (p === '30') i = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 29);
+    else if (p === '15' || p === '30') i = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - (Number(p) - 1));
     else i = new Date(hoje.getFullYear(), 0, 1);
     carregarFaturamento(isoData(i), isoData(f));
   }));
