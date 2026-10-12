@@ -196,6 +196,7 @@ function renderizarFaturamento(fat) {
   document.getElementById('faturamento-periodo').textContent = `${formatarData(fat.inicio)} a ${formatarData(fat.fim)}`;
   document.getElementById('fat-inicio').value = fat.inicio;
   document.getElementById('fat-fim').value = fat.fim;
+  marcarPresetAtivo(fat.inicio, fat.fim);
   document.getElementById('fat-entregas').textContent = fat.entregas;
 
   const custoTotal = fat.custo_manutencao + fat.custo_abastecimento;
@@ -257,21 +258,37 @@ async function carregarFaturamento(inicio, fim) {
   else if (fat && fat.detail) toastErro(typeof fat.detail === 'string' ? fat.detail : 'Período inválido');
 }
 
+function intervaloPreset(p) {
+  const hoje = new Date();
+  let i, f = hoje;
+  if (p === 'mes') i = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+  else if (p === 'mes-passado') { i = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1); f = new Date(hoje.getFullYear(), hoje.getMonth(), 0); }
+  else if (p === '15' || p === '30') i = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - (Number(p) - 1));
+  else i = new Date(hoje.getFullYear(), 0, 1);
+  return [isoData(i), isoData(f)];
+}
+
+/* Destaca o atalho cujo intervalo bate com o período mostrado (vale também pro
+   período inicial e pra datas digitadas à mão). */
+function marcarPresetAtivo(inicio, fim) {
+  document.querySelectorAll('[data-preset]').forEach(btn => {
+    const [i, f] = intervaloPreset(btn.dataset.preset);
+    const ativo = i === inicio && f === fim;
+    btn.classList.toggle('btn-outline', !ativo);
+    btn.setAttribute('aria-pressed', ativo ? 'true' : 'false');
+  });
+}
+
 function configurarFiltroPeriodo() {
-  document.getElementById('fat-aplicar').addEventListener('click', () => {
+  // Mudou a data -> já atualiza, sem botão "Aplicar".
+  ['fat-inicio', 'fat-fim'].forEach(id => document.getElementById(id).addEventListener('change', () => {
     const i = document.getElementById('fat-inicio').value;
     const f = document.getElementById('fat-fim').value;
     if (i && f) carregarFaturamento(i, f);
-  });
+  }));
   document.querySelectorAll('[data-preset]').forEach(btn => btn.addEventListener('click', () => {
-    const hoje = new Date();
-    const p = btn.dataset.preset;
-    let i, f = hoje;
-    if (p === 'mes') i = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-    else if (p === 'mes-passado') { i = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1); f = new Date(hoje.getFullYear(), hoje.getMonth(), 0); }
-    else if (p === '15' || p === '30') i = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - (Number(p) - 1));
-    else i = new Date(hoje.getFullYear(), 0, 1);
-    carregarFaturamento(isoData(i), isoData(f));
+    const [i, f] = intervaloPreset(btn.dataset.preset);
+    carregarFaturamento(i, f);
   }));
 }
 
