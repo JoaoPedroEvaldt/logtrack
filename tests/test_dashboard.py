@@ -326,3 +326,24 @@ def test_faturamento_por_conjunto_veiculo_manda_e_nada_some(client, db_session, 
     assert sum(l["receita"] for l in dados["por_conjunto"]) == dados["receita_bruta"] == 1500
     assert sum(l["abastecimento"] for l in dados["por_conjunto"]) == dados["custo_abastecimento"] == 200
     assert sum(l["liquido"] for l in dados["por_conjunto"]) == pytest.approx(dados["faturamento_liquido"])
+
+
+def test_faturamento_periodo_personalizado_conta_entregas_e_valida_datas(client, db_session, admin):
+    veiculo = criar_veiculo_orm(db_session)
+    motorista = criar_motorista_orm(db_session)
+    for dia, frete in ((date(2026, 9, 1), 1000), (date(2026, 9, 30), 2000), (date(2026, 10, 1), 4000)):
+        e = criar_entrega_orm(db_session, motorista_id=motorista.id, veiculo_id=veiculo.id, status="entregue")
+        e.valor_frete = frete
+        e.concluido_em = datetime.combine(dia, time(12))
+        db_session.commit()
+
+    headers = auth_headers(client, "admin@teste.com")
+    dados = client.get("/dashboard/faturamento?inicio=2026-09-01&fim=2026-09-30", headers=headers).json()
+    assert dados["entregas"] == 2
+    assert dados["receita_bruta"] == 3000
+    assert dados["comissao"] == 390
+    assert dados["faturamento_liquido"] == 2610
+    assert sum(l["entregas"] for l in dados["por_conjunto"]) == 2
+
+    res = client.get("/dashboard/faturamento?inicio=2026-09-30&fim=2026-09-01", headers=headers)
+    assert res.status_code == 400

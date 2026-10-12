@@ -125,10 +125,28 @@
 
     <div data-staff-only>
       <div class="table-header" style="margin-top:8px;">
-        <h2>Faturamento do mês</h2>
+        <h2>Faturamento do período</h2>
         <span class="topbar-sub" id="faturamento-periodo"></span>
       </div>
+      <div class="filtro-periodo" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:16px;">
+        <label style="display:flex;flex-direction:column;font-size:12px;gap:4px;">De
+          <input type="date" id="fat-inicio" />
+        </label>
+        <label style="display:flex;flex-direction:column;font-size:12px;gap:4px;">Até
+          <input type="date" id="fat-fim" />
+        </label>
+        <button class="btn" id="fat-aplicar" type="button">Aplicar</button>
+        <button class="btn btn-outline" type="button" data-preset="mes">Este mês</button>
+        <button class="btn btn-outline" type="button" data-preset="mes-passado">Mês passado</button>
+        <button class="btn btn-outline" type="button" data-preset="30">Últimos 30 dias</button>
+        <button class="btn btn-outline" type="button" data-preset="ano">Este ano</button>
+      </div>
       <div class="cards-grid" style="margin-bottom:24px;">
+        <div class="card">
+          <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 9.4 7.5 4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div>
+          <div class="card-valor" id="fat-entregas">—</div>
+          <div class="card-label">Entregas concluídas</div>
+        </div>
         <div class="card verde">
           <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
           <div class="card-valor" id="fat-receita">—</div>
@@ -159,8 +177,8 @@
         <div class="table-container">
           <div class="table-header"><h2>Faturamento por conjunto</h2></div>
           <table>
-            <thead><tr><th>Conjunto</th><th>Placas</th><th>Motorista</th><th>Receita</th><th>Abastecimento</th><th>Manutenção</th><th>Comissão (13%)</th><th>Líquido</th></tr></thead>
-            <tbody id="tabela-faturamento-conjunto"><tr><td colspan="8" style="padding:0;"><div class="loading-state"><span class="spinner"></span> Carregando...</div></td></tr></tbody>
+            <thead><tr><th>Conjunto</th><th>Placas</th><th>Motorista</th><th>Entregas</th><th>Receita</th><th>Abastecimento</th><th>Manutenção</th><th>Comissão (13%)</th><th>Sobrou</th></tr></thead>
+            <tbody id="tabela-faturamento-conjunto"><tr><td colspan="9" style="padding:0;"><div class="loading-state"><span class="spinner"></span> Carregando...</div></td></tr></tbody>
           </table>
         </div>
       </div>

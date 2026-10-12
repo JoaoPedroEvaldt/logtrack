@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import Date, func
 from sqlalchemy.ext.compiler import compiles
@@ -240,27 +240,39 @@ def _totais_periodo(db: Session, inicio: date, fim: date):
     return entregas, manutencoes, abastecimentos, receita_bruta, custo_manutencao, custo_abastecimento, comissao, diarias
 
 @router.get("/faturamento")
-def faturamento(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
-    """Faturamento líquido do mês atual (visão da empresa): receita das entregas
+def faturamento(inicio: date | None = None, fim: date | None = None,
+                db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
+    """Faturamento líquido de um período (visão da empresa): receita das entregas
     concluídas + diárias, menos manutenção, abastecimento e o que vai para o
-    motorista (13% do frete + 1/3 das diárias) no período, detalhado por conjunto (veículo + motorista fixo). Movimento que
+    motorista (13% do frete + 1/3 das diárias), detalhado por conjunto (veículo + motorista fixo). Movimento que
     não pertence a nenhum conjunto cadastrado entra como linha "Sem conjunto".
-    Inclui também os totais do mês anterior, só pra comparação (sem detalhamento) —
-    usando o MESMO NÚMERO DE DIAS decorridos, não o mês anterior inteiro. Sem isso,
-    no dia 7 do mês a comparação seria "7 dias vs 31 dias", inflando/distorcendo a
-    variação por pura diferença de tempo decorrido, não de desempenho real."""
+    `inicio` e `fim` (inclusive) escolhem o período; sem eles vale o mês atual.
+    Inclui também os totais do período anterior de MESMA DURAÇÃO, só pra comparação
+    (sem detalhamento). No mês atual, o mês passado também é cortado nos mesmos
+    dias decorridos — senão, no dia 7, seria "7 dias vs 31 dias" e a variação
+    refletiria o tempo, não o desempenho."""
     hoje = hoje_brasilia()
-    inicio_mes = date(hoje.year, hoje.month, 1)
-    fim_mes = date(hoje.year + 1, 1, 1) if hoje.month == 12 else date(hoje.year, hoje.month + 1, 1)
-    inicio_mes_anterior = date(hoje.year - 1, 12, 1) if hoje.month == 1 else date(hoje.year, hoje.month - 1, 1)
+    if inicio is None and fim is None:
+        inicio = date(hoje.year, hoje.month, 1)
+        fim_mes = date(hoje.year + 1, 1, 1) if hoje.month == 12 else date(hoje.year, hoje.month + 1, 1)
+        fim = fim_mes - timedelta(days=1)
+        inicio_ant = date(hoje.year - 1, 12, 1) if hoje.month == 1 else date(hoje.year, hoje.month - 1, 1)
+        dias = (hoje - inicio).days + 1
+        fim_ant_excl = min(inicio_ant + timedelta(days=dias), inicio)
+    else:
+        inicio = inicio or fim
+        fim = fim or inicio
+        if fim < inicio:
+            raise HTTPException(status_code=400, detail="A data final não pode ser anterior à inicial")
+        if (fim - inicio).days > 366:
+            raise HTTPException(status_code=400, detail="Período máximo de 1 ano")
+        dias = (fim - inicio).days + 1
+        inicio_ant = inicio - timedelta(days=dias)
+        fim_ant_excl = inicio
+    fim_excl = fim + timedelta(days=1)
 
-    dias_decorridos = (hoje - inicio_mes).days + 1
-    fim_mes_anterior_comparavel = min(inicio_mes_anterior + timedelta(days=dias_decorridos), inicio_mes)
-
-    entregas, manutencoes, abastecimentos, receita_bruta, custo_manutencao, custo_abastecimento, comissao_total, diarias = \
-        _totais_periodo(db, inicio_mes, fim_mes)
-    _, _, _, receita_bruta_ant, custo_manutencao_ant, custo_abastecimento_ant, comissao_ant, _ = \
-        _totais_periodo(db, inicio_mes_anterior, fim_mes_anterior_comparavel)
+    entregas, manutencoes, abastecimentos, receita_bruta, custo_manutencao, custo_abastecimento, comissao_total, diarias =         _totais_periodo(db, inicio, fim_excl)
+    _, _, _, receita_bruta_ant, custo_manutencao_ant, custo_abastecimento_ant, comissao_ant, _ =         _totais_periodo(db, inicio_ant, fim_ant_excl)
 
     conjuntos = db.query(Conjunto).filter(Conjunto.status != "inativo").all()
     # Todos os motoristas (inclusive inativos): quem trabalhou no mês e foi
@@ -296,11 +308,12 @@ def faturamento(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_s
     conjunto_por_entrega = {e.id: conjunto_da_entrega(e) for e in entregas}
     conjunto_por_diaria = {d.id: conjunto_da_entrega(d.entrega) for d in diarias}
 
-    def linha(receita_fretes, comissao_fretes, receita_diarias, comissao_diarias, abastecimento, manutencao, **ident):
+    def linha(receita_fretes, comissao_fretes, receita_diarias, comissao_diarias, abastecimento, manutencao, qtd_entregas, **ident):
         receita = receita_fretes + receita_diarias
         comissao = comissao_fretes + comissao_diarias
         return {
             **ident,
+            "entregas": qtd_entregas,
             "receita": receita,
             "abastecimento": abastecimento,
             "manutencao": manutencao,
@@ -326,7 +339,7 @@ def faturamento(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_s
         manutencao = sum(float(m.custo or 0) for m in manutencoes if m.veiculo_id in veic_ids)
         if ents or dias or abastecimento or manutencao:
             por_conjunto.append(linha(
-                *soma_entregas(ents), *soma_diarias(dias), abastecimento, manutencao,
+                *soma_entregas(ents), *soma_diarias(dias), abastecimento, manutencao, len(ents),
                 conjunto_id=c.id, conjunto=c.nome, placas=placas_do_conjunto(c),
                 motorista_id=c.motorista_id, motorista=motoristas.get(c.motorista_id),
             ))
@@ -348,7 +361,7 @@ def faturamento(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_s
         ents, dias, abast, manut = sem_conjunto(mid)
         if ents or dias or abast or manut:
             por_conjunto.append(linha(
-                *soma_entregas(ents), *soma_diarias(dias), abast, manut,
+                *soma_entregas(ents), *soma_diarias(dias), abast, manut, len(ents),
                 conjunto_id=None, conjunto="Sem conjunto", placas="",
                 motorista_id=mid, motorista=motoristas.get(mid),
             ))
@@ -356,7 +369,10 @@ def faturamento(db: Session = Depends(get_db), atual: Usuario = Depends(exigir_s
     por_conjunto.sort(key=lambda x: x["liquido"], reverse=True)
 
     return {
-        "periodo": f"{hoje.year}-{hoje.month:02d}",
+        "periodo": f"{inicio.year}-{inicio.month:02d}",
+        "inicio": str(inicio),
+        "fim": str(fim),
+        "entregas": len(entregas),
         "receita_bruta": receita_bruta,
         "custo_manutencao": custo_manutencao,
         "custo_abastecimento": custo_abastecimento,

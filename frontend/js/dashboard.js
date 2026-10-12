@@ -189,12 +189,14 @@ function badgeVariacao(atual, anterior, aumentoEBom) {
   const bom = subiu === aumentoEBom;
   const seta = subiu ? '▲' : '▼';
   const classe = bom ? 'variacao-positiva' : 'variacao-negativa';
-  return `<span class="${classe}">${seta} ${Math.abs(pct).toFixed(0)}% vs mesmo período do mês passado</span>`;
+  return `<span class="${classe}">${seta} ${Math.abs(pct).toFixed(0)}% vs período anterior equivalente</span>`;
 }
 
 function renderizarFaturamento(fat) {
-  const [ano, mes] = fat.periodo.split('-').map(Number);
-  document.getElementById('faturamento-periodo').textContent = `${NOMES_MES_EXTENSO[mes - 1]} de ${ano}`;
+  document.getElementById('faturamento-periodo').textContent = `${formatarData(fat.inicio)} a ${formatarData(fat.fim)}`;
+  document.getElementById('fat-inicio').value = fat.inicio;
+  document.getElementById('fat-fim').value = fat.fim;
+  document.getElementById('fat-entregas').textContent = fat.entregas;
 
   const custoTotal = fat.custo_manutencao + fat.custo_abastecimento;
   document.getElementById('fat-receita').textContent = formatarMoeda(fat.receita_bruta);
@@ -211,13 +213,14 @@ function renderizarFaturamento(fat) {
 
   const tbodyConjunto = document.getElementById('tabela-faturamento-conjunto');
   if (fat.por_conjunto.length === 0) {
-    tbodyConjunto.innerHTML = estadoVazio(8, 'Sem movimento no mês', null, 'vazio');
+    tbodyConjunto.innerHTML = estadoVazio(9, 'Sem movimento no período', null, 'vazio');
   } else {
     tbodyConjunto.innerHTML = fat.por_conjunto.map(c => `
       <tr>
         <td>${escapeHtml(c.conjunto)}</td>
         <td>${c.placas ? escapeHtml(c.placas) : '—'}</td>
         <td>${c.motorista ? escapeHtml(c.motorista) : '—'}</td>
+        <td>${c.entregas}</td>
         <td>${formatarMoeda(c.receita)}</td>
         <td>${formatarMoeda(c.abastecimento)}</td>
         <td>${formatarMoeda(c.manutencao)}</td>
@@ -226,6 +229,35 @@ function renderizarFaturamento(fat) {
       </tr>
     `).join('');
   }
+}
+
+function isoData(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+async function carregarFaturamento(inicio, fim) {
+  const qs = inicio && fim ? `?inicio=${inicio}&fim=${fim}` : '';
+  const fat = await get('/dashboard/faturamento' + qs);
+  if (fat && !fat.detail) renderizarFaturamento(fat);
+  else if (fat && fat.detail) toastErro(typeof fat.detail === 'string' ? fat.detail : 'Período inválido');
+}
+
+function configurarFiltroPeriodo() {
+  document.getElementById('fat-aplicar').addEventListener('click', () => {
+    const i = document.getElementById('fat-inicio').value;
+    const f = document.getElementById('fat-fim').value;
+    if (i && f) carregarFaturamento(i, f);
+  });
+  document.querySelectorAll('[data-preset]').forEach(btn => btn.addEventListener('click', () => {
+    const hoje = new Date();
+    const p = btn.dataset.preset;
+    let i, f = hoje;
+    if (p === 'mes') i = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    else if (p === 'mes-passado') { i = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1); f = new Date(hoje.getFullYear(), hoje.getMonth(), 0); }
+    else if (p === '30') i = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 29);
+    else i = new Date(hoje.getFullYear(), 0, 1);
+    carregarFaturamento(isoData(i), isoData(f));
+  }));
 }
 
 /* Linha "#1, #2, #3..." com destaque pro topo do ranking — reforça a leitura de
@@ -327,4 +359,5 @@ async function carregarPainel() {
   renderizarTabela(listaEntregas, listaConjuntos);
 }
 
+configurarFiltroPeriodo();
 carregarPainel();
