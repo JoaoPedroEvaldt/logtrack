@@ -1666,3 +1666,49 @@ a.link-ficha:hover { color: var(--accent-dark); text-decoration: underline; }
 /* Nova entrega: caixa para lançar uma viagem antiga com as datas reais. */
 .viagem-realizada { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 10px; background: rgba(242,169,59,0.10); border: 1px dashed rgba(242,169,59,0.55); font-size: 13px; color: var(--text); cursor: pointer; }
 .viagem-realizada input { width: auto; margin-top: 2px; }
+
+/* ===================== CELULAR (iPhone/Safari e Android) ===================== */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body { overflow-x: hidden; }
+img, video, canvas, svg { max-width: 100%; }
+
+@media (max-width: 768px) {
+  /* iOS dá zoom na tela ao focar campo com fonte menor que 16px. */
+  input, select, textarea,
+  .form-group input, .form-group select, .form-group textarea,
+  .filtros input, .filtros select, .topbar-busca input { font-size: 16px; }
+
+  /* 100vh no Safari inclui a barra de endereço e corta o rodapé do menu e dos modais. */
+  .sidebar { height: 100vh; height: 100dvh; min-height: 0; padding-bottom: env(safe-area-inset-bottom); }
+  .modal { max-height: 90vh; max-height: 90dvh; -webkit-overflow-scrolling: touch; }
+  .modal-overlay { padding: 12px; }
+
+  /* Notch / barra inferior do iPhone. */
+  .btn-menu-mobile { top: calc(12px + env(safe-area-inset-top)); left: calc(12px + env(safe-area-inset-left)); min-width: 40px; min-height: 40px; }
+  .main-content {
+    padding-left: calc(16px + env(safe-area-inset-left));
+    padding-right: calc(16px + env(safe-area-inset-right));
+    padding-top: calc(60px + env(safe-area-inset-top));
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
+  }
+
+  .topbar { padding: 14px 16px; }
+  .topbar-titulo h1 { font-size: 19px; }
+  .topbar-acoes { flex-wrap: wrap; width: 100%; }
+  .toolbar-esquerda { width: 100%; }
+  .toolbar-esquerda > * { flex: 1 1 140px; min-width: 0; }
+  .filtros { flex-direction: column; align-items: stretch; }
+  .filtros select, .filtros input { width: 100%; min-width: 0; }
+
+  /* Botões e links com área de toque confortável. */
+  .btn { min-height: 40px; }
+  .table-container { -webkit-overflow-scrolling: touch; }
+  th, td { padding: 10px 12px; }
+
+  /* Grades que ainda tinham colunas fixas. */
+  .veiculos-grid { grid-template-columns: minmax(0, 1fr); }
+  .frota-resumo { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .vazio-mapa, .rotograma-mapa { height: 320px; }
+  .cards-grid > *, .charts-grid > *, .form-grid > * { min-width: 0; }
+  #toast-container { bottom: calc(12px + env(safe-area-inset-bottom)); }
+}
