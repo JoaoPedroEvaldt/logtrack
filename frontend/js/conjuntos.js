@@ -15,47 +15,91 @@ async function carregarConjuntos() {
   renderizarListaConjuntos();
 }
 
+function conjuntoCombinaBusca(c, termo) {
+  if (!termo) return true;
+  const alvo = [
+    c.nome,
+    c.motorista && c.motorista.nome,
+    c.cavalo && `${c.cavalo.placa} ${c.cavalo.marca} ${c.cavalo.modelo}`,
+    c.semirreboque1 && `${c.semirreboque1.placa} ${c.semirreboque1.modelo}`,
+    c.semirreboque2 && `${c.semirreboque2.placa} ${c.semirreboque2.modelo}`,
+  ].filter(Boolean).join(' ').toLowerCase();
+  return alvo.includes(termo);
+}
+
+function pecaConjunto(rotulo, icone, principal, secundario) {
+  const vazia = !principal;
+  return `
+    <div class="conjunto-peca${vazia ? ' vazia' : ''}">
+      <span class="conjunto-peca-icone">${svgIcone(icone, 16)}</span>
+      <div class="conjunto-peca-texto">
+        <span class="conjunto-peca-rotulo">${rotulo}</span>
+        <span class="conjunto-peca-principal">${vazia ? 'Não definido' : escapeHtml(principal)}</span>
+        ${secundario ? `<span class="conjunto-peca-sec">${escapeHtml(secundario)}</span>` : ''}
+      </div>
+    </div>`;
+}
+
 function renderizarListaConjuntos() {
   const container = document.getElementById('lista-conjuntos');
+  const termo = (document.getElementById('busca-conjuntos').value || '').trim().toLowerCase();
+  const visiveis = conjuntosCarregados.filter(c => conjuntoCombinaBusca(c, termo));
+
+  const emViagem = conjuntosCarregados.filter(c => c.viagem_atual).length;
+  document.getElementById('conjuntos-resumo').textContent = conjuntosCarregados.length
+    ? `${conjuntosCarregados.length} no total · ${emViagem} em viagem · ${conjuntosCarregados.length - emViagem} disponíveis`
+    : '';
 
   if (conjuntosCarregados.length === 0) {
-    container.innerHTML = estadoVazio(null, 'Nenhum conjunto cadastrado', 'Monte seu primeiro conjunto ali em cima, vinculando motorista, cavalo mecânico e semirreboques.', 'link');
+    container.innerHTML = estadoVazio(null, 'Nenhum conjunto cadastrado', 'Clique em "Novo conjunto" para vincular motorista, cavalo mecânico e semirreboques.', 'link');
+    return;
+  }
+  if (visiveis.length === 0) {
+    container.innerHTML = estadoVazio(null, 'Nenhum conjunto encontrado', 'Nenhum conjunto bate com a busca. Tente outra placa ou nome.', 'link');
     return;
   }
 
-  container.innerHTML = conjuntosCarregados.map(c => `
-    <div class="conjunto-linha">
-      <div class="conjunto-linha-foto" data-upload-foto ${c.foto_path ? '' : `onclick="acionarUploadFoto(this)" title="Clique para adicionar a foto"`}>
-        ${c.foto_path
-          ? `<img src="${urlFoto(c.foto_path)}" alt="Foto do conjunto ${escapeHtml(c.nome)}" onclick="abrirFotoTelaCheia('${urlFoto(c.foto_path)}')" title="Clique para ampliar" />`
-          : svgIcone('caminhao', 22)}
-        <span class="conjunto-linha-foto-overlay" onclick="event.stopPropagation(); acionarUploadFoto(this)" title="${c.foto_path ? 'Trocar' : 'Adicionar'} foto">${svgIcone('camera', 14)}</span>
-        <input type="file" accept="image/jpeg,image/png,image/webp" onchange="enviarFotoConjunto(${c.id}, this.files[0])" />
+  const cardsHtml = visiveis.map(c => {
+    const v = c.viagem_atual;
+    const estado = v
+      ? `<span class="conjunto-estado em-viagem" title="${escapeHtml(v.cliente)}"><i></i>Em viagem · ${escapeHtml(v.destino)}</span>`
+      : `<span class="conjunto-estado disponivel"><i></i>Disponível</span>`;
+    return `
+    <div class="conjunto-card">
+      <div class="conjunto-card-topo">
+        <div class="conjunto-linha-foto" data-upload-foto ${c.foto_path ? '' : `onclick="acionarUploadFoto(this)" title="Clique para adicionar a foto"`}>
+          ${c.foto_path
+            ? `<img src="${urlFoto(c.foto_path)}" alt="Foto do conjunto ${escapeHtml(c.nome)}" onclick="abrirFotoTelaCheia('${urlFoto(c.foto_path)}')" title="Clique para ampliar" />`
+            : svgIcone('caminhao', 28)}
+          <span class="conjunto-linha-foto-overlay" onclick="event.stopPropagation(); acionarUploadFoto(this)" title="${c.foto_path ? 'Trocar' : 'Adicionar'} foto">${svgIcone('camera', 14)}</span>
+          <input type="file" accept="image/jpeg,image/png,image/webp" onchange="enviarFotoConjunto(${c.id}, this.files[0])" />
+        </div>
+        <div class="conjunto-card-titulo">
+          <div class="conjunto-card-nome">${escapeHtml(c.nome)}</div>
+          ${estado}
+        </div>
+        <div class="conjunto-linha-acoes">
+          <button class="btn-icone" title="Editar" onclick="editarConjunto(${c.id})">${svgIcone('editar', 15)}</button>
+          <button class="btn-icone perigo" title="Excluir" onclick="excluirConjunto(${c.id})">${svgIcone('excluir', 15)}</button>
+        </div>
       </div>
-      <div class="conjunto-linha-nome">${escapeHtml(c.nome)}</div>
-      <div class="conjunto-linha-col">
-        <span class="conjunto-linha-label">Motorista</span>
-        <span class="conjunto-linha-valor">${c.motorista ? escapeHtml(c.motorista.nome || 'Sem nome') : '—'}</span>
+      <div class="conjunto-card-pecas">
+        ${pecaConjunto('Motorista', 'usuario', c.motorista && (c.motorista.nome || 'Sem nome'), '')}
+        ${pecaConjunto('Cavalo', 'caminhao', c.cavalo && c.cavalo.placa, c.cavalo && `${c.cavalo.marca} ${c.cavalo.modelo}`)}
+        ${pecaConjunto('Semirreboque 1', 'reboque', c.semirreboque1 && c.semirreboque1.placa, c.semirreboque1 && c.semirreboque1.modelo)}
+        ${pecaConjunto('Semirreboque 2', 'reboque', c.semirreboque2 && c.semirreboque2.placa, c.semirreboque2 && c.semirreboque2.modelo)}
       </div>
-      <div class="conjunto-linha-col">
-        <span class="conjunto-linha-label">Cavalo</span>
-        <span class="conjunto-linha-valor">${c.cavalo ? escapeHtml(c.cavalo.placa) : '—'}</span>
-      </div>
-      <div class="conjunto-linha-col">
-        <span class="conjunto-linha-label">Semirreboque 1</span>
-        <span class="conjunto-linha-valor">${c.semirreboque1 ? escapeHtml(c.semirreboque1.placa) : '—'}</span>
-      </div>
-      <div class="conjunto-linha-col">
-        <span class="conjunto-linha-label">Semirreboque 2</span>
-        <span class="conjunto-linha-valor">${c.semirreboque2 ? escapeHtml(c.semirreboque2.placa) : '—'}</span>
-      </div>
-      <span class="badge badge-entregue">Ativo</span>
-      <div class="conjunto-linha-acoes">
-        <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="editarConjunto(${c.id})">${svgIcone('editar', 12)} Editar</button>
-        <button class="btn btn-danger" style="font-size:11px;padding:4px 10px;" onclick="excluirConjunto(${c.id})">${svgIcone('excluir', 12)} Excluir</button>
-      </div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
+  container.innerHTML = `<div class="conjuntos-grade">${cardsHtml}</div>`;
+}
+
+function alternarBuilder(abrir) {
+  const painel = document.getElementById('conjunto-builder');
+  const mostrar = abrir === undefined ? painel.hidden : abrir;
+  painel.hidden = !mostrar;
+  document.getElementById('btn-novo-conjunto').hidden = mostrar;
+  if (mostrar) painel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 async function enviarFotoConjunto(id, arquivo) {
@@ -190,6 +234,7 @@ async function salvarConjuntoBuilder() {
 
   toastSucesso(`"${dados.nome}" criado com sucesso!`);
   limparBuilder();
+  alternarBuilder(false);
   await carregarConjuntos();
   await carregarBuilder();
 }

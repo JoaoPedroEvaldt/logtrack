@@ -61,7 +61,7 @@
       <div class="topbar-acoes">
         <div class="topbar-busca">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input type="text" placeholder="Buscar..." disabled />
+          <input type="text" id="busca-conjuntos" placeholder="Buscar conjunto, placa, motorista..." oninput="renderizarListaConjuntos()" />
         </div>
         <div class="topbar-sino">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
@@ -76,7 +76,15 @@
       </div>
     </div>
 
-    <div class="conjunto-builder">
+    <div class="conjuntos-cabecalho">
+      <div>
+        <div class="conjuntos-titulo-secao">Conjuntos ativos</div>
+        <div class="conjuntos-resumo" id="conjuntos-resumo"></div>
+      </div>
+      <button class="btn btn-primary" id="btn-novo-conjunto" onclick="alternarBuilder(true)">+ Novo conjunto</button>
+    </div>
+
+    <div class="conjunto-builder" id="conjunto-builder" hidden>
       <div class="conjunto-builder-titulo">Compor novo conjunto</div>
       <div class="conjunto-builder-sub">Motorista, cavalo-mecânico e até dois semirreboques — cada peça pode ser trocada de forma independente.</div>
 
@@ -132,12 +140,12 @@
         </div>
       </div>
 
-      <div style="display:flex;justify-content:flex-end;">
+      <div style="display:flex;justify-content:flex-end;gap:12px;">
+        <button class="btn btn-outline" onclick="limparBuilder(); alternarBuilder(false)">Cancelar</button>
         <button class="btn btn-primary" onclick="salvarConjuntoBuilder()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;vertical-align:-2px;"><polyline points="20 6 9 17 4 12"/></svg> Salvar conjunto</button>
       </div>
     </div>
 
-    <div class="conjuntos-titulo-secao">Conjuntos ativos</div>
     <div id="lista-conjuntos">
       <div class="loading-state"><span class="spinner"></span> Carregando...</div>
     </div>
