@@ -200,6 +200,21 @@ function atualizarVeiculoPorMotorista() {
   }
 }
 
+/* Caminho inverso: escolhendo primeiro o cavalo de um conjunto, puxa o motorista
+   vinculado (se ainda não tiver motorista escolhido e ele estiver disponível). */
+function atualizarMotoristaPorVeiculo() {
+  const selMotorista = document.getElementById('motorista-id');
+  if (selMotorista.value) return;
+  const veiculoId = document.getElementById('veiculo-id').value;
+  const motoristaId = Object.keys(mapaConjuntoPorMotorista)
+    .find(id => String(mapaConjuntoPorMotorista[id].veiculoId) === veiculoId);
+  if (!motoristaId) return;
+  const opt = [...selMotorista.options].find(o => o.value === String(motoristaId));
+  if (!opt || opt.disabled) return;
+  selMotorista.value = motoristaId;
+  atualizarVeiculoPorMotorista();
+}
+
 const STATUS_LISTA = ['aguardando', 'em_rota', 'entregue', 'atrasado', 'ocorrencia', 'cancelado'];
 
 function veiculoLabel(veiculoId) {
