@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -21,7 +21,7 @@ MAX_TENTATIVAS_LOGIN = 5
 JANELA_BLOQUEIO_MINUTOS = 15
 
 @router.post("/login")
-def login(request: Request, form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+def login(request: Request, form: OAuth2PasswordRequestForm = Depends(), lembrar: bool = Form(False), db: Session = Depends(get_db)):
     # Mesmo relogio do LogAcesso.criado_em (utcnow, gerado em Python) - se um
     # lado usasse hora local e o outro UTC, a janela ficaria 3h deslocada.
     # Teclado de celular costuma pôr a 1ª letra em maiúscula — e-mail não
@@ -61,7 +61,10 @@ def login(request: Request, form: OAuth2PasswordRequestForm = Depends(), db: Ses
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Usuário inativo"
         )
-    token = auth.criar_token({"sub": str(usuario.id), "perfil": usuario.perfil})
+    token = auth.criar_token(
+        {"sub": str(usuario.id), "perfil": usuario.perfil, "sv": auth.selo_da_senha(usuario.senha_hash)},
+        lembrar=lembrar,
+    )
     return {"access_token": token, "token_type": "bearer", "perfil": usuario.perfil, "nome": usuario.nome}
 
 def _resolver_usuario_do_token(token: str, db: Session) -> Usuario:
@@ -76,6 +79,13 @@ def _resolver_usuario_do_token(token: str, db: Session) -> Usuario:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Usuário não encontrado"
+        )
+    # Senha trocada depois do login: o token antigo cai (tokens emitidos antes
+    # do selo existir não têm "sv" e seguem valendo até expirar, no máximo 8 h).
+    if "sv" in payload and payload["sv"] != auth.selo_da_senha(usuario.senha_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token inválido ou expirado"
         )
     return usuario
 

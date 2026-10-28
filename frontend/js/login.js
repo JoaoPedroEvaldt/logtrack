@@ -17,6 +17,25 @@ function alternarMostrarSenha() {
   btn.setAttribute('aria-label', btn.title);
 }
 
+// Token ainda válido neste navegador (ex.: entrou com "Lembrar-me"): vai direto
+// pro painel. Se o servidor recusar o token (senha trocada, usuário desativado),
+// o primeiro 401 do painel chama logout() e a pessoa volta pra cá sem token.
+(function entrarSeJaReconhecido() {
+  const token = localStorage.getItem('token');
+  if (!token) return;
+  try {
+    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const { exp } = JSON.parse(atob(base64));
+    if (exp * 1000 > Date.now() + 60000) window.location.replace('pages/dashboard.html');
+  } catch (e) { /* token malformado — segue pro login normal */ }
+})();
+
+const _emailLembrado = localStorage.getItem('email_lembrado');
+if (_emailLembrado) {
+  document.getElementById('email').value = _emailLembrado;
+  document.getElementById('lembrar').checked = true;
+}
+
 document.getElementById('form-login').addEventListener('submit', async (e) => {
   e.preventDefault();
 
@@ -33,6 +52,8 @@ document.getElementById('form-login').addEventListener('submit', async (e) => {
     const formData = new FormData();
     formData.append('username', email);
     formData.append('password', senha);
+    const lembrar = document.getElementById('lembrar').checked;
+    formData.append('lembrar', lembrar ? 'true' : 'false');
 
     const res = await fetch(`${API}/auth/login`, {
       method: 'POST',
@@ -48,6 +69,8 @@ document.getElementById('form-login').addEventListener('submit', async (e) => {
     localStorage.setItem('token', data.access_token);
     localStorage.setItem('perfil', data.perfil);
     localStorage.setItem('nome', data.nome || '');
+    if (lembrar) localStorage.setItem('email_lembrado', email.trim());
+    else localStorage.removeItem('email_lembrado');
 
     window.location.href = 'pages/dashboard.html';
 

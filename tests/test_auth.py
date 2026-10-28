@@ -1,3 +1,8 @@
+from datetime import datetime
+
+from jose import jwt
+
+from app import auth as auth_module
 from app.models.log_acesso import LogAcesso
 from tests.conftest import SENHA_PADRAO
 
@@ -89,3 +94,30 @@ def test_bloqueio_por_forca_bruta_vale_com_email_em_maiusculas(client, admin):
 
     resp = client.post("/auth/login", data={"username": admin.email, "password": SENHA_PADRAO})
     assert resp.status_code == 429
+
+
+def _validade_em_horas(token):
+    payload = jwt.get_unverified_claims(token)
+    return (datetime.utcfromtimestamp(payload["exp"]) - datetime.utcnow()).total_seconds() / 3600
+
+
+def test_login_sem_lembrar_gera_token_de_8_horas(client, admin):
+    resp = client.post("/auth/login", data={"username": admin.email, "password": SENHA_PADRAO})
+    assert 7.9 < _validade_em_horas(resp.json()["access_token"]) <= 8
+
+
+def test_login_com_lembrar_gera_token_de_30_dias(client, admin):
+    resp = client.post("/auth/login", data={"username": admin.email, "password": SENHA_PADRAO, "lembrar": "true"})
+    assert resp.status_code == 200
+    assert 30 * 24 - 0.1 < _validade_em_horas(resp.json()["access_token"]) <= 30 * 24
+
+
+def test_trocar_a_senha_derruba_o_token_antigo(client, admin, db_session):
+    resp = client.post("/auth/login", data={"username": admin.email, "password": SENHA_PADRAO, "lembrar": "true"})
+    headers = {"Authorization": f"Bearer {resp.json()['access_token']}"}
+    assert client.get("/motoristas", headers=headers).status_code == 200
+
+    admin.senha_hash = auth_module.gerar_hash_senha("senha_nova_456")
+    db_session.commit()
+
+    assert client.get("/motoristas", headers=headers).status_code == 401
