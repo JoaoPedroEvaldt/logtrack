@@ -12,8 +12,8 @@ checarAuth();
 checarStaff();
 document.getElementById('usuario-perfil').textContent = localStorage.getItem('perfil') || '';
 
-const COR_ESTADO = { viagem: '#2E75B6', destino: '#8E44AD', alerta: '#E67E22', disponivel: '#27AE60', manutencao: '#8E99AD' };
-const ROTULO_ESTADO = { viagem: 'Em viagem', destino: 'No destino', alerta: 'Atenção', disponivel: 'Disponível', manutencao: 'Em manutenção' };
+const COR_ESTADO = { carregado: '#16A085', viagem: '#2E75B6', destino: '#8E44AD', alerta: '#E67E22', disponivel: '#27AE60', manutencao: '#8E99AD' };
+const ROTULO_ESTADO = { carregado: 'Carregado, sai depois', viagem: 'Em viagem', destino: 'No destino', alerta: 'Atenção', disponivel: 'Disponível', manutencao: 'Em manutenção' };
 // STATUS_EM_VIAGEM / emViagem() vêm do api.js (mesma regra no sistema todo).
 const ATUALIZAR_A_CADA_MS = 60 * 1000;
 
@@ -61,9 +61,9 @@ async function montarCaminhoes(veiculos, entregas, conjuntos, manutencoes, nomeM
     const proxima = doVeiculo.filter(e => e.status === 'aguardando')
       .sort((a, b) => new Date(a.saida_prevista || a.previsao) - new Date(b.saida_prevista || b.previsao))[0] || null;
     // Revisão só agendada para daqui a uns dias não tira o caminhão da estrada.
-    const hojeISO = dataLocalISO(new Date());
-    const manutencao = manutencoes.find(m => m.veiculo_id === v.id &&
-      (m.status === 'em_andamento' || (m.status === 'agendada' && m.data_manutencao <= hojeISO))) || null;
+    // Carreta do conjunto na oficina também deixa o conjunto parado.
+    const placasConjunto = conjunto ? [conjunto.cavalo_id, conjunto.semirreboque1_id, conjunto.semirreboque2_id] : [v.id];
+    const manutencao = manutencoes.find(m => placasConjunto.includes(m.veiculo_id) && manutencaoAgora(m)) || null;
     const motoristaId = (viagem && viagem.motorista_id) || (conjunto && conjunto.motorista_id) || null;
     const placas = conjunto
       ? [conjunto.cavalo, conjunto.semirreboque1, conjunto.semirreboque2].filter(Boolean).map(x => x.placa).join(' / ')
@@ -87,7 +87,7 @@ async function montarCaminhoes(veiculos, entregas, conjuntos, manutencoes, nomeM
   // só aquele sem posição — nunca a tela inteira presa em "carregando".
   await Promise.all(lista.map(c => comLimiteDeTempo(localizar(c), 20000).catch(() => {})));
   lista.filter(c => c.viagem).forEach(definirEstadoViagem);
-  const ordem = { destino: 0, alerta: 1, viagem: 2, disponivel: 3, manutencao: 4 };
+  const ordem = { destino: 0, alerta: 1, viagem: 2, carregado: 3, disponivel: 4, manutencao: 5 };
   return lista.sort((a, b) => ordem[a.estado] - ordem[b.estado] || a.veiculo.placa.localeCompare(b.veiculo.placa));
 }
 
@@ -99,6 +99,7 @@ async function montarCaminhoes(veiculos, entregas, conjuntos, manutencoes, nomeM
 function definirEstadoViagem(c) {
   const agora = new Date();
   if (c.viagem.status !== 'em_rota') c.estado = 'alerta';
+  else if (aguardandoSaida(c.viagem)) c.estado = 'carregado';
   else if (c.chegada && agora >= c.chegada) c.estado = 'destino';
   else if (agora > new Date(c.viagem.previsao)) c.estado = 'alerta';
   else c.estado = 'viagem';
@@ -137,7 +138,7 @@ async function calcularPosicaoEmViagem(c) {
   }
   const ufs = await ufsAoLongoDaRota(rota.coordinates);
   const est = estimarViagemCaminhao(rota, ufs);
-  const saida = dataUtc(e.iniciado_em);
+  const saida = inicioNaEstrada(e);
   c.rota = { coordenadas: rota.coordinates.map(([lon, lat]) => [lat, lon]), km: rota.distanceKm, est };
   c.chegada = new Date(saida.getTime() + est.totalH * 3600 * 1000);
   atualizarFracao(c);
@@ -145,7 +146,7 @@ async function calcularPosicaoEmViagem(c) {
 
 function atualizarFracao(c) {
   if (!c.rota) return;
-  const saida = dataUtc(c.viagem.iniciado_em);
+  const saida = inicioNaEstrada(c.viagem);
   c.frac = Math.max(0, Math.min(0.99, (Date.now() - saida.getTime()) / (c.rota.est.totalH * 3600 * 1000)));
   if (c.fonte === 'estimativa') c.posicao = pontoNaLinha(c.rota.coordenadas, c.frac);
 }
@@ -278,6 +279,9 @@ function selecionar(id, enquadrar = true) {
 
 /* ===================== PAINEL LATERAL ===================== */
 function textoSituacao(c) {
+  if (c.viagem && c.estado === 'carregado') {
+    return `Carregado em ${escapeHtml(c.viagem.origem)} · sai ${inicioNaEstrada(c.viagem).toLocaleString('pt-BR', FMT_CURTO)} → ${escapeHtml(c.viagem.destino)}`;
+  }
   if (c.viagem) {
     const pct = Math.round(c.frac * 100);
     const extra = c.viagem.status === 'ocorrencia' ? ' · ocorrência aberta'
@@ -296,7 +300,7 @@ function renderizarResumo() {
       <strong>${valor}</strong><span>${rotulo}</span>
     </div>`;
   document.getElementById('frota-resumo').innerHTML =
-    card('viagem', conta('viagem'), 'em viagem') +
+    card('viagem', conta('viagem') + conta('carregado'), conta('carregado') ? `em viagem (${conta('carregado')} aguardando saída)` : 'em viagem') +
     card('destino', conta('destino'), 'no destino') +
     card('alerta', conta('alerta'), 'atrasado / ocorrência') +
     card('disponivel', conta('disponivel'), 'disponíveis') +
@@ -348,7 +352,8 @@ function htmlDetalhe(c) {
         ${linha('Entrega', `#${e.id} · ${escapeHtml(e.cliente)}`)}
         ${linha('Carga', e.descricao_carga ? escapeHtml(e.descricao_carga) : '')}
         ${linha('Frete', e.valor_frete ? reais(parseFloat(e.valor_frete)) : '')}
-        ${linha('Saiu em', dataUtc(e.iniciado_em).toLocaleString('pt-BR', FMT_CURTO))}
+        ${linha(e.parte_em ? 'Carregou em' : 'Saiu em', dataUtc(e.iniciado_em).toLocaleString('pt-BR', FMT_CURTO))}
+        ${e.parte_em ? linha(aguardandoSaida(e) ? 'Sai para a estrada' : 'Pegou a estrada', inicioNaEstrada(e).toLocaleString('pt-BR', FMT_CURTO)) : ''}
         ${linha('Chegada estimada', c.chegada ? c.chegada.toLocaleString('pt-BR', FMT_CURTO) : '')}
         ${linha('Previsão do cliente', new Date(e.previsao).toLocaleString('pt-BR', FMT_CURTO))}
         ${linha('Situação', badgeStatus(e.status))}
@@ -374,6 +379,7 @@ function htmlDetalhe(c) {
     ${linha('Motorista', motoristaLink)}
     ${viagemHtml}
     <div class="frota-det-acoes">
+      ${c.estado === 'carregado' ? `<button class="btn btn-outline" onclick="saiuAgora(${c.id})">▶ Saiu agora</button>` : ''}
       ${c.viagem ? `<button class="btn btn-primary" onclick="encerrarViagem(${c.id})">${svgIcone('check', 14)} Confirmar entrega</button>` : ''}
       ${podeReabrir(c) ? `<button class="btn btn-outline" onclick="reabrirViagem(${c.id})">↺ Reabrir viagem #${c.ultima.id}</button>` : ''}
       ${c.motoristaId ? `<a class="btn btn-outline" href="entregas.html?motorista=${c.motoristaId}">${svgIcone('local', 14)} Rotograma</a>` : ''}
@@ -396,6 +402,18 @@ async function encerrarViagem(id) {
   const res = await put(`/entregas/${e.id}/status?status=entregue`, {});
   if (res.detail) { toastErro('Erro: ' + extrairErro(res)); return; }
   toastSucesso(`Entrega #${e.id} concluída — ${c.veiculo.placa} disponível em ${e.destino}. Foi engano? Clique no caminhão e use "Reabrir viagem".`, 7000);
+  await carregarComAviso();
+}
+
+/* Carga com tempo: o motorista voltou da folga antes (ou na hora) e saiu.
+   A viagem continua a mesma; só a estimativa passa a contar de agora. */
+async function saiuAgora(id) {
+  const c = caminhoes.find(x => x.id === id);
+  if (!c || !c.viagem) return;
+  const e = c.viagem;
+  const res = await put(`/entregas/${e.id}/status?status=em_rota&parte_em=${encodeURIComponent(new Date().toISOString())}`, {});
+  if (res.detail) { toastErro('Erro: ' + extrairErro(res)); return; }
+  toastSucesso(`${c.veiculo.placa} pegou a estrada — posição estimada a partir de agora.`);
   await carregarComAviso();
 }
 

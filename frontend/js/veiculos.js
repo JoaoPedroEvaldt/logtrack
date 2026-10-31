@@ -49,7 +49,7 @@ async function carregarVeiculos() {
   const [veiculos, entregas, manutencoes, conjuntos] = await Promise.all([get('/veiculos'), get('/entregas'), get('/manutencoes'), get('/conjuntos')]);
   veiculosCarregados = veiculos || [];
   veiculosEmRota = new Set(veiculosEmViagem(entregas, conjuntos).keys());
-  veiculosEmManutencao = new Set((manutencoes || []).filter(m => m.status !== 'concluida').map(m => m.veiculo_id));
+  veiculosEmManutencao = new Set((manutencoes || []).filter(manutencaoAgora).map(m => m.veiculo_id));
   filtrarVeiculos();
 }
 

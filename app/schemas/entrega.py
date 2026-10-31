@@ -77,6 +77,7 @@ class EntregaResponse(BaseModel):
     rota_via: Optional[List[PontoVia]] = None
     distancia_km: Optional[float] = None
     tempo_estimado_h: Optional[float] = None
+    parte_em: Optional[datetime] = None
     criado_em: datetime
 
     model_config = ConfigDict(from_attributes=True)

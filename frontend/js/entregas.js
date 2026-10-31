@@ -18,8 +18,18 @@ let mapaVeiculosEmManutencao = {};
 async function carregarManutencoesAtivas() {
   const manutencoes = await get('/manutencoes') || [];
   mapaVeiculosEmManutencao = {};
-  manutencoes.filter(m => m.status !== 'concluida').forEach(m => {
+  manutencoes.filter(manutencaoAgora).forEach(m => {
     mapaVeiculosEmManutencao[m.veiculo_id] = m.tipo;
+  });
+}
+
+/* A entrega só guarda o cavalo: carreta do conjunto na oficina também segura
+   o cavalo (o servidor recusa salvar). Precisa dos conjuntos já carregados. */
+function marcarCarretasNaOficina() {
+  conjuntosAtivos.forEach(c => {
+    if (!c.cavalo_id || mapaVeiculosEmManutencao[c.cavalo_id]) return;
+    const carreta = [c.semirreboque1, c.semirreboque2].find(v => v && mapaVeiculosEmManutencao[v.id]);
+    if (carreta) mapaVeiculosEmManutencao[c.cavalo_id] = `carreta ${carreta.placa}: ${mapaVeiculosEmManutencao[carreta.id]}`;
   });
 }
 
@@ -269,7 +279,8 @@ function renderizarTabela(lista) {
       <td>${celulaAtribuicao(veiculoLabel(e.veiculo_id), e.status === 'aguardando')}</td>
       <td>${formatarDataHora(e.previsao)}${prazoCurto(e) ? '<span class="prazo-curto-tag" title="A previsão é menor que a saída prevista + tempo estimado de viagem">⚠ prazo curto</span>' : ''}</td>
       <td>${e.valor_frete != null ? 'R$ ' + parseFloat(e.valor_frete).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'}</td>
-      <td>${badgeStatus(e.status)}</td>
+      <td>${badgeStatus(e.status)}${e.status === 'em_rota' && aguardandoSaida(e)
+        ? `<br><small style="color:var(--text-light);">carregado, sai ${inicioNaEstrada(e).toLocaleString('pt-BR', FORMATO_DATA_HORA_CURTO)}</small>` : ''}</td>
       <td style="display:flex;gap:6px;">
         ${ehMotorista ? '' : `<button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="abrirModal(${e.id})">${svgIcone('editar', 12)} Editar</button>`}
         <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="abrirModalStatus(${e.id})">Status</button>
@@ -368,10 +379,77 @@ function abrirModal(id) {
     }
   }
 
+  mostrarRotasDoCliente();
   document.getElementById('modal').classList.add('aberto');
   // Depois de abrir o modal: o mapa do planejamento precisa do container
   // visível pra calcular o próprio tamanho.
   prepararPlanejamento(entrega);
+}
+
+/* ===================== CLIENTE JÁ CONHECIDO =====================
+   Ao digitar o cliente, sugere os nomes já usados; escolhido um, mostra as
+   rotas já feitas para ele (mais recente primeiro) e um clique preenche
+   origem, destino, carga, peso, frete e o "Passar por" — tudo editável. */
+// Data da viagem (não a do lançamento: "viagem já realizada" é lançada depois).
+const momentoViagem = e => dataUtc(e.concluido_em || e.iniciado_em || e.criado_em);
+const maisRecentePrimeiro = (a, b) => momentoViagem(b) - momentoViagem(a);
+
+function viagensDoCliente(nome) {
+  const chave = chaveCliente(nome);
+  if (!chave) return [];
+  return entregas.filter(e => e.status !== 'cancelado' && chaveCliente(e.cliente) === chave)
+    .sort(maisRecentePrimeiro);
+}
+
+async function clientesConhecidos() {
+  // Grafia da viagem mais recente de cada cliente, recentes primeiro.
+  const vistos = new Map();
+  [...entregas].sort(maisRecentePrimeiro).forEach(e => {
+    if (e.status === 'cancelado') return;
+    const chave = chaveCliente(e.cliente);
+    if (chave && !vistos.has(chave)) vistos.set(chave, e.cliente.trim());
+  });
+  return [...vistos.values()];
+}
+
+let rotasClienteAtuais = [];
+
+function mostrarRotasDoCliente() {
+  const box = document.getElementById('rotas-cliente');
+  const rotas = new Map();
+  if (!entregaEditandoId) {
+    viagensDoCliente(document.getElementById('cliente').value).forEach(e => {
+      const chave = `${normalizarBusca(e.origem)}>${normalizarBusca(e.destino)}`;
+      if (!rotas.has(chave) && rotas.size < 5) rotas.set(chave, e);
+    });
+  }
+  rotasClienteAtuais = [...rotas.values()];
+  box.hidden = rotasClienteAtuais.length === 0;
+  box.innerHTML = rotasClienteAtuais.length ? `<span class="rotas-cliente-titulo">Rotas já feitas para este cliente — clique para preencher:</span>` +
+    rotasClienteAtuais.map((e, i) => {
+      const detalhes = [
+        e.descricao_carga ? escapeHtml(e.descricao_carga) : null,
+        e.valor_frete ? 'R$ ' + numeroParaMoeda(e.valor_frete) : null,
+        `última em ${momentoViagem(e).toLocaleDateString('pt-BR')}`,
+      ].filter(Boolean).join(' · ');
+      return `<button type="button" class="rota-cliente" onclick="usarRotaDoCliente(${i})">
+        <strong>${escapeHtml(e.origem)} → ${escapeHtml(e.destino)}</strong><small>${detalhes}</small></button>`;
+    }).join('') : '';
+}
+
+function usarRotaDoCliente(i) {
+  const e = rotasClienteAtuais[i];
+  if (!e) return;
+  document.getElementById('cliente').value = e.cliente.trim();
+  document.getElementById('origem').value = e.origem;
+  document.getElementById('destino').value = e.destino;
+  document.getElementById('descricao').value = e.descricao_carga || '';
+  document.getElementById('peso').value = e.peso_kg || '';
+  document.getElementById('valor-frete').value = numeroParaMoeda(e.valor_frete);
+  viasAtuais = Array.isArray(e.rota_via) ? e.rota_via.map(v => ({ ...v })) : [];
+  renderizarVias();
+  recalcularPlano();
+  document.querySelectorAll('.rota-cliente').forEach((b, j) => b.classList.toggle('ativa', j === i));
 }
 
 function fecharModal() {
@@ -381,6 +459,9 @@ function fecharModal() {
 
 function abrirModalStatus(id) {
   entregaIdSelecionada = id;
+  document.getElementById('carga-com-tempo').checked = false;
+  document.getElementById('parte-em').value = '';
+  alternarCargaComTempo();
   document.getElementById('modal-status').classList.add('aberto');
 }
 
@@ -775,7 +856,9 @@ async function abrirModalRota(id) {
       // planejada no cadastro, senão "se sair agora". "Atrasado" e
       // "ocorrência" com iniciado_em também são caminhão já na estrada.
       const emViagem = ['em_rota', 'atrasado', 'ocorrencia'].includes(entrega.status) && !!entrega.iniciado_em;
-      const iniciadoEm = emViagem ? dataUtc(entrega.iniciado_em) : null;
+      // Carga com tempo: conta de quando pega a estrada, não de quando carregou.
+      const iniciadoEm = emViagem ? inicioNaEstrada(entrega) : null;
+      const parado = emViagem && aguardandoSaida(entrega);
       const saidaPrevista = entrega.saida_prevista ? new Date(entrega.saida_prevista) : null;
       const ancoraPartida = iniciadoEm || saidaPrevista || new Date();
       const chegada = new Date(ancoraPartida.getTime() + horasTotais * 3600 * 1000);
@@ -785,6 +868,8 @@ async function abrirModalRota(id) {
       if (entrega.status === 'entregue' && entrega.concluido_em) {
         chegadaLabel = 'Entregue em';
         chegadaTexto = dataUtc(entrega.concluido_em).toLocaleString('pt-BR', FORMATO_DATA_HORA_CURTO);
+      } else if (parado) {
+        chegadaLabel = `Chegada (sai ${iniciadoEm.toLocaleString('pt-BR', FORMATO_DATA_HORA_CURTO)})`;
       } else if (emViagem) {
         chegadaLabel = 'Chegada estimada';
       } else if (saidaPrevista) {
@@ -813,7 +898,9 @@ async function abrirModalRota(id) {
         fracAtual = 1;
       }
       const posicaoCaminhao = fracAtual === 0 ? [origem.lat, origem.lon] : pontoNaLinha(coordenadas, fracAtual);
-      const popupCaminhao = emViagem
+      const popupCaminhao = parado
+        ? `Carregado em ${escapeHtml(entrega.origem)} — sai ${iniciadoEm.toLocaleString('pt-BR', FORMATO_DATA_HORA_CURTO)}`
+        : emViagem
         ? `Posição estimada — ${Math.round(fracAtual * 100)}% do trajeto`
         : `Origem: ${escapeHtml(entrega.origem)}`;
       L.marker(posicaoCaminhao, { icon: iconeCaminhaoMapa() }).addTo(camadaRota).bindPopup(popupCaminhao);
@@ -913,10 +1000,31 @@ async function refazerKmVazioDaViagem(entregaId) {
   } catch (e) { /* métrica secundária — a tela de deslocamento vazio completa depois */ }
 }
 
+/* Carga com tempo: carregou agora (caminhão fica ocupado) mas só pega a
+   estrada depois — ex.: agenda longa, motorista tira a folga antes de seguir.
+   O mapa deixa o caminhão parado na origem até essa data. */
+function alternarCargaComTempo() {
+  const emRota = document.getElementById('novo-status').value === 'em_rota';
+  document.getElementById('bloco-carga-com-tempo').hidden = !emRota;
+  const marcado = emRota && document.getElementById('carga-com-tempo').checked;
+  document.getElementById('grupo-parte-em').hidden = !marcado;
+  if (marcado && !document.getElementById('parte-em').value) {
+    const amanha = new Date(Date.now() + 24 * 3600 * 1000);
+    amanha.setMinutes(0, 0, 0);
+    document.getElementById('parte-em').value = paraInputDataHora(amanha);
+  }
+}
+
 async function confirmarStatus() {
   const status = document.getElementById('novo-status').value;
   const idAlvo = entregaIdSelecionada;
-  const res = await fetch(`${API}/entregas/${idAlvo}/status?status=${status}`, {
+  let qs = `status=${status}`;
+  if (status === 'em_rota' && document.getElementById('carga-com-tempo').checked) {
+    const parte = lerDataInput('parte-em');
+    if (!parte) { toastAviso('Informe quando o caminhão sai para a estrada.'); return; }
+    qs += `&parte_em=${encodeURIComponent(parte.toISOString())}`;
+  }
+  const res = await fetch(`${API}/entregas/${idAlvo}/status?${qs}`, {
     method: 'PUT',
     headers: { 'Authorization': `Bearer ${getToken()}` }
   });
@@ -932,6 +1040,9 @@ async function confirmarStatus() {
 
 async function iniciar() {
   definirPeriodoPadrao();
+  ativarAutocompleteCidade(document.getElementById('cliente'), clientesConhecidos);
+  document.getElementById('cliente').addEventListener('change', mostrarRotasDoCliente);
+  document.getElementById('cliente').addEventListener('input', mostrarRotasDoCliente);
   ativarAutocompleteCidade(document.getElementById('origem'));
   ativarAutocompleteCidade(document.getElementById('destino'));
   ativarAutocompleteCidade(document.getElementById('via-cidade'));
@@ -954,6 +1065,7 @@ async function iniciar() {
      ficam bloqueados pra esse perfil, então nem tenta carregar (e nem precisa). */
   if (localStorage.getItem('perfil') !== 'motorista') {
     await Promise.all([carregarVeiculos(), carregarMotoristas(), carregarConjuntosMotoristas(), carregarManutencoesAtivas()]);
+    marcarCarretasNaOficina();
     // "Ver rotograma" da ficha do motorista chega com ?motorista=ID já filtrado.
     const motoristaUrl = new URLSearchParams(location.search).get('motorista');
     if (motoristaUrl) document.getElementById('filtro-motorista').value = motoristaUrl;

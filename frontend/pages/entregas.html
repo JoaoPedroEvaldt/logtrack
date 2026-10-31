@@ -186,8 +186,9 @@
           <input type="checkbox" id="viagem-realizada" onchange="alternarViagemRealizada()" />
           <span><strong>Viagem já realizada</strong> — lançar uma viagem antiga com as datas reais de saída e entrega</span>
         </label>
-        <div class="form-group"><label>Cliente *</label><input type="text" id="cliente" placeholder="Nome do cliente" />
+        <div class="form-group"><label>Cliente *</label><input type="text" id="cliente" placeholder="Nome do cliente" autocomplete="off" />
         </div>
+        <div class="rotas-cliente" id="rotas-cliente" hidden style="grid-column:1/-1;"></div>
         <div class="form-group"><label>Peso (kg)</label><input type="number" id="peso" placeholder="0.00" step="0.01" />
         </div>
         <div class="form-group"><label>Valor do frete (R$)</label><input type="text" inputmode="decimal"
@@ -283,7 +284,7 @@
       </div>
       <div class="form-group">
         <label>Novo status</label>
-        <select id="novo-status">
+        <select id="novo-status" onchange="alternarCargaComTempo()">
           <option value="aguardando">Aguardando</option>
           <option value="em_rota">Em Rota</option>
           <option value="entregue">Entregue</option>
@@ -291,6 +292,16 @@
           <option value="ocorrencia">Ocorrência</option>
           <option value="cancelado">Cancelado</option>
         </select>
+      </div>
+      <div id="bloco-carga-com-tempo" hidden style="margin-top:14px;">
+        <label class="viagem-realizada">
+          <input type="checkbox" id="carga-com-tempo" onchange="alternarCargaComTempo()" />
+          <span><strong>Carregou e sai depois</strong> — carga com tempo: o caminhão fica ocupado, mas só pega a estrada na data abaixo (ex.: depois da folga do motorista)</span>
+        </label>
+        <div class="form-group" id="grupo-parte-em" hidden style="margin-top:10px;">
+          <label>Sai para a estrada em</label>
+          <input type="datetime-local" id="parte-em" />
+        </div>
       </div>
       <div style="margin-top:24px;display:flex;gap:12px;justify-content:flex-end;">
         <button class="btn btn-outline" onclick="fecharModalStatus()">Cancelar</button>

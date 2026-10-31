@@ -77,3 +77,30 @@ def test_operador_nao_pode_excluir_manutencao(client, operador, db_session):
 
     resp = client.delete(f"/manutencoes/{manutencao.id}", headers=headers)
     assert resp.status_code == 403
+
+
+def test_nao_abre_manutencao_em_veiculo_em_viagem(client, admin, db_session):
+    from tests.conftest import criar_entrega_orm
+    veiculo = criar_veiculo_orm(db_session)
+    criar_entrega_orm(db_session, veiculo_id=veiculo.id, status="em_rota")
+    headers = auth_headers(client, admin.email)
+    resp = client.post("/manutencoes/", headers=headers, json={**_payload(veiculo.id), "status": "em_andamento"})
+    assert resp.status_code == 400
+    assert "em viagem" in resp.json()["detail"]
+    # Registrar uma já feita ou agendar a próxima revisão continua livre.
+    assert client.post("/manutencoes/", headers=headers, json=_payload(veiculo.id)).status_code == 200
+    agendada = {**_payload(veiculo.id), "status": "agendada", "data_manutencao": "2099-01-01"}
+    assert client.post("/manutencoes/", headers=headers, json=agendada).status_code == 200
+
+
+def test_nao_abre_manutencao_na_carreta_do_conjunto_em_viagem(client, admin, db_session):
+    from app.models.conjunto import Conjunto
+    from tests.conftest import criar_entrega_orm
+    cavalo = criar_veiculo_orm(db_session, placa="CAV1A11")
+    carreta = criar_veiculo_orm(db_session, placa="CAR2B22", tipo="semirreboque")
+    db_session.add(Conjunto(nome="C", cavalo_id=cavalo.id, semirreboque1_id=carreta.id))
+    db_session.commit()
+    criar_entrega_orm(db_session, veiculo_id=cavalo.id, status="em_rota")
+    headers = auth_headers(client, admin.email)
+    resp = client.post("/manutencoes/", headers=headers, json={**_payload(carreta.id), "status": "em_andamento"})
+    assert resp.status_code == 400

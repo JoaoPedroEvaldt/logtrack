@@ -166,6 +166,12 @@ function dataUtc(iso) {
 }
 
 // "AAAA-MM-DD" do dia local (toISOString() daria o dia seguinte depois das 21h).
+/* Na oficina agora: em andamento, ou agendada para hoje ou antes (mesma regra
+   do servidor). Revisão marcada para a semana que vem não prende o caminhão. */
+function manutencaoAgora(m) {
+  return m.status === 'em_andamento' || (m.status === 'agendada' && m.data_manutencao <= dataLocalISO(new Date()));
+}
+
 function dataLocalISO(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
@@ -396,6 +402,11 @@ async function carregarNotificacoes() {
    busca nas próprias entregas (motoristas/veículos são staff-only). */
 let _buscaCache = null;
 let _buscaPromise = null;
+
+/* Nome de cliente é digitado livre: "AMBEV TRANSF" e "Ambev  Transf" são o mesmo. */
+function chaveCliente(nome) {
+  return normalizarBusca(nome).replace(/\s+/g, ' ').trim();
+}
 
 function normalizarBusca(s) {
   const semAcento = (s || '').toString().toLowerCase().normalize('NFD');
@@ -727,6 +738,19 @@ function emViagem(e) {
   return e.status === 'em_rota' || (STATUS_EM_VIAGEM.includes(e.status) && !!e.iniciado_em);
 }
 
+/* Quando o caminhão pegou (ou vai pegar) a estrada: na "carga com tempo" ele
+   carrega, fica parado (folga do motorista) e só sai em parte_em. É daqui
+   que a posição estimada conta — nunca da hora em que foi marcado em rota. */
+function inicioNaEstrada(e) {
+  const iniciado = dataUtc(e.iniciado_em);
+  const parte = dataUtc(e.parte_em);
+  return parte && parte > iniciado ? parte : iniciado;
+}
+
+function aguardandoSaida(e) {
+  return !!e.parte_em && inicioNaEstrada(e) > new Date();
+}
+
 /* Veículos em viagem agora: o da entrega (o cavalo) e as carretas engatadas
    nele pelo conjunto ativo — a entrega só guarda o cavalo, mas a carreta
    viaja junto e também não está disponível. Devolve Map veiculoId -> entrega. */
@@ -1034,8 +1058,9 @@ async function ufsAoLongoDaRota(coordenadas) {
 
 /* Liga o autocomplete num <input> — dropdown de sugestões, navegação por
    seta/Enter/Esc, filtra a lista do IBGE já em cache (sem tecla nenhuma
-   pesquisa de novo na API, só filtra em memória). */
-function ativarAutocompleteCidade(input) {
+   pesquisa de novo na API, só filtra em memória). `fonte` troca a lista
+   (ex.: clientes já cadastrados no formulário de entrega). */
+function ativarAutocompleteCidade(input, fonte = carregarCidadesIBGE) {
   if (!input) return;
   const container = input.parentElement;
   container.style.position = 'relative';
@@ -1072,7 +1097,7 @@ function ativarAutocompleteCidade(input) {
   async function filtrar(termo) {
     const q = normalizarBusca(termo.trim());
     if (q.length < 2) { dropdown.hidden = true; return; }
-    const cidades = await carregarCidadesIBGE();
+    const cidades = await fonte();
     renderizar(cidades.filter(c => normalizarBusca(c).includes(q)).slice(0, 8));
   }
 

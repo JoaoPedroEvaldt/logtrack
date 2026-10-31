@@ -185,6 +185,20 @@
 
       <div class="table-container">
         <div class="table-header">
+          <h2>Clientes do período</h2>
+          <div class="filtros" style="margin:0;">
+            <input type="search" id="busca-cliente-rank" placeholder="Filtrar cliente (ex.: ambev)" autocomplete="off"
+              oninput="renderizarRankClientes()" style="min-width:220px;" />
+          </div>
+        </div>
+        <table>
+          <thead><tr><th>#</th><th>Cliente</th><th>Cargas</th><th>Frete</th><th style="min-width:140px;">Parte do frete</th></tr></thead>
+          <tbody id="tabela-rank-clientes"><tr><td colspan="5" style="padding:0;"><div class="loading-state"><span class="spinner"></span> Carregando...</div></td></tr></tbody>
+        </table>
+      </div>
+
+      <div class="table-container">
+        <div class="table-header">
           <h2>Entregas do período</h2>
           <span class="topbar-sub">Frete e comissão de cada entrega concluída (diárias entram só nos totais acima)</span>
         </div>

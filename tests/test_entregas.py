@@ -407,3 +407,73 @@ def test_viagem_atrasada_ou_com_ocorrencia_ainda_prende_motorista_e_caminhao(cli
     db_session.commit()
     r = client.put(f"/entregas/{nova.id}/status", headers=headers, params={"status": "em_rota"})
     assert r.status_code == 200, r.text
+
+
+def _conjunto_com_carreta(db_session, motorista_id=None):
+    from app.models.conjunto import Conjunto
+    cavalo = criar_veiculo_orm(db_session, placa="CAV1A11")
+    carreta = criar_veiculo_orm(db_session, placa="CAR2B22", tipo="semirreboque")
+    conjunto = Conjunto(nome="Conjunto", motorista_id=motorista_id, cavalo_id=cavalo.id, semirreboque1_id=carreta.id)
+    db_session.add(conjunto)
+    db_session.commit()
+    return cavalo, carreta
+
+
+def test_carreta_do_conjunto_em_manutencao_bloqueia_a_viagem(client, admin, db_session):
+    cavalo, carreta = _conjunto_com_carreta(db_session)
+    criar_manutencao_orm(db_session, veiculo_id=carreta.id, status="em_andamento")
+    headers = auth_headers(client, admin.email)
+    resp = client.post("/entregas/", headers=headers, json=_payload(veiculo_id=cavalo.id))
+    assert resp.status_code == 400
+    assert "CAR2B22" in resp.json()["detail"]
+
+
+def test_manutencao_agendada_para_depois_nao_bloqueia_hoje(client, admin, db_session):
+    from datetime import date
+    veiculo = criar_veiculo_orm(db_session)
+    m = criar_manutencao_orm(db_session, veiculo_id=veiculo.id, status="agendada")
+    m.data_manutencao = date(2099, 1, 1)
+    db_session.commit()
+    headers = auth_headers(client, admin.email)
+    resp = client.post("/entregas/", headers=headers, json=_payload(veiculo_id=veiculo.id))
+    assert resp.status_code == 200, resp.text
+    # Agendada para hoje ou antes já conta como na oficina.
+    m.data_manutencao = date(2026, 1, 1)
+    db_session.commit()
+    resp = client.post("/entregas/", headers=headers, json=_payload(veiculo_id=veiculo.id))
+    assert resp.status_code == 400
+
+
+def test_carga_com_tempo_guarda_a_saida_para_a_estrada(client, admin, db_session):
+    from datetime import datetime, timedelta
+    veiculo = criar_veiculo_orm(db_session)
+    entrega = criar_entrega_orm(db_session, veiculo_id=veiculo.id)
+    headers = auth_headers(client, admin.email)
+    depois = (datetime.utcnow() + timedelta(days=2)).replace(microsecond=0)
+    resp = client.put(f"/entregas/{entrega.id}/status", headers=headers,
+                      params={"status": "em_rota", "parte_em": depois.isoformat() + "Z"})
+    assert resp.status_code == 200, resp.text
+    dados = client.get(f"/entregas/{entrega.id}", headers=headers).json()
+    assert dados["status"] == "em_rota" and dados["parte_em"].startswith(depois.isoformat())
+    # Carregado e parado continua ocupando o caminhão.
+    resp = client.post("/entregas/", headers=headers, json=_payload(veiculo_id=veiculo.id))
+    assert resp.status_code == 400
+    # "Saiu agora": a viagem continua, só a saída para a estrada muda.
+    iniciado = dados["iniciado_em"]
+    agora = datetime.utcnow().isoformat() + "Z"
+    assert client.put(f"/entregas/{entrega.id}/status", headers=headers,
+                      params={"status": "em_rota", "parte_em": agora}).status_code == 200
+    dados = client.get(f"/entregas/{entrega.id}", headers=headers).json()
+    assert dados["iniciado_em"] == iniciado
+    assert dados["parte_em"] < depois.isoformat()
+
+
+def test_carga_com_tempo_valida_a_data(client, admin, db_session):
+    entrega = criar_entrega_orm(db_session)
+    headers = auth_headers(client, admin.email)
+    resp = client.put(f"/entregas/{entrega.id}/status", headers=headers,
+                      params={"status": "em_rota", "parte_em": "2020-01-01T00:00:00Z"})
+    assert resp.status_code == 400
+    resp = client.put(f"/entregas/{entrega.id}/status", headers=headers,
+                      params={"status": "em_rota", "parte_em": "2099-01-01T00:00:00Z"})
+    assert resp.status_code == 400

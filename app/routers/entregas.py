@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import and_, or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from datetime import datetime, timedelta, timezone
 from app.database import get_db
 from app.models.entrega import Entrega
@@ -68,16 +68,41 @@ def _buscar_entrega_anterior(veiculo_id, excluir_id: int, db: Session):
         .first()
     )
 
+def filtro_manutencao_agora():
+    # Na oficina agora: em andamento, ou agendada para hoje ou antes. Revisão
+    # agendada para a semana que vem não segura o caminhão hoje (mesma regra
+    # do mapa da frota).
+    from app.routers.dashboard import hoje_brasilia
+    return (or_(Manutencao.status == "em_andamento",
+                and_(Manutencao.status == "agendada", Manutencao.data_manutencao <= hoje_brasilia())),)
+
+def carretas_do_cavalo(cavalo_id, db: Session):
+    # A entrega só guarda o cavalo; as carretas do conjunto ativo viajam junto.
+    from app.models.conjunto import Conjunto
+    ids = []
+    for c in db.query(Conjunto).filter(Conjunto.status == "ativo", Conjunto.cavalo_id == cavalo_id).all():
+        ids += [i for i in (c.semirreboque1_id, c.semirreboque2_id) if i]
+    return ids
+
 def _validar_veiculo_sem_manutencao(veiculo_id, db: Session):
     if not veiculo_id:
         return
     manutencao = db.query(Manutencao).filter(
-        Manutencao.veiculo_id == veiculo_id, Manutencao.status != "concluida"
+        Manutencao.veiculo_id == veiculo_id, *filtro_manutencao_agora()
     ).first()
     if manutencao:
         raise HTTPException(
             status_code=400,
             detail=f'Veículo está em manutenção (#{manutencao.id} — {manutencao.tipo}). Finalize a manutenção antes de usá-lo em uma entrega.'
+        )
+    carretas = carretas_do_cavalo(veiculo_id, db)
+    manutencao = carretas and db.query(Manutencao).options(joinedload(Manutencao.veiculo)).filter(
+        Manutencao.veiculo_id.in_(carretas), *filtro_manutencao_agora()
+    ).first()
+    if manutencao:
+        raise HTTPException(
+            status_code=400,
+            detail=f'A carreta {manutencao.veiculo.placa} do conjunto está em manutenção (#{manutencao.id} — {manutencao.tipo}). Finalize a manutenção ou troque a carreta no conjunto.'
         )
 
 def _travar_viagem_acertada(entrega: Entrega, atual: Usuario, status_novo=None, motorista_novo=..., muda_frete=False):
@@ -162,7 +187,8 @@ def buscar_entrega(id: int, db: Session = Depends(get_db), atual: Usuario = Depe
     return entrega
 
 @router.put("/{id}/status")
-def atualizar_status(id: int, status: str, db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
+def atualizar_status(id: int, status: str, parte_em: datetime | None = None,
+                     db: Session = Depends(get_db), atual: Usuario = Depends(get_usuario_atual)):
     entrega = db.query(Entrega).filter(Entrega.id == id).first()
     if not entrega:
         raise HTTPException(status_code=404, detail="Entrega não encontrada")
@@ -176,6 +202,12 @@ def atualizar_status(id: int, status: str, db: Session = Depends(get_db), atual:
     if status == "em_rota":
         _validar_motorista_veiculo_livres(entrega.motorista_id, entrega.veiculo_id, db, excluir_id=entrega.id)
         _validar_veiculo_sem_manutencao(entrega.veiculo_id, db)
+    if status == "em_rota" and parte_em is not None:
+        parte_em = _utc_sem_fuso(parte_em)
+        if parte_em < (entrega.iniciado_em or datetime.utcnow()) - timedelta(minutes=5):
+            raise HTTPException(status_code=400, detail="A saída para a estrada não pode ser antes da carga.")
+        if parte_em > datetime.utcnow() + timedelta(days=60):
+            raise HTTPException(status_code=400, detail="A saída para a estrada precisa ser nos próximos 60 dias.")
     status_anterior = entrega.status
     entrega.status = status
     entrega_anterior_id = None
@@ -205,6 +237,13 @@ def atualizar_status(id: int, status: str, db: Session = Depends(get_db), atual:
             db.add(dv)
         dv.entrega_anterior_id = entrega_anterior_id
         dv.km_vazio = None
+    # Carga com tempo: em rota (carregado, ocupado) mas a estrada só começa em
+    # parte_em. Sem ele, num início novo, sai na hora. Na viagem que continua
+    # (ex.: "Saiu agora" no mapa) só muda se vier um valor novo.
+    if status == "em_rota" and parte_em is not None:
+        entrega.parte_em = max(parte_em, entrega.iniciado_em)
+    elif status == "em_rota" and not continua_viagem:
+        entrega.parte_em = None
     # Marcar "entregue" de novo não muda a data de conclusão (é a que sai no recibo do acerto).
     if status == "entregue" and not (status_anterior == "entregue" and entrega.concluido_em):
         entrega.concluido_em = datetime.utcnow()

@@ -231,6 +231,9 @@ function renderizarFaturamento(fat) {
     `).join('');
   }
 
+  entregasDoPeriodo = fat.por_entrega;
+  renderizarRankClientes();
+
   const tbodyEntregas = document.getElementById('tabela-faturamento-entregas');
   tbodyEntregas.innerHTML = fat.por_entrega.length === 0
     ? estadoVazio(7, 'Nenhuma entrega concluída no período', null, 'vazio')
@@ -245,6 +248,62 @@ function renderizarFaturamento(fat) {
         <td>${formatarMoeda(e.comissao)}</td>
       </tr>
     `).join('');
+}
+
+/* Ranking de clientes do período (mesmas entregas concluídas da tabela
+   abaixo). O nome é digitado livre na entrega, então "AMBEV TRANSF" e
+   "Ambev  Transf" viram uma linha só; mostra a grafia mais usada. */
+let entregasDoPeriodo = [];
+
+function rankClientes(entregas) {
+  const grupos = new Map();
+  entregas.forEach(e => {
+    const chave = chaveCliente(e.cliente);
+    const g = grupos.get(chave) || { cargas: 0, frete: 0, grafias: {} };
+    g.cargas++;
+    g.frete += e.valor_frete || 0;
+    const grafia = (e.cliente || '').trim();
+    g.grafias[grafia] = (g.grafias[grafia] || 0) + 1;
+    grupos.set(chave, g);
+  });
+  return [...grupos.entries()].map(([chave, g]) => ({
+    chave,
+    nome: Object.entries(g.grafias).sort((a, b) => b[1] - a[1])[0][0],
+    cargas: g.cargas,
+    frete: g.frete,
+  })).sort((a, b) => b.cargas - a.cargas || b.frete - a.frete);
+}
+
+function renderizarRankClientes() {
+  const tbody = document.getElementById('tabela-rank-clientes');
+  const busca = chaveCliente(document.getElementById('busca-cliente-rank').value);
+  const todos = rankClientes(entregasDoPeriodo);
+  const freteTotal = todos.reduce((s, c) => s + c.frete, 0);
+  const lista = todos.map((c, i) => ({ ...c, posicao: i + 1 })).filter(c => !busca || c.chave.includes(busca));
+  if (lista.length === 0) {
+    tbody.innerHTML = estadoVazio(5, busca ? 'Nenhum cliente com esse nome no período' : 'Nenhuma entrega concluída no período', null, 'vazio');
+    return;
+  }
+  const linhas = lista.map(c => {
+    const parte = freteTotal ? c.frete / freteTotal * 100 : 0;
+    return `
+      <tr>
+        <td>${c.posicao}º</td>
+        <td>${escapeHtml(c.nome)}</td>
+        <td><strong>${c.cargas}</strong></td>
+        <td>${formatarMoeda(c.frete)}</td>
+        <td><span class="frota-barra" title="${parte.toFixed(1).replace('.', ',')}%"><i style="width:${parte}%"></i></span>
+          <small>${parte.toFixed(1).replace('.', ',')}%</small></td>
+      </tr>`;
+  });
+  // Buscando "ambev": soma Transf + Dedicado + ... numa linha de total.
+  if (busca && lista.length > 1) {
+    const cargas = lista.reduce((s, c) => s + c.cargas, 0);
+    const frete = lista.reduce((s, c) => s + c.frete, 0);
+    linhas.push(`<tr><td></td><td><strong>Total (${lista.length} clientes)</strong></td><td><strong>${cargas}</strong></td>
+      <td><strong>${formatarMoeda(frete)}</strong></td><td><small>${(freteTotal ? frete / freteTotal * 100 : 0).toFixed(1).replace('.', ',')}%</small></td></tr>`);
+  }
+  tbody.innerHTML = linhas.join('');
 }
 
 function isoData(d) {
