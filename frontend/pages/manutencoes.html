@@ -105,6 +105,11 @@
         <div class="card-valor" id="total-agendadas">—</div>
         <div class="card-label">Agendadas</div>
       </div>
+      <div class="card azul">
+        <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+        <div class="card-valor" id="custo-periodo">—</div>
+        <div class="card-label">Custo no período</div>
+      </div>
     </div>
 
     <!-- FILTROS -->
@@ -125,7 +130,21 @@
         <option value="em_andamento">Em andamento</option>
         <option value="concluida">Concluída</option>
       </select>
-      <input type="search" id="filtro-veiculo" placeholder="Buscar por veículo..." onkeyup="filtrar()" autocomplete="off" style="min-width:200px;" />
+      <select id="filtro-categoria" onchange="filtrar()">
+        <option value="">Caminhões e carretas</option>
+        <option value="cavalo">Só caminhões</option>
+        <option value="semirreboque">Só carretas</option>
+      </select>
+      <input type="search" id="filtro-veiculo" placeholder="Buscar por placa ou motorista..." oninput="filtrar()" autocomplete="off" style="min-width:220px;" />
+      <div class="form-group">
+        <label style="font-size:12px;color:var(--text-light);">De</label>
+        <input type="date" id="filtro-data-inicio" onchange="filtrar()" />
+      </div>
+      <div class="form-group">
+        <label style="font-size:12px;color:var(--text-light);">Até</label>
+        <input type="date" id="filtro-data-fim" onchange="filtrar()" />
+      </div>
+      <button class="btn btn-outline" onclick="limparFiltros()" style="font-size:12px;">Limpar filtros</button>
     </div>
 
     <div class="table-container">
