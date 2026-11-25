@@ -1675,6 +1675,9 @@ a.link-ficha:hover { color: var(--accent-dark); text-decoration: underline; }
 /* Nova entrega: caixa para lançar uma viagem antiga com as datas reais. */
 .viagem-realizada { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 10px; background: rgba(242,169,59,0.10); border: 1px dashed rgba(242,169,59,0.55); font-size: 13px; color: var(--text); cursor: pointer; }
 .viagem-realizada input { width: auto; margin-top: 2px; }
+.cooperativa-conta { font-size: 13px; line-height: 1.6; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+.cooperativa-receber { display: flex; gap: 6px; align-items: center; }
+.cooperativa-receber input { padding: 4px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-card); color: var(--text); font-size: 12px; }
 
 /* ===================== CELULAR (iPhone/Safari e Android) ===================== */
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }

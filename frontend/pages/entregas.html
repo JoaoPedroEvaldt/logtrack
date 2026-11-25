@@ -80,6 +80,7 @@
     </div>
 
     <div class="toolbar" style="justify-content:flex-end;" data-staff-only>
+      <button class="btn btn-outline" onclick="abrirModalCooperativa()">Recebimentos da cooperativa</button>
       <button class="btn btn-primary" onclick="abrirModal()">+ Nova Entrega</button>
     </div>
 
@@ -193,6 +194,16 @@
         </div>
         <div class="form-group"><label>Valor do frete (R$)</label><input type="text" inputmode="decimal"
             id="valor-frete" placeholder="0,00" /></div>
+        <label class="viagem-realizada" style="grid-column:1/-1;">
+          <input type="checkbox" id="carga-cooperativa" onchange="alternarCooperativa()" />
+          <span><strong>Carga pela cooperativa</strong> — ela emite o CT-e e o manifesto, fica com uma parte do frete e paga depois. Informe acima o frete cheio.</span>
+        </label>
+        <div id="bloco-cooperativa" class="form-grid" hidden style="grid-column:1/-1;">
+          <div class="form-group"><label>Taxa da cooperativa (%)</label><input type="number" id="cooperativa-pct" min="0.01" max="99.99" step="0.01" /></div>
+          <div class="form-group"><label>Emissão do CT-e (carregamento)</label><input type="date" id="cte-emitido-em" /></div>
+          <div class="form-group"><label>Prazo para receber (dias)</label><input type="number" id="prazo-recebimento" min="0" max="365" step="1" /></div>
+          <div class="cooperativa-conta" id="cooperativa-conta" style="grid-column:1/-1;"></div>
+        </div>
         <div class="form-group"><label>Origem *</label><input type="text" id="origem"
             placeholder="Endereço de origem" /></div>
         <div class="form-group"><label>Destino *</label><input type="text" id="destino"
@@ -273,6 +284,22 @@
       </div>
       <div id="rota-status" style="flex-shrink:0;margin-bottom:10px;font-size:12px;color:var(--text-light);"></div>
       <div id="mapa-rota" style="flex:1;min-height:0;border-radius:12px;background:#eef2f7;"></div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-cooperativa">
+    <div class="modal" style="max-width:980px;">
+      <div class="modal-header">
+        <h2>Recebimentos da cooperativa</h2>
+        <button class="btn-fechar" onclick="fecharModalCooperativa()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+      <div class="cards-grid" id="cooperativa-cards" style="margin-bottom:16px;"></div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>#</th><th>Rota</th><th>CT-e</th><th>Frete</th><th>Taxa</th><th>A receber</th><th>Vence</th><th>Recebimento</th></tr></thead>
+          <tbody id="cooperativa-linhas"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 

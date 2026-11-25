@@ -80,6 +80,8 @@ class ViagemAcerto(BaseModel):
     origem: str
     destino: str
     valor_frete: float
+    taxa_cooperativa: float
+    frete_liquido: float
     comissao: float
 
 

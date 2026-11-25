@@ -6,7 +6,7 @@ from sqlalchemy.sql.functions import FunctionElement
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from app.database import get_db
-from app.models.entrega import Entrega
+from app.models.entrega import COMISSAO_MOTORISTA, Entrega
 from app.models.veiculo import Veiculo
 from app.models.motorista import Motorista
 from app.models.ocorrencia import Ocorrencia
@@ -25,18 +25,12 @@ router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 # noite contava como de amanhã). Brasil sem horário de verão desde 2019.
 FUSO_BRASILIA = timedelta(hours=-3)
 
-# Comissão do motorista: 13% do frete de cada entrega concluída, sem descontar
-# abastecimento — vai somando frete a frete. Para a empresa ela é custo.
-COMISSAO_MOTORISTA = 0.13
+# Comissão do motorista (Entrega.comissao): soma frete a frete, igual ao acerto.
+# Para a empresa ela é custo, assim como a taxa da cooperativa.
 # Diária (estadia paga pelo cliente): 1/3 motorista (ver parte_motorista_diaria), 1/3 caminhão, 1/3 empresa.
 
 def _centavos(v) -> Decimal:
     return Decimal(str(v or 0)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-
-def comissao_frete(valor) -> float:
-    """13% do frete arredondado ao centavo por viagem — igual ao acerto, para os
-    as duas telas fecharem no centavo."""
-    return float((_centavos(valor) * Decimal(str(COMISSAO_MOTORISTA))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
 def parte_motorista_diaria(valor) -> float:
     """1/3 da diária por lançamento, igual a dividir_diaria() do acerto."""
@@ -196,7 +190,11 @@ def desempenho_motoristas(db: Session = Depends(get_db), atual: Usuario = Depend
         func.count(Entrega.id).label("total"),
         func.count(Entrega.id).filter(Entrega.status == "entregue").label("concluidas"),
         func.count(Entrega.id).filter(Entrega.status == "atrasado").label("atrasadas"),
-        faturamento.label("faturamento")
+        faturamento.label("faturamento"),
+        func.coalesce(
+            func.sum(Entrega.valor_frete * (1 - func.coalesce(Entrega.cooperativa_pct, 0) / 100.0))
+            .filter(Entrega.status == "entregue"), 0
+        ).label("base_comissao")
     ).join(Entrega, Entrega.motorista_id == Motorista.id)\
      .filter(Motorista.status != "inativo")\
      .group_by(Motorista.id, Motorista.nome)\
@@ -205,7 +203,7 @@ def desempenho_motoristas(db: Session = Depends(get_db), atual: Usuario = Depend
 
     return [
         {"motorista_id": r.id, "motorista": r.nome, "total": r.total, "concluidas": r.concluidas, "atrasadas": r.atrasadas, "faturamento": float(r.faturamento),
-         "comissao": float(r.faturamento) * COMISSAO_MOTORISTA}
+         "comissao": float(r.base_comissao) * COMISSAO_MOTORISTA}
         for r in resultado
     ]
 
@@ -235,16 +233,17 @@ def _totais_periodo(db: Session, inicio: date, fim: date):
     receita_bruta = receita_fretes + receita_diarias
     custo_manutencao = sum(float(m.custo or 0) for m in manutencoes)
     custo_abastecimento = sum(float(a.valor_total or 0) for a in abastecimentos)
-    # Pago aos motoristas: 13% do frete + a parte deles (1/3) nas diárias.
-    comissao = sum(comissao_frete(e.valor_frete) for e in entregas) + sum(parte_motorista_diaria(d.valor) for d in diarias)
-    return entregas, manutencoes, abastecimentos, receita_bruta, custo_manutencao, custo_abastecimento, comissao, diarias
+    # Pago aos motoristas: comissão dos fretes + a parte deles (1/3) nas diárias.
+    comissao = sum(float(e.comissao) for e in entregas) + sum(parte_motorista_diaria(d.valor) for d in diarias)
+    taxa_cooperativa = sum(float(e.taxa_cooperativa) for e in entregas)
+    return entregas, manutencoes, abastecimentos, receita_bruta, custo_manutencao, custo_abastecimento, comissao, diarias, taxa_cooperativa
 
 @router.get("/faturamento")
 def faturamento(inicio: date | None = None, fim: date | None = None,
                 db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     """Faturamento líquido de um período (visão da empresa): receita das entregas
     concluídas + diárias, menos manutenção, abastecimento e o que vai para o
-    motorista (13% do frete + 1/3 das diárias), detalhado por conjunto (veículo + motorista fixo). Movimento que
+    motorista (13% do frete + 1/3 das diárias) e para a cooperativa, detalhado por conjunto (veículo + motorista fixo). Movimento que
     não pertence a nenhum conjunto cadastrado entra como linha "Sem conjunto".
     `inicio` e `fim` (inclusive) escolhem o período; sem eles vale o mês atual.
     Inclui também os totais do período anterior de MESMA DURAÇÃO, só pra comparação
@@ -271,8 +270,8 @@ def faturamento(inicio: date | None = None, fim: date | None = None,
         fim_ant_excl = inicio
     fim_excl = fim + timedelta(days=1)
 
-    entregas, manutencoes, abastecimentos, receita_bruta, custo_manutencao, custo_abastecimento, comissao_total, diarias =         _totais_periodo(db, inicio, fim_excl)
-    _, _, _, receita_bruta_ant, custo_manutencao_ant, custo_abastecimento_ant, comissao_ant, _ =         _totais_periodo(db, inicio_ant, fim_ant_excl)
+    entregas, manutencoes, abastecimentos, receita_bruta, custo_manutencao, custo_abastecimento, comissao_total, diarias, taxa_cooperativa = _totais_periodo(db, inicio, fim_excl)
+    _, _, _, receita_bruta_ant, custo_manutencao_ant, custo_abastecimento_ant, comissao_ant, _, taxa_cooperativa_ant = _totais_periodo(db, inicio_ant, fim_ant_excl)
 
     conjuntos = db.query(Conjunto).filter(Conjunto.status != "inativo").all()
     # Todos os motoristas (inclusive inativos): quem trabalhou no mês e foi
@@ -308,7 +307,7 @@ def faturamento(inicio: date | None = None, fim: date | None = None,
     conjunto_por_entrega = {e.id: conjunto_da_entrega(e) for e in entregas}
     conjunto_por_diaria = {d.id: conjunto_da_entrega(d.entrega) for d in diarias}
 
-    def linha(receita_fretes, comissao_fretes, receita_diarias, comissao_diarias, abastecimento, manutencao, qtd_entregas, **ident):
+    def linha(receita_fretes, comissao_fretes, taxa_cooperativa, receita_diarias, comissao_diarias, abastecimento, manutencao, qtd_entregas, **ident):
         receita = receita_fretes + receita_diarias
         comissao = comissao_fretes + comissao_diarias
         return {
@@ -318,11 +317,13 @@ def faturamento(inicio: date | None = None, fim: date | None = None,
             "abastecimento": abastecimento,
             "manutencao": manutencao,
             "comissao": comissao,
-            "liquido": receita - abastecimento - manutencao - comissao,
+            "taxa_cooperativa": taxa_cooperativa,
+            "liquido": receita - abastecimento - manutencao - comissao - taxa_cooperativa,
         }
 
     def soma_entregas(lista):
-        return sum(float(e.valor_frete or 0) for e in lista), sum(comissao_frete(e.valor_frete) for e in lista)
+        return (sum(float(e.valor_frete or 0) for e in lista), sum(float(e.comissao) for e in lista),
+                sum(float(e.taxa_cooperativa) for e in lista))
 
     def soma_diarias(lista):
         return sum(float(d.valor) for d in lista), sum(parte_motorista_diaria(d.valor) for d in lista)
@@ -378,7 +379,8 @@ def faturamento(inicio: date | None = None, fim: date | None = None,
         "custo_abastecimento": custo_abastecimento,
         "comissao": comissao_total,
         "receita_diarias": sum(float(d.valor) for d in diarias),
-        "faturamento_liquido": receita_bruta - custo_manutencao - custo_abastecimento - comissao_total,
+        "taxa_cooperativa": taxa_cooperativa,
+        "faturamento_liquido": receita_bruta - custo_manutencao - custo_abastecimento - comissao_total - taxa_cooperativa,
         "por_conjunto": por_conjunto,
         "por_entrega": [
             {
@@ -391,7 +393,8 @@ def faturamento(inicio: date | None = None, fim: date | None = None,
                 "conjunto": conjunto_por_entrega[e.id].nome if conjunto_por_entrega[e.id] else None,
                 "placas": placas_do_conjunto(conjunto_por_entrega[e.id]) if conjunto_por_entrega[e.id] else "",
                 "valor_frete": float(e.valor_frete or 0),
-                "comissao": comissao_frete(e.valor_frete),
+                "taxa_cooperativa": float(e.taxa_cooperativa),
+                "comissao": float(e.comissao),
             }
             for e in sorted(entregas, key=lambda e: e.concluido_em or datetime.min, reverse=True)
         ],
@@ -399,6 +402,6 @@ def faturamento(inicio: date | None = None, fim: date | None = None,
             "receita_bruta": receita_bruta_ant,
             "custo_total": custo_manutencao_ant + custo_abastecimento_ant,
             "comissao": comissao_ant,
-            "faturamento_liquido": receita_bruta_ant - custo_manutencao_ant - custo_abastecimento_ant - comissao_ant
+            "faturamento_liquido": receita_bruta_ant - custo_manutencao_ant - custo_abastecimento_ant - comissao_ant - taxa_cooperativa_ant
         }
     }

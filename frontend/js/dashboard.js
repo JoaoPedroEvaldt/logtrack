@@ -205,6 +205,10 @@ function renderizarFaturamento(fat) {
   document.getElementById('fat-comissao').textContent = formatarMoeda(fat.comissao);
   document.getElementById('fat-liquido').textContent = formatarMoeda(fat.faturamento_liquido);
 
+  // Só aparece quando houve carga pela cooperativa no período.
+  document.getElementById('card-cooperativa').hidden = !fat.taxa_cooperativa;
+  document.getElementById('fat-cooperativa').textContent = formatarMoeda(fat.taxa_cooperativa);
+
   const anterior = fat.mes_anterior || {};
   document.getElementById('fat-receita-var').innerHTML = badgeVariacao(fat.receita_bruta, anterior.receita_bruta, true);
   document.getElementById('fat-custos-var').innerHTML = badgeVariacao(custoTotal, anterior.custo_total, false);
@@ -222,7 +226,7 @@ function renderizarFaturamento(fat) {
         <td>${c.placas ? escapeHtml(c.placas) : '—'}</td>
         <td>${c.motorista ? escapeHtml(c.motorista) : '—'}</td>
         <td>${c.entregas}</td>
-        <td>${formatarMoeda(c.receita)}</td>
+        <td>${formatarMoeda(c.receita)}${c.taxa_cooperativa ? `<br><small style="color:var(--text-light);">− ${formatarMoeda(c.taxa_cooperativa)} cooperativa</small>` : ''}</td>
         <td>${formatarMoeda(c.abastecimento)}</td>
         <td>${formatarMoeda(c.manutencao)}</td>
         <td>${formatarMoeda(c.comissao)}</td>
@@ -244,7 +248,7 @@ function renderizarFaturamento(fat) {
         <td>${escapeHtml(e.origem)} → ${escapeHtml(e.destino)}</td>
         <td>${e.motorista ? escapeHtml(e.motorista) : '—'}</td>
         <td>${e.conjunto ? escapeHtml(e.conjunto) : '—'}</td>
-        <td>${formatarMoeda(e.valor_frete)}</td>
+        <td>${formatarMoeda(e.valor_frete)}${e.taxa_cooperativa ? `<br><small style="color:var(--text-light);">− ${formatarMoeda(e.taxa_cooperativa)} cooperativa</small>` : ''}</td>
         <td>${formatarMoeda(e.comissao)}</td>
       </tr>
     `).join('');

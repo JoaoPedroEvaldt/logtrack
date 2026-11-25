@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session, joinedload
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from app.database import get_db
 from app.models.entrega import Entrega
 from app.models.manutencao import Manutencao
@@ -140,6 +140,15 @@ def _validar_viagem_realizada(dados: EntregaCreate):
     if dados.concluido_em > datetime.utcnow() + timedelta(minutes=5):
         raise HTTPException(status_code=400, detail="Viagem já realizada não pode ter entrega no futuro.")
 
+PRAZO_COOPERATIVA_DIAS = 120
+
+def _completar_cooperativa(entrega: Entrega):
+    """Prazo padrão na carga da cooperativa; frete direto não guarda nada dela."""
+    if entrega.cooperativa_pct is None:
+        entrega.cte_emitido_em = entrega.prazo_recebimento_dias = entrega.recebido_em = None
+    elif entrega.prazo_recebimento_dias is None:
+        entrega.prazo_recebimento_dias = PRAZO_COOPERATIVA_DIAS
+
 @router.post("/", response_model=EntregaResponse, include_in_schema=False)
 @router.post("", response_model=EntregaResponse)
 def criar_entrega(dados: EntregaCreate, db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
@@ -152,6 +161,7 @@ def criar_entrega(dados: EntregaCreate, db: Session = Depends(get_db), atual: Us
         _validar_motorista_veiculo_livres(dados.motorista_id, dados.veiculo_id, db)
         _validar_veiculo_sem_manutencao(dados.veiculo_id, db)
     entrega = Entrega(**dados.model_dump())
+    _completar_cooperativa(entrega)
     if realizada:
         entrega.status = "entregue"
     db.add(entrega)
@@ -251,6 +261,26 @@ def atualizar_status(id: int, status: str, parte_em: datetime | None = None,
     db.refresh(entrega)
     return {"message": f"Status atualizado para {status}", "entrega_anterior_id": entrega_anterior_id}
 
+@router.put("/{id}/recebimento", response_model=EntregaResponse)
+def registrar_recebimento(id: int, recebido_em: date | None = None,
+                          db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
+    """Marca quando a cooperativa pagou o frete; sem data, desfaz a marcação.
+    Não mexe na comissão, então vale também para viagem já acertada."""
+    from app.routers.dashboard import hoje_brasilia
+    entrega = db.query(Entrega).filter(Entrega.id == id).first()
+    if not entrega:
+        raise HTTPException(status_code=404, detail="Entrega não encontrada")
+    if entrega.cooperativa_pct is None:
+        raise HTTPException(status_code=400, detail="Só a carga feita pela cooperativa tem controle de recebimento.")
+    if recebido_em and entrega.status == "cancelado":
+        raise HTTPException(status_code=400, detail="Entrega cancelada não tem recebimento.")
+    if recebido_em and recebido_em > hoje_brasilia():
+        raise HTTPException(status_code=400, detail="O recebimento não pode ser numa data futura.")
+    entrega.recebido_em = recebido_em
+    db.commit()
+    db.refresh(entrega)
+    return entrega
+
 @router.put("/{id}", response_model=EntregaResponse)
 def atualizar_entrega(id: int, dados: EntregaUpdate, db: Session = Depends(get_db), atual: Usuario = Depends(exigir_staff)):
     entrega = db.query(Entrega).filter(Entrega.id == id).first()
@@ -267,7 +297,9 @@ def atualizar_entrega(id: int, dados: EntregaUpdate, db: Session = Depends(get_d
     _travar_viagem_acertada(
         entrega, atual, status_novo=atualizacoes.get("status"),
         motorista_novo=atualizacoes.get("motorista_id", ...),
-        muda_frete="valor_frete" in atualizacoes and atualizacoes["valor_frete"] != float(entrega.valor_frete or 0),
+        muda_frete=("valor_frete" in atualizacoes and atualizacoes["valor_frete"] != float(entrega.valor_frete or 0))
+        or ("cooperativa_pct" in atualizacoes
+            and (atualizacoes["cooperativa_pct"] or 0) != float(entrega.cooperativa_pct or 0)),
     )
     if "motorista_id" in atualizacoes or "veiculo_id" in atualizacoes:
         _validar_motorista_e_veiculo_existem(motorista_id, veiculo_id, db)
@@ -294,8 +326,9 @@ def atualizar_entrega(id: int, dados: EntregaUpdate, db: Session = Depends(get_d
 
     for campo, valor in atualizacoes.items():
         setattr(entrega, campo, valor)
+    _completar_cooperativa(entrega)
     # Frete corrigido numa viagem já paga num acerto: o acerto acompanha.
-    if entrega.acerto_id and "valor_frete" in atualizacoes:
+    if entrega.acerto_id and ("valor_frete" in atualizacoes or "cooperativa_pct" in atualizacoes):
         from app.routers.acertos import recalcular_acerto
         recalcular_acerto(entrega.acerto_id, db)
     db.commit()

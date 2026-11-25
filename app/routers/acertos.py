@@ -1,5 +1,6 @@
 """Acerto do motorista: a cada 30 dias (na entrega do envelope) o motorista
-recebe a comissão de 13% sobre o frete das viagens concluídas + a parte dele
+recebe a comissão de 13% sobre o frete das viagens concluídas (na carga da
+cooperativa, sobre o que sobra da taxa dela) + a parte dele
 nas diárias (1/3) - os adiantamentos (vales do dia 5 e do dia 15). A empresa
 paga o diesel e não há outras despesas nem descontos.
 
@@ -19,7 +20,7 @@ from app.models.entrega import Entrega
 from app.models.motorista import Motorista
 from app.models.usuario import Usuario
 from app.routers.auth import exigir_admin, exigir_staff
-from app.routers.dashboard import COMISSAO_MOTORISTA, FUSO_BRASILIA, hoje_brasilia, inicio_do_dia_utc
+from app.routers.dashboard import FUSO_BRASILIA, hoje_brasilia, inicio_do_dia_utc
 from app.schemas.acerto import (
     AcertoCreate, AcertoDetalhe, AcertoResponse, AcertoUpdate, AdiantamentoCreate, AdiantamentoResponse,
     AdiantamentoUpdate, DiariaCreate, DiariaResponse, DiariaUpdate, PreviaAcerto, ViagemAcerto,
@@ -28,7 +29,6 @@ from app.schemas.acerto import (
 router = APIRouter(tags=["Acerto do motorista"])
 
 CENTAVO = Decimal("0.01")
-TAXA_COMISSAO = Decimal(str(COMISSAO_MOTORISTA))
 
 
 def _dinheiro(v) -> Decimal:
@@ -67,10 +67,10 @@ def _serializar_diaria(d: Diaria) -> DiariaResponse:
 
 
 def _serializar_viagem(e: Entrega) -> ViagemAcerto:
-    frete = _dinheiro(e.valor_frete)
     return ViagemAcerto(
         id=e.id, data=_dia_brasilia(e.concluido_em), origem=e.origem, destino=e.destino,
-        valor_frete=float(frete), comissao=float((frete * TAXA_COMISSAO).quantize(CENTAVO, rounding=ROUND_HALF_UP)),
+        valor_frete=float(_dinheiro(e.valor_frete)), taxa_cooperativa=float(e.taxa_cooperativa),
+        frete_liquido=float(e.frete_liquido), comissao=float(e.comissao),
     )
 
 
@@ -112,10 +112,7 @@ def _pendencias(motorista_id: int, inicio: date, fim: date, db: Session):
 
 def _totais(viagens, diarias, adiantamentos) -> dict:
     total_frete = sum((_dinheiro(e.valor_frete) for e in viagens), Decimal("0"))
-    comissao = sum(
-        ((_dinheiro(e.valor_frete) * TAXA_COMISSAO).quantize(CENTAVO, rounding=ROUND_HALF_UP) for e in viagens),
-        Decimal("0"),
-    )
+    comissao = sum((e.comissao for e in viagens), Decimal("0"))
     total_diarias = sum((_dinheiro(d.valor) for d in diarias), Decimal("0"))
     diarias_motorista = sum((dividir_diaria(d.valor)[0] for d in diarias), Decimal("0"))
     total_adiantamentos = sum((_dinheiro(a.valor) for a in adiantamentos), Decimal("0"))

@@ -2,15 +2,14 @@
    atual, resumo do período (viagens, km, frete, comissão de 13%,
    pontualidade), gráfico dos últimos 12 meses, viagens e ocorrências do
    período e a ficha em PDF. Tudo calculado aqui em cima das listas que a API
-   já devolve — a regra de comissão é a mesma do painel (COMISSAO_MOTORISTA
-   em app/routers/dashboard.py): 13% do frete de cada entrega concluída,
+   já devolve — a comissão de cada viagem já vem pronta da API
+   (Entrega.comissao em app/models/entrega.py): 13% do frete de cada entrega concluída,
    sem descontar abastecimento. O acerto da empresa fecha a cada 30 dias,
    por isso o período padrão é o mês corrente. */
 checarAuth();
 checarStaff();
 document.getElementById('usuario-perfil').textContent = localStorage.getItem('perfil') || '';
 
-const COMISSAO_MOTORISTA = 0.13;
 const NOMES_MES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 const TIPO_OCORRENCIA_LABEL = {
   atraso: 'Atraso', acidente: 'Acidente', cliente_ausente: 'Cliente ausente',
@@ -154,6 +153,7 @@ function renderizarPerfil() {
     : '';
   const concluidas = entregas.filter(e => e.status === 'entregue');
   const freteTotal = concluidas.reduce((s, e) => s + (parseFloat(e.valor_frete) || 0), 0);
+  const comissaoTotal = concluidas.reduce((s, e) => s + e.comissao, 0);
   const primeiraViagem = concluidas.length ? new Date(Math.min(...concluidas.map(e => dataUtc(e.concluido_em) || new Date(e.previsao)))) : null;
 
   const info = (rotulo, valor) => `<div class="ficha-info"><span>${rotulo}</span><strong>${valor}</strong></div>`;
@@ -185,7 +185,7 @@ function renderizarPerfil() {
       ${info('Acesso ao sistema', m.possui_login ? escapeHtml(m.email || 'Sim') : 'Sem acesso')}
       ${info('Viagens concluídas', concluidas.length.toLocaleString('pt-BR'))}
       ${info('Frete total gerado', reais(freteTotal))}
-      ${info('Comissão acumulada (13%)', reais(freteTotal * COMISSAO_MOTORISTA))}
+      ${info('Comissão acumulada (13%)', reais(comissaoTotal))}
       ${info('Primeira viagem', primeiraViagem ? primeiraViagem.toLocaleDateString('pt-BR') : '—')}
     </div>
   `;
@@ -212,7 +212,8 @@ function resumoDoPeriodo(periodo) {
   const pontuais = concluidas.filter(noPrazo).length;
   const ocorrencias = ficha.ocorrencias.filter(o => periodo === 'tudo' || chaveMes(dataUtc(o.criado_em)) === periodo);
   return {
-    viagens: doPeriodo, concluidas, frete, km, comissao: frete * COMISSAO_MOTORISTA,
+    viagens: doPeriodo, concluidas, frete, km, comissao: concluidas.reduce((s, e) => s + e.comissao, 0),
+    taxaCooperativa: concluidas.reduce((s, e) => s + e.taxa_cooperativa, 0),
     pontualidade: concluidas.length ? Math.round(pontuais / concluidas.length * 100) : null,
     ocorrencias,
   };
@@ -260,6 +261,7 @@ function renderizarComissao(r, nomePeriodo) {
         <span>Frete total (${r.concluidas.length} viage${r.concluidas.length === 1 ? 'm' : 'ns'})</span>
         <span>${reais(r.frete)}</span>
       </div>
+      ${r.taxaCooperativa ? `<div class="ficha-comissao-linha"><span>− taxa da cooperativa</span><span>${reais(r.taxaCooperativa)}</span></div>` : ''}
       <div class="ficha-comissao-linha">
         <span>× 13% de comissão</span>
         <span></span>
@@ -268,7 +270,7 @@ function renderizarComissao(r, nomePeriodo) {
         <span>Comissão do motorista</span>
         <strong>${reais(r.comissao)}</strong>
       </div>
-      <p class="ficha-nota">Sobre o frete bruto, sem descontar abastecimento. O acerto com o motorista fecha a cada 30 dias.</p>
+      <p class="ficha-nota">Sobre o frete bruto, sem descontar abastecimento (na carga da cooperativa, sobre o que sobra da taxa dela). O acerto com o motorista fecha a cada 30 dias.</p>
     </div>`;
 }
 
@@ -292,7 +294,7 @@ function renderizarViagens(r, nomePeriodo) {
         <td>${v ? escapeHtml(v.placa) : '—'}</td>
         <td>${kmDaViagem(e) != null ? (e.distancia_km == null ? '≈ ' : '') + formatarKm(kmDaViagem(e)) : '—'}</td>
         <td>${reais(frete)}</td>
-        <td>${concluida ? reais(frete * COMISSAO_MOTORISTA) : '<span style="color:var(--text-light);">ao concluir</span>'}</td>
+        <td>${concluida ? reais(e.comissao) : '<span style="color:var(--text-light);">ao concluir</span>'}</td>
         <td>${badgeStatus(e.status)}</td>
       </tr>`;
   }).join('');
@@ -324,10 +326,13 @@ function ultimos12Meses() {
 
 function renderizarGrafico() {
   const meses = ultimos12Meses();
+  const comissaoPorMes = Object.fromEntries(meses.map(m => [m, 0]));
   const fretePorMes = Object.fromEntries(meses.map(m => [m, 0]));
   ficha.entregas.filter(e => e.status === 'entregue').forEach(e => {
     const chave = chaveMes(dataDaViagem(e));
-    if (chave in fretePorMes) fretePorMes[chave] += parseFloat(e.valor_frete) || 0;
+    if (!(chave in fretePorMes)) return;
+    fretePorMes[chave] += parseFloat(e.valor_frete) || 0;
+    comissaoPorMes[chave] += e.comissao;
   });
   const escuro = document.body.classList.contains('dark');
   const corTexto = escuro ? '#9CA3AF' : '#7C8598';
@@ -340,7 +345,7 @@ function renderizarGrafico() {
       labels: meses.map(m => NOMES_MES[parseInt(m.slice(5), 10) - 1].slice(0, 3).replace(/^./, c => c.toUpperCase())),
       datasets: [
         { type: 'bar', label: 'Frete', data: meses.map(m => fretePorMes[m]), backgroundColor: escuro ? '#4A6FA5' : '#2E3E60', borderRadius: 6, order: 2 },
-        { type: 'line', label: 'Comissão (13%)', data: meses.map(m => fretePorMes[m] * COMISSAO_MOTORISTA), borderColor: '#F2A93B', backgroundColor: '#F2A93B', tension: 0.3, pointRadius: 3, order: 1, yAxisID: 'y1' },
+        { type: 'line', label: 'Comissão (13%)', data: meses.map(m => comissaoPorMes[m]), borderColor: '#F2A93B', backgroundColor: '#F2A93B', tension: 0.3, pointRadius: 3, order: 1, yAxisID: 'y1' },
       ],
     },
     options: {
@@ -413,7 +418,7 @@ function exportarFichaPDF() {
   ]) + 4;
   doc.setFontSize(8);
   doc.setTextColor(...PDF_COR_TEXTO_CLARO);
-  doc.text(`Entregas no prazo: ${r.pontualidade === null ? '—' : r.pontualidade + '%'}  ·  Ocorrências: ${r.ocorrencias.length}  ·  Comissão = 13% do frete bruto, sem descontar abastecimento.`, 14, y);
+  doc.text(`Entregas no prazo: ${r.pontualidade === null ? '—' : r.pontualidade + '%'}  ·  Ocorrências: ${r.ocorrencias.length}  ·  Comissão = 13% do frete bruto, sem descontar abastecimento${r.taxaCooperativa ? ' (cooperativa: sobre o que sobra da taxa)' : ''}.`, 14, y);
   y += 10;
 
   pdfTituloSecao(doc, 14, y, 'Viagens do período', 11);
@@ -426,7 +431,7 @@ function exportarFichaPDF() {
       const v = ficha.veiculos.get(e.veiculo_id);
       const frete = parseFloat(e.valor_frete) || 0;
       return [`#${e.id}`, dataDaViagem(e).toLocaleDateString('pt-BR'), `${e.origem} » ${e.destino}`, v ? v.placa : '—',
-        reais(frete), e.status === 'entregue' ? reais(frete * COMISSAO_MOTORISTA) : '—', statusLabel[e.status] || e.status];
+        reais(frete), e.status === 'entregue' ? reais(e.comissao) : '—', statusLabel[e.status] || e.status];
     }) : [['', '', 'Nenhuma viagem no período', '', '', '', '']],
     foot: r.viagens.length ? [['', '', 'Total das concluídas', '', reais(r.frete), reais(r.comissao), '']] : undefined,
     footStyles: { fillColor: PDF_COR_FUNDO, textColor: PDF_COR_PRIMARIA, fontStyle: 'bold', fontSize: 8 },

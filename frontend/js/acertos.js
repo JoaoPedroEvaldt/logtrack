@@ -103,7 +103,7 @@ function renderizarRecibo(p) {
       <span class="acerto-recibo-periodo">${formatarData(p.periodo_inicio)} a ${formatarData(p.periodo_fim)}</span>
     </div>
     <div class="acerto-linha">
-      <div><strong>Comissão</strong><span>13% de ${reais(p.total_frete)} · ${p.viagens.length} viage${p.viagens.length === 1 ? 'm' : 'ns'}</span></div>
+      <div><strong>Comissão</strong><span>13% de ${reais(baseComissao(p))}${notaCooperativa(p)} · ${p.viagens.length} viage${p.viagens.length === 1 ? 'm' : 'ns'}</span></div>
       <b class="positivo">+ ${reais(p.comissao)}</b>
     </div>
     <div class="acerto-linha">
@@ -129,6 +129,16 @@ function renderizarRecibo(p) {
   `;
 }
 
+/* Base da comissão: o frete das viagens já sem a taxa da cooperativa. */
+function baseComissao(a) {
+  return a.viagens.reduce((s, v) => s + v.frete_liquido, 0);
+}
+
+function notaCooperativa(a) {
+  const taxa = a.viagens.reduce((s, v) => s + v.taxa_cooperativa, 0);
+  return taxa ? ` (frete ${reais(a.total_frete)} menos ${reais(taxa)} da cooperativa)` : '';
+}
+
 function renderizarViagens(p) {
   document.getElementById('acerto-viagens-sub').textContent = `${p.viagens.length} pendente${p.viagens.length === 1 ? '' : 's'} de acerto`;
   const tbody = document.getElementById('acerto-viagens');
@@ -141,7 +151,7 @@ function renderizarViagens(p) {
       <td>#${v.id}</td>
       <td>${formatarData(v.data)}</td>
       <td>${escapeHtml(v.origem)} → ${escapeHtml(v.destino)}</td>
-      <td>${reais(v.valor_frete)}</td>
+      <td>${reais(v.valor_frete)}${v.taxa_cooperativa ? `<br><small style="color:var(--text-light);">− ${reais(v.taxa_cooperativa)} cooperativa</small>` : ''}</td>
       <td><strong>${reais(v.comissao)}</strong></td>
     </tr>`).join('');
 }
@@ -302,7 +312,7 @@ async function abrirDetalheAcerto(id) {
       ${admin ? 'Corrija um vale ou uma diária lançados errado: o acerto é recalculado e o recibo sai atualizado.' : 'Só um administrador pode corrigir um acerto já fechado.'}
     </p>
     <div class="acerto-detalhe-resumo">
-      <div><span>Comissão (13% de ${reais(a.total_frete)})</span><strong>+ ${reais(a.comissao)}</strong></div>
+      <div><span>Comissão (13% de ${reais(baseComissao(a))}${notaCooperativa(a)})</span><strong>+ ${reais(a.comissao)}</strong></div>
       <div><span>Diárias (⅓ de ${reais(a.total_diarias)})</span><strong>+ ${reais(a.diarias_motorista)}</strong></div>
       <div><span>Adiantamentos</span><strong>− ${reais(a.total_adiantamentos)}</strong></div>
       <div class="acerto-saldo ${devedor ? 'devedor' : ''}"><span>${devedor ? 'Saldo devedor' : 'Saldo pago'}</span><strong>${reais(Math.abs(a.saldo))}</strong></div>
@@ -310,7 +320,7 @@ async function abrirDetalheAcerto(id) {
 
     <h3 class="acerto-detalhe-sec">Viagens (${a.viagens.length})</h3>
     <table><thead><tr><th>#</th><th>Concluída</th><th>Rota</th><th>Frete</th><th>Comissão</th></tr></thead>
-      <tbody>${a.viagens.length ? a.viagens.map(v => `<tr><td>#${v.id}</td><td>${formatarData(v.data)}</td><td>${escapeHtml(v.origem)} → ${escapeHtml(v.destino)}</td><td>${reais(v.valor_frete)}</td><td>${reais(v.comissao)}</td></tr>`).join('') : estadoVazio(5, 'Nenhuma viagem', null, 'caminhao')}</tbody>
+      <tbody>${a.viagens.length ? a.viagens.map(v => `<tr><td>#${v.id}</td><td>${formatarData(v.data)}</td><td>${escapeHtml(v.origem)} → ${escapeHtml(v.destino)}</td><td>${reais(v.valor_frete)}${v.taxa_cooperativa ? `<br><small style="color:var(--text-light);">− ${reais(v.taxa_cooperativa)} cooperativa</small>` : ''}</td><td>${reais(v.comissao)}</td></tr>`).join('') : estadoVazio(5, 'Nenhuma viagem', null, 'caminhao')}</tbody>
     </table>
     ${admin ? '<p class="acerto-nota">Frete errado? Corrija na tela de Entregas — este acerto acompanha.</p>' : ''}
 
@@ -615,7 +625,7 @@ async function gerarRecibo(id) {
     startY: y + 4,
     head: [['Item', 'Base de cálculo', 'Valor']],
     body: [
-      ['(+) Comissão', `13% de ${reais(a.total_frete)} em ${a.qtd_viagens} viage${a.qtd_viagens === 1 ? 'm' : 'ns'}`, reais(a.comissao)],
+      ['(+) Comissão', `13% de ${reais(baseComissao(a))}${notaCooperativa(a)} em ${a.qtd_viagens} viage${a.qtd_viagens === 1 ? 'm' : 'ns'}`, reais(a.comissao)],
       ['(+) Diárias', `1/3 de ${reais(a.total_diarias)} pagos pelos clientes`, reais(a.diarias_motorista)],
       ['(-) Adiantamentos', `${a.adiantamentos.length} vale${a.adiantamentos.length === 1 ? '' : 's'} (dias 5 e 15)`, reais(a.total_adiantamentos)],
     ],
@@ -634,7 +644,7 @@ async function gerarRecibo(id) {
     y = doc.lastAutoTable.finalY + 8;
   };
   secaoTabela('Viagens', ['#', 'Concluída', 'Rota', 'Frete', 'Comissão'],
-    a.viagens.map(v => [`#${v.id}`, formatarData(v.data), `${v.origem} » ${v.destino}`, reais(v.valor_frete), reais(v.comissao)]),
+    a.viagens.map(v => [`#${v.id}`, formatarData(v.data), `${v.origem} » ${v.destino}`, reais(v.valor_frete) + (v.taxa_cooperativa ? `\n- ${reais(v.taxa_cooperativa)} cooperativa` : ''), reais(v.comissao)]),
     { columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' } } });
   secaoTabela('Diárias', ['Data', 'Entrega', 'Pago pelo cliente', 'Motorista', 'Caminhão', 'Empresa'],
     a.diarias.map(d => [formatarData(d.data), `#${d.entrega_id} ${rota(d.rota)}`, reais(d.valor), reais(d.parte_motorista), reais(d.parte_caminhao), reais(d.parte_empresa)]));

@@ -273,7 +273,7 @@ function renderizarTabela(lista) {
   tbody.innerHTML = ordenada.map(e => `
     <tr>
       <td>#${e.id}</td>
-      <td>${escapeHtml(e.cliente)}</td>
+      <td>${escapeHtml(e.cliente)}${e.cooperativa_pct != null ? `<br><span class="badge badge-pendente" title="Carga feita pela cooperativa, que fica com ${parseFloat(e.cooperativa_pct).toLocaleString('pt-BR')}% do frete">Cooperativa</span>` : ''}</td>
       <td>${escapeHtml(e.origem)} → ${escapeHtml(e.destino)}</td>
       <td>${celulaAtribuicao(motoristaLabel(e.motorista_id), e.status === 'aguardando')}</td>
       <td>${celulaAtribuicao(veiculoLabel(e.veiculo_id), e.status === 'aguardando')}</td>
@@ -361,6 +361,7 @@ function abrirModal(id) {
   if (info) info.textContent = '';
 
   const entrega = entregaEditandoId ? entregas.find(e => e.id === entregaEditandoId) : null;
+  preencherCooperativa(entrega);
 
   document.getElementById('modal-titulo').textContent = entrega ? 'Editar Entrega' : 'Nova Entrega';
 
@@ -370,6 +371,7 @@ function abrirModal(id) {
     document.getElementById('destino').value = entrega.destino;
     document.getElementById('peso').value = entrega.peso_kg || '';
     document.getElementById('valor-frete').value = numeroParaMoeda(entrega.valor_frete);
+    atualizarCooperativa();
     document.getElementById('previsao').value = entrega.previsao ? entrega.previsao.slice(0, 16) : '';
     document.getElementById('descricao').value = entrega.descricao_carga || '';
     document.getElementById('motorista-id').value = entrega.motorista_id || '';
@@ -384,6 +386,113 @@ function abrirModal(id) {
   // Depois de abrir o modal: o mapa do planejamento precisa do container
   // visível pra calcular o próprio tamanho.
   prepararPlanejamento(entrega);
+}
+
+/* ===================== CARGA PELA COOPERATIVA =====================
+   A cooperativa fica com uma taxa do frete (7% hoje) e paga o resto num prazo
+   contado da emissão do CT-e, no dia do carregamento. A comissão do motorista
+   incide sobre o que sobra da taxa (Entrega.comissao no backend). */
+const COOPERATIVA_PADRAO = { pct: 7, prazo: 120 };
+
+function hojeIso() {
+  return paraInputDataHora(new Date()).slice(0, 10);
+}
+
+function preencherCooperativa(entrega) {
+  const tem = !!entrega && entrega.cooperativa_pct != null;
+  document.getElementById('carga-cooperativa').checked = tem;
+  document.getElementById('cooperativa-pct').value = tem ? parseFloat(entrega.cooperativa_pct) : COOPERATIVA_PADRAO.pct;
+  document.getElementById('prazo-recebimento').value = tem ? entrega.prazo_recebimento_dias : COOPERATIVA_PADRAO.prazo;
+  document.getElementById('cte-emitido-em').value = tem ? entrega.cte_emitido_em || '' : '';
+  atualizarCooperativa();
+}
+
+function alternarCooperativa() {
+  const cte = document.getElementById('cte-emitido-em');
+  if (document.getElementById('carga-cooperativa').checked && !cte.value) {
+    cte.value = document.getElementById('saida-prevista').value.slice(0, 10) || hojeIso();
+  }
+  atualizarCooperativa();
+}
+
+function atualizarCooperativa() {
+  const marcada = document.getElementById('carga-cooperativa').checked;
+  document.getElementById('bloco-cooperativa').hidden = !marcada;
+  if (!marcada) return;
+  const frete = moedaParaNumero(document.getElementById('valor-frete').value) || 0;
+  const pct = parseFloat(document.getElementById('cooperativa-pct').value) || 0;
+  const taxa = Math.round(frete * pct) / 100;
+  const sobra = frete - taxa;
+  const r = v => 'R$ ' + numeroParaMoeda(v);
+  const cte = document.getElementById('cte-emitido-em').value;
+  const prazo = parseInt(document.getElementById('prazo-recebimento').value, 10);
+  let vence = '';
+  if (cte && !isNaN(prazo)) {
+    const d = new Date(cte + 'T00:00:00');
+    d.setDate(d.getDate() + prazo);
+    vence = `<br>Previsão de recebimento: <strong>${d.toLocaleDateString('pt-BR')}</strong>`;
+  }
+  document.getElementById('cooperativa-conta').innerHTML =
+    `Frete ${r(frete)} − ${pct.toLocaleString('pt-BR')}% (${r(taxa)}) = <strong>${r(sobra)}</strong> a receber`
+    + `<br>Comissão do motorista: 13% de ${r(sobra)} = <strong>${r(Math.round(sobra * 13) / 100)}</strong>${vence}`;
+}
+
+function abrirModalCooperativa() {
+  renderizarCooperativa();
+  document.getElementById('modal-cooperativa').classList.add('aberto');
+}
+
+function fecharModalCooperativa() {
+  document.getElementById('modal-cooperativa').classList.remove('aberto');
+}
+
+/* Só conta como "a receber" a carga que já saiu; a que ainda está aguardando
+   aparece na lista, mas fora dos totais. Pendentes por vencimento, recebidas
+   no fim (últimas primeiro). */
+function renderizarCooperativa() {
+  const hoje = hojeIso();
+  const lista = entregas.filter(e => e.cooperativa_pct != null && e.status !== 'cancelado');
+  const pendentes = lista.filter(e => !e.recebido_em)
+    .sort((a, b) => (a.previsao_recebimento || '9999').localeCompare(b.previsao_recebimento || '9999'));
+  const recebidas = lista.filter(e => e.recebido_em).sort((a, b) => b.recebido_em.localeCompare(a.recebido_em));
+  const devidas = pendentes.filter(e => e.status !== 'aguardando');
+  const vencida = e => e.status !== 'aguardando' && e.previsao_recebimento && e.previsao_recebimento < hoje;
+  const total = l => 'R$ ' + numeroParaMoeda(l.reduce((s, e) => s + e.frete_liquido, 0));
+  const card = (cor, valor, rotulo) => `<div class="card ${cor}"><div class="card-valor">${valor}</div><div class="card-label">${rotulo}</div></div>`;
+  document.getElementById('cooperativa-cards').innerHTML =
+    card('azul', total(devidas), `A receber (${devidas.length})`)
+    + card('vermelho', total(devidas.filter(vencida)), `Vencido (${devidas.filter(vencida).length})`)
+    + card('verde', total(recebidas), `Recebido (${recebidas.length})`);
+
+  const situacao = e => {
+    if (e.recebido_em) {
+      return `<span class="badge badge-entregue">Recebido em ${formatarData(e.recebido_em)}</span>
+        <button class="btn btn-outline" style="font-size:11px;padding:4px 8px;" onclick="marcarRecebimento(${e.id}, true)">Desfazer</button>`;
+    }
+    if (e.status === 'aguardando') return '<span class="badge badge-aguardando">Ainda não carregou</span>';
+    return `<input type="date" id="recebido-${e.id}" value="${hoje}" max="${hoje}" aria-label="Data do recebimento" />
+      <button class="btn btn-primary" style="font-size:11px;padding:4px 8px;" onclick="marcarRecebimento(${e.id})">Receber</button>`;
+  };
+  document.getElementById('cooperativa-linhas').innerHTML = [...pendentes, ...recebidas].map(e => `
+    <tr>
+      <td>#${e.id}</td>
+      <td>${escapeHtml(e.origem)} → ${escapeHtml(e.destino)}</td>
+      <td>${formatarData(e.cte_emitido_em)}</td>
+      <td>R$ ${numeroParaMoeda(e.valor_frete || 0)}</td>
+      <td>R$ ${numeroParaMoeda(e.taxa_cooperativa)}</td>
+      <td><strong>R$ ${numeroParaMoeda(e.frete_liquido)}</strong></td>
+      <td>${formatarData(e.previsao_recebimento)}${!e.recebido_em && vencida(e) ? ' <span class="badge badge-ocorrencia">Vencido</span>' : ''}</td>
+      <td><div class="cooperativa-receber">${situacao(e)}</div></td>
+    </tr>`).join('') || estadoVazio(8, 'Nenhuma carga pela cooperativa', 'Marque "Carga pela cooperativa" ao cadastrar a entrega.', 'vazio');
+}
+
+async function marcarRecebimento(id, desfazer = false) {
+  const data = desfazer ? '' : document.getElementById(`recebido-${id}`).value;
+  if (!desfazer && !data) { toastAviso('Informe a data do recebimento.'); return; }
+  const res = await put(`/entregas/${id}/recebimento${data ? `?recebido_em=${data}` : ''}`, {});
+  if (res && res.detail) { toastErro('Erro: ' + extrairErro(res)); return; }
+  await carregarEntregas();
+  renderizarCooperativa();
 }
 
 /* ===================== CLIENTE JÁ CONHECIDO =====================
@@ -446,6 +555,7 @@ function usarRotaDoCliente(i) {
   document.getElementById('descricao').value = e.descricao_carga || '';
   document.getElementById('peso').value = e.peso_kg || '';
   document.getElementById('valor-frete').value = numeroParaMoeda(e.valor_frete);
+  atualizarCooperativa();
   viasAtuais = Array.isArray(e.rota_via) ? e.rota_via.map(v => ({ ...v })) : [];
   renderizarVias();
   recalcularPlano();
@@ -940,6 +1050,19 @@ async function salvarEntrega() {
     saida_prevista: document.getElementById('saida-prevista').value || null,
     rota_via: viasAtuais.length ? viasAtuais : null,
   };
+  if (document.getElementById('carga-cooperativa').checked) {
+    const pct = parseFloat(document.getElementById('cooperativa-pct').value);
+    const prazo = parseInt(document.getElementById('prazo-recebimento').value, 10);
+    if (!(pct > 0 && pct < 100) || !(prazo >= 0 && prazo <= 365) || !document.getElementById('cte-emitido-em').value) {
+      toastAviso('Carga pela cooperativa: informe a taxa, a data do CT-e e o prazo (até 365 dias).');
+      return;
+    }
+    dados.cooperativa_pct = pct;
+    dados.prazo_recebimento_dias = prazo;
+    dados.cte_emitido_em = document.getElementById('cte-emitido-em').value;
+  } else {
+    dados.cooperativa_pct = null;
+  }
   // Sem rota calculada (falha de rede, cidade não achada) não sobrescreve a
   // estimativa gravada de uma entrega em edição com vazio.
   if (planoAtual) {
@@ -1039,6 +1162,8 @@ async function confirmarStatus() {
 }
 
 async function iniciar() {
+  ['valor-frete', 'cooperativa-pct', 'cte-emitido-em', 'prazo-recebimento'].forEach(id =>
+    document.getElementById(id).addEventListener('input', atualizarCooperativa));
   definirPeriodoPadrao();
   ativarAutocompleteCidade(document.getElementById('cliente'), clientesConhecidos);
   document.getElementById('cliente').addEventListener('change', mostrarRotasDoCliente);

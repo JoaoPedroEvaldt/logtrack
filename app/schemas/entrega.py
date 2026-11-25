@@ -1,5 +1,5 @@
 from pydantic import ConfigDict, BaseModel, Field, field_validator
-from datetime import datetime
+from datetime import date, datetime
 from typing import List, Optional
 
 def _nao_negativo(v: Optional[float]) -> Optional[float]:
@@ -21,6 +21,9 @@ class EntregaCreate(BaseModel):
     descricao_carga: Optional[str] = None
     peso_kg: Optional[float] = None
     valor_frete: Optional[float] = None
+    cooperativa_pct: Optional[float] = Field(default=None, gt=0, lt=100)
+    cte_emitido_em: Optional[date] = None
+    prazo_recebimento_dias: Optional[int] = Field(default=None, ge=0, le=365)
     motorista_id: Optional[int] = None
     veiculo_id: Optional[int] = None
     previsao: datetime
@@ -45,6 +48,9 @@ class EntregaUpdate(BaseModel):
     descricao_carga: Optional[str] = None
     peso_kg: Optional[float] = None
     valor_frete: Optional[float] = None
+    cooperativa_pct: Optional[float] = Field(default=None, gt=0, lt=100)
+    cte_emitido_em: Optional[date] = None
+    prazo_recebimento_dias: Optional[int] = Field(default=None, ge=0, le=365)
     motorista_id: Optional[int] = None
     veiculo_id: Optional[int] = None
     status: Optional[str] = None
@@ -78,6 +84,14 @@ class EntregaResponse(BaseModel):
     distancia_km: Optional[float] = None
     tempo_estimado_h: Optional[float] = None
     parte_em: Optional[datetime] = None
+    cooperativa_pct: Optional[float] = None
+    cte_emitido_em: Optional[date] = None
+    prazo_recebimento_dias: Optional[int] = None
+    recebido_em: Optional[date] = None
+    taxa_cooperativa: float
+    frete_liquido: float
+    comissao: float
+    previsao_recebimento: Optional[date] = None
     criado_em: datetime
 
     model_config = ConfigDict(from_attributes=True)
